@@ -30,7 +30,7 @@ hparams = tf.contrib.training.HParams(
 	embedding_dim = 512,
 
 	#Training
-	batch_size = 16,
+	batch_size = 32,
 	reg_weight = 10e-6,
 	decay_learning_rate = True,
 	decay_steps = 50000,
