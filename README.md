@@ -7,7 +7,7 @@ Current state:
 - feature prediction model (tacotron): implemented
 - vocoder (wavenet): not yet
 
-since the two parts of the global model are trained separately, we can start by training the feature prediction model to use his predictions laters on on the wavenet training.
+since the two parts of the global model are trained separately, we can start by training the feature prediction model to use his predictions laters on the wavenet training.
 
 # How to start
 first, you need to have python 3 installed along with [Tensorflow](https://www.tensorflow.org/install/).
