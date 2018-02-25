@@ -32,7 +32,7 @@ hparams = tf.contrib.training.HParams(
 	max_iters=200, #Max decoder steps during inference (feel free to change it)
 
 	#Training
-	batch_size = 16,
+	batch_size = 32,
 	reg_weight = 10e-6,
 	decay_learning_rate = True,
 	decay_steps = 50000,
