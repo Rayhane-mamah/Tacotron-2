@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.seq2seq import Helper
-from .modules import projection
+from .modules import stop_token_projection
 
 
 # Adapted from tf.contrib.seq2seq.GreedyEmbeddingHelper
@@ -40,8 +40,8 @@ class TacoTestHelper(Helper):
 
 			#Predict if the encoder should stop (dynamic end token)
 			concat = tf.concat([LSTM_output, context], axis=-1)
-			scalar = projection(concat, 1, activation=tf.nn.sigmoid, scope='end_token_projection')
-			finished = np.round(f).astype(np.bool)
+			scalar = tf.squeeze(stop_token_projection(concat, activation=tf.nn.sigmoid), [1])
+			finished = tf.cast(tf.round(scalar), tf.bool)
 
 			# Feed last output frame as next input. outputs is [N, output_dim * r]
 			next_inputs = cell_outputs
@@ -88,10 +88,11 @@ class TacoTrainingHelper(Helper):
 
 			#Compute model prediction to stop token
 			concat = tf.concat([LSTM_output, context], axis=-1)
-			finished_p = tf.squeeze(projection(concat, 1, activation=tf.nn.sigmoid, scope='end_token_projection'), [1])
+			finished_p = tf.squeeze(stop_token_projection(concat), [1])
 
 			#Compute the stop token error for infer time
-			stop_error = tf.losses.absolute_difference(tf.cast(finished, tf.float32), finished_p)
+			stop_error = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(finished, tf.float32), 
+																				logits=finished_p))
 			next_inputs = self._targets[:, time, :] #teacher-forcing: return true frame
 			next_state = state
 			return (finished, next_inputs, next_state, stop_error)

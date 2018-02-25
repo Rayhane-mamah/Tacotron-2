@@ -28,13 +28,15 @@ hparams = tf.contrib.training.HParams(
 	time_major = False,
 	hidden_dim = 128,
 	embedding_dim = 512,
+	num_decoder_layers=2,
+	max_iters=200, #Max decoder steps during inference (feel free to change it)
 
 	#Training
-	batch_size = 32,
+	batch_size = 16,
 	reg_weight = 10e-6,
 	decay_learning_rate = True,
 	decay_steps = 50000,
-	decay_rate = 0.96,
+	decay_rate = 0.97,
 	initial_learning_rate = 10e-3,
 	final_learning_rate = 10e-5,
 	adam_beta1 = 0.9,

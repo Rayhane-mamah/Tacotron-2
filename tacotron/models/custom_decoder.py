@@ -125,8 +125,11 @@ class CustomDecoder(decoder.Decoder):
           LSTM_output=LSTM_output,
           sample_ids=sample_ids)
 
-      #Cumulating stop token prediction error
-      error += stop_error
+      #we don't care about this error at synthesis time
+      if stop_error is not None:
+        #Cumulating stop token prediction error
+        error += stop_error
+
 
     outputs = CustomDecoderOutput(cell_outputs, sample_ids)
     return (outputs, next_state, next_inputs, finished, error)

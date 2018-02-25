@@ -14,11 +14,11 @@ class Tacotron():
 	def __init__(self, hparams):
 		self._hparams = hparams
 
-	def initialize(self, inputs, input_lengths, mel_targets=None, linear_targets=None):
+	def initialize(self, inputs, input_lengths, mel_targets=None):
 		"""
 		Initializes the model for inference
 
-		sets "mel_outputs", "linear_outputs" and "alignments" fields.
+		sets "mel_outputs" and "alignments" fields.
 
 		Args:
 			- inputs: int32 Tensor with shape [N, T_in] where N is batch size, T_in is number of
@@ -27,9 +27,6 @@ class Tacotron():
 			of each sequence in inputs.
 			- mel_targets: float32 Tensor with shape [N, T_out, M] where N is batch size, T_out is number
 			of steps in the output time series, M is num_mels, and values are entries in the mel
-			spectrogram. Only needed for training.
-			- linear_targets: float32 Tensor with shape [N, T_out, F] where N is batch_size, T_out is number
-			of steps in the output time series, F is num_freq, and values are entries in the linear
 			spectrogram. Only needed for training.
 		"""
 		with tf.variable_scope('inference') as scope:
@@ -40,17 +37,20 @@ class Tacotron():
 			# Embeddings
 			embedding_table = tf.get_variable(
 				'inputs_embedding', [len(symbols), hp.embedding_dim], dtype=tf.float32,
-				initializer=tf.truncated_normal_initializer(stddev=0.5))
-			embedded_inputs = tf.nn.embedding_lookup(embedding_table, inputs)      
+				initializer=tf.contrib.layers.xavier_initializer())
+			embedded_inputs = tf.nn.embedding_lookup(embedding_table, inputs)
 
 			#Encoder
-			enc_conv_outputs = enc_conv_layers(embedded_inputs, is_training)        
-			encoder_outputs, encoder_states = bidirectional_LSTM(enc_conv_outputs, 
+			enc_conv_outputs = enc_conv_layers(embedded_inputs, is_training)    
+			#Paper doesn't specify what to do with final encoder state
+			#We send them however to the attention mechanism as source state
+			#(direct link between source and targets cells)
+			encoder_outputs, encoder_states = bidirectional_LSTM(enc_conv_outputs, input_lengths,
 				'encoder_LSTM', is_training=is_training)                                        
 
 			#DecoderWrapper
 			decoder_cell = TacotronDecoderWrapper(
-				unidirectional_LSTM(is_training, layers=2, size=512),
+				unidirectional_LSTM(is_training, layers=hp.num_decoder_layers, size=512),
 				is_training)
 
 			#AttentionWrapper on top of TacotronDecoderWrapper
@@ -58,9 +58,12 @@ class Tacotron():
 				decoder_cell,
 				LocationBasedAttention(hp.attention_dim, encoder_outputs),
 				alignment_history=True,
-				output_attention=False)
+				output_attention=False,
+				name='attention_decoder_wrapper')
 
-			decoder_init_state = attention_decoder.zero_state(batch_size=batch_size, dtype=tf.float32)
+			#We pass (num_decoder_layers times) encoder final states to the decoder of #layers (num_decoder_layers)
+			decoder_init_state = attention_decoder.zero_state(batch_size=batch_size, dtype=tf.float32).clone(
+				cell_state=tuple(encoder_states for _ in range(hp.num_decoder_layers)))
 
 			#Define the helper for our decoder
 			if is_training:
@@ -68,10 +71,13 @@ class Tacotron():
 			else:
 				helper = TacoTestHelper(batch_size, hp.num_mels, hp.outputs_per_step)
 
+			#We"ll only limit decoder time steps during inference (consult hparams.py to modify the value)
+			max_iterations = None if is_training else hp.max_iters
+
 			#Decode
 			(decoder_output, _), final_decoder_state, self.stop_error = dynamic_decode(
 				CustomDecoder(attention_decoder, helper, decoder_init_state),
-				impute_finished=True)
+				impute_finished=True, maximum_iterations=max_iterations)
 
 			#Compute residual using post-net
 			residual = postnet(decoder_output, is_training)
@@ -94,13 +100,13 @@ class Tacotron():
 			self.mel_outputs = mel_outputs
 			self.mel_targets = mel_targets
 			log('Initialized Tacotron model. Dimensions: ')
-			log('  embedding:               {}'.format(embedded_inputs.shape[-1]))
-			log('  enc conv out:            {}'.format(enc_conv_outputs.shape[-1]))
-			log('  encoder out:             {}'.format(encoder_outputs.shape[-1]))
-			log('  decoder out:             {}'.format(decoder_output.shape[-1]))
-			log('  residual out:            {}'.format(residual.shape[-1]))
-			log('  projected residual out:  {}'.format(projected_residual.shape[-1]))
-			log('  mel out:                 {}'.format(mel_outputs.shape[-1]))
+			log('  embedding:                {}'.format(embedded_inputs.shape))
+			log('  enc conv out:             {}'.format(enc_conv_outputs.shape))
+			log('  encoder out:              {}'.format(encoder_outputs.shape))
+			log('  decoder out:              {}'.format(decoder_output.shape))
+			log('  residual out:             {}'.format(residual.shape))
+			log('  projected residual out:   {}'.format(projected_residual.shape))
+			log('  mel out:                  {}'.format(mel_outputs.shape))
 
 
 	def add_loss(self):

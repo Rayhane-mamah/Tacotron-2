@@ -67,10 +67,10 @@ def _build_mel_basis():
 	return librosa.filters.mel(hparams.sample_rate, n_fft, n_mels=hparams.num_mels)
 
 def _amp_to_db(x):
-	return 20 * np.log10(np.maximum(1e-5, x))
+	return 20 * np.log10(np.maximum(1e-5, x)) + 0.01
 
 def _dp_to_amp(x):
-	return np.power(10.0, x * 0.05)
+	return np.power(10.0, (x - 0.01) * 0.05)
 
 def _normalize(S):
 	return np.clip((S - hparams.min_level_db) / (-hparams.min_level_db), 0, 1)

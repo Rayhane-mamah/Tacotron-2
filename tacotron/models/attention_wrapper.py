@@ -225,26 +225,27 @@ def _location_based_score(W_query, attention_weights):
   577–585.
 
   ############################################################
-                    location-based attention
-                        f = F * α_{i-1}
-        energy = dot(v_a, tanh(W_query(h_dec) + W_fil(f)))
+					location-based attention
+						f = F * α_{i-1}
+		energy = dot(v_a, tanh(W_query(h_dec) + W_fil(f)))
   ############################################################
 
   Args:
-  	W_query: Tensor, shape '[batch_size, num_units]' to compare to location features.
-  	attention_weights (alignments): previous attention weights, shape '[batch_size, max_time]'
+	W_query: Tensor, shape '[batch_size, num_units]' to compare to location features.
+	attention_weights (alignments): previous attention weights, shape '[batch_size, max_time]'
   Returns:
-  	A '[batch_size, max_time]'
+	A '[batch_size, max_time]'
 	"""
 	dtype = W_query.dtype
 	# Get the number of hidden units from the trailing dimension of query
 	num_units = W_query.shape[-1].value or array_ops.shape(W_query)[-1]
+
 	# [batch_size, max_time] -> [batch_size, max_time, 1]
 	attention_weights = tf.expand_dims(attention_weights, axis=2)
 	# location features [batch_size, max_time, filters]
 	f = tf.layers.conv1d(attention_weights, filters=32,
-											 kernel_size=31, padding='same',
-											 name='location_features')
+											kernel_size=31, padding='same',
+											name='location_features')
 
 	# Projected location features [batch_size, max_time, attention_dim]
 	W_fil = tf.contrib.layers.fully_connected(
@@ -329,7 +330,7 @@ class LocationBasedAttention(_BaseAttentionMechanism):
 			processed_query = self.query_layer(query) if self.query_layer else query
 			# energy shape [batch_size, max_time]
 			energy = _location_based_score(processed_query, previous_alignments)
-		# alignments shape = enery shape = [batch_size, max_time]
+		# alignments shape = energy shape = [batch_size, max_time]
 		alignments = self._probability_fn(energy, previous_alignments)
 		return alignments
 
@@ -557,8 +558,8 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
 
 	def _batch_size_checks(self, batch_size, error_message):
 		return [check_ops.assert_equal(batch_size,
-																	 attention_mechanism.batch_size,
-																	 message=error_message)
+									 attention_mechanism.batch_size,
+									 message=error_message)
 						for attention_mechanism in self._attention_mechanisms]
 
 	def _item_or_tuple(self, seq):
@@ -678,7 +679,8 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
 
 		# Step 1: Calculate the true inputs to the cell based on the
 		# previous attention value.
-		cell_inputs = self._cell_input_fn(inputs, state.attention)
+		#cell_inputs = self._cell_input_fn(inputs, state.attention)
+		cell_inputs = inputs
 		#cell_state = state.cell_state
 		(cell_output, LSTM_output), next_cell_state = self._cell(cell_inputs, state)
 

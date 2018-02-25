@@ -12,11 +12,12 @@ def conv1d(inputs, kernel_size, channels, activation, is_training, scope):
 			inputs,
 			filters=channels,
 			kernel_size=kernel_size,
+			activation=activation,
 			padding='same')
 		batched = tf.layers.batch_normalization(conv1d_output, training=is_training)
-		activated = activation(batched)
-		return tf.layers.dropout(activated, rate=drop_rate, training=is_training,
-								 name='dropout_{}'.format(scope))
+		# return tf.layers.dropout(activated, rate=drop_rate, training=is_training,
+		# 						 name='dropout_{}'.format(scope))
+		return batched
 
 
 def enc_conv_layers(inputs, is_training, kernel_size=(5, ), channels=512, activation=tf.nn.relu, scope=None):
@@ -39,10 +40,10 @@ def postnet(inputs, is_training, kernel_size=(5, ), channels=512, activation=tf.
 		for i in range(4):
 			x = conv1d(x, kernel_size, channels, activation,
 								is_training, 'conv_layer_{}_'.format(i + 1)+scope)
-		x = conv1d(x, kernel_size, channels, lambda x:x, is_training, 'conv_layer_{}_'.format(5)+scope)
+		x = conv1d(x, kernel_size, channels, lambda _: _, is_training, 'conv_layer_{}_'.format(5)+scope)
 	return x
 
-def bidirectional_LSTM(inputs, scope, is_training):
+def bidirectional_LSTM(inputs, input_lengths, scope, is_training):
 	with tf.variable_scope(scope):
 		outputs, (fw_state, bw_state) = tf.nn.bidirectional_dynamic_rnn(
 												  ZoneoutLSTMCell(256, 
@@ -54,6 +55,7 @@ def bidirectional_LSTM(inputs, scope, is_training):
 												  				  zoneout_factor_cell=0.1,
                  												  zoneout_factor_output=0.1,),
 												  inputs,
+												  sequence_length=input_lengths,
 												  dtype=tf.float32)
 
 		#Concatenate c states and h states from forward
@@ -63,12 +65,12 @@ def bidirectional_LSTM(inputs, scope, is_training):
 		encoder_final_state_h = tf.concat(
 			(fw_state.h, bw_state.h), 1)
 
-		#Get the final state to pass as initial state to decoder
+		#Get the final state to pass it to attention mechanism as initial state
 		final_state = LSTMStateTuple(
 			c=encoder_final_state_c,
 			h=encoder_final_state_h)
 
-	return tf.concat(outputs, axis=2), final_state # Concat forward + backward outputs and final states
+		return tf.concat(outputs, axis=2), final_state # Concat forward + backward outputs and return with final states
 
 def prenet(inputs, is_training, layer_sizes=[128, 128], scope=None):
 	x = inputs
@@ -106,3 +108,14 @@ def projection(x, shape=512, activation=None, scope=None):
 												   scope=scope)
 		return output
 
+def stop_token_projection(x, shape=1, activation=lambda _: _, weights_name='stop_token_weights', bias_name='step_token_bias'):
+	"""Just making sure we use the same weights for training and
+	inference time for stop token prediction
+	"""
+
+	st_W = tf.get_variable(weights_name, shape=[x.shape[-1], 1], dtype=tf.float32, initializer=tf.truncated_normal_initializer())
+	st_b = tf.get_variable(bias_name, shape=[1], dtype=tf.float32, initializer=tf.zeros_initializer())
+
+	output = activation(tf.add(tf.matmul(x, st_W), st_b))
+
+	return output

@@ -13,19 +13,18 @@ _pad = 0
 
 class Feeder(threading.Thread):
 	"""
-		Feeds batches of data into queue on a bachground thread.
+		Feeds batches of data into queue on a background thread.
 	"""
 
 	def __init__(self, coordinator, metadata_filename, hparams):
 		super(Feeder, self).__init__()
 		self._coord = coordinator
 		self._hparams = hparams
-		self._clearner_names = [x.strip() for x in hparams.cleaners.split(',')]
+		self._cleaner_names = [x.strip() for x in hparams.cleaners.split(',')]
 		self._offset = 0
 
 		# Load metadata
 		self._datadir = os.path.dirname(metadata_filename)
-		print(metadata_filename)
 		with open(metadata_filename, encoding='utf-8') as f:
 			self._metadata = [line.strip().split('|') for line in f]
 			hours = sum([int(x[1]) for x in self._metadata]) * hparams.frame_shift_ms / (3600 * 1000)
@@ -81,7 +80,7 @@ class Feeder(threading.Thread):
 
 	def _get_next_example(self):
 		"""
-		Gets a single example (input, mel_target, linear_target, cost) from disk
+		Gets a single example (input, mel_target, cost) from disk
 		"""
 		if self._offset >= len(self._metadata):
 			self._offset = 0
@@ -91,7 +90,7 @@ class Feeder(threading.Thread):
 
 		text = meta[2]
 
-		input_data = np.asarray(text_to_sequence(text, self._clearner_names), dtype=np.int32)
+		input_data = np.asarray(text_to_sequence(text, self._cleaner_names), dtype=np.int32)
 		mel_target = np.load(os.path.join(self._datadir, meta[0]))
 		return (input_data, mel_target, len(mel_target))
 

@@ -1,5 +1,4 @@
 import numpy as np 
-import pandas as pd
 from datetime import datetime
 import os
 import subprocess
@@ -31,8 +30,8 @@ def time_string():
 	return datetime.now().strftime('%Y-%m-%d %H:%M')
 
 def train(log_dir, args):
-	checkpoint_path = os.path.join(log_dir, 'model.ckpt')
 	save_dir = os.path.join(log_dir, 'pretrained/')
+	checkpoint_path = os.path.join(save_dir, 'model.ckpt')
 	input_path = os.path.join(args.base_dir, args.input)
 	log('Checkpoint path: {}'.format(checkpoint_path))
 	log('Loading training data from: {}'.format(input_path))
@@ -48,7 +47,7 @@ def train(log_dir, args):
 	step_count = 0
 	try:
 		#simple text file to keep count of global step
-		with open('step_counter.txt', 'r') as file:
+		with open(os.path.join(log_dir, 'step_counter.txt'), 'r') as file:
 			step_count = int(file.read())
 	except:
 		print('no step_counter file found, assuming there is no saved checkpoint')
@@ -65,7 +64,7 @@ def train(log_dir, args):
 	step = 0
 	time_window = ValueWindow(100)
 	loss_window = ValueWindow(100)
-	saver = tf.train.Saver(max_to_keep=5, keep_checkpoint_every_n_hours=2)
+	saver = tf.train.Saver(max_to_keep=5)
 
 	#Memory allocation on the GPU as needed
 	config = tf.ConfigProto()
@@ -81,7 +80,7 @@ def train(log_dir, args):
 			if args.restore:
 				#Restore saved model if the user requested it, Default = True.
 				try:
-					checkpoint_state = tf.train.get_checkpoint_state(log_dir)
+					checkpoint_state = tf.train.get_checkpoint_state(save_dir)
 				except tf.errors.OutOfRangeError as e:
 					log('Cannot restore checkpoint: {}'.format(e))
 
@@ -117,7 +116,7 @@ def train(log_dir, args):
 					summary_writer.add_summary(sess.run(stats), step)
 				
 				if step % args.checkpoint_interval == 0:
-					with open('step_counter.txt', 'w') as file:
+					with open(os.path.join(log_dir,'step_counter.txt'), 'w') as file:
 						file.write(str(step))
 					log('Saving checkpoint to: {}-{}'.format(checkpoint_path, step))
 					saver.save(sess, checkpoint_path, global_step=step)
@@ -130,7 +129,7 @@ def train(log_dir, args):
 																 ])
 					#save predicted spectrogram to disk (for plot and manual evaluation purposes)
 					mel_filename = 'ljspeech-mel-prediction-step-{}.npy'.format(step)
-					np.save(os.path.join(log_dir, mel_filename), prediction.T, allow_pickle=False)
+					np.save(os.path.join(log_dir, mel_filename), prediction, allow_pickle=False)
 
 					#save alignment plot to disk (evaluation purposes)
 					plot.plot_alignment(alignment, os.path.join(log_dir, 'step-{}-align.png'.format(step)),
@@ -149,7 +148,7 @@ def main():
 	parser.add_argument('--model', default='Tacotron')
 	parser.add_argument('--name', help='Name of the run, Used for logging, Defaults to model name')
 	parser.add_argument('--restore', type=bool, default=True, help='Set this to False to do a fresh training')
-	parser.add_argument('--summary_interval', type=int, default=100,
+	parser.add_argument('--summary_interval', type=int, default=10,
 		help='Steps between running summary ops')
 	parser.add_argument('--checkpoint_interval', type=int, default=100,
 		help='Steps between writing checkpoints')
