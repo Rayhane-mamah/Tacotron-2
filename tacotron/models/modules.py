@@ -15,9 +15,9 @@ def conv1d(inputs, kernel_size, channels, activation, is_training, scope):
 			activation=activation,
 			padding='same')
 		batched = tf.layers.batch_normalization(conv1d_output, training=is_training)
-		# return tf.layers.dropout(activated, rate=drop_rate, training=is_training,
-		# 						 name='dropout_{}'.format(scope))
-		return batched
+		return tf.layers.dropout(batched, rate=drop_rate, training=is_training,
+		 						name='dropout_{}'.format(scope))
+
 
 
 def enc_conv_layers(inputs, is_training, kernel_size=(5, ), channels=512, activation=tf.nn.relu, scope=None):
@@ -82,7 +82,11 @@ def prenet(inputs, is_training, layer_sizes=[128, 128], scope=None):
 	with tf.variable_scope(scope):
 		for i, size in enumerate(layer_sizes):
 			dense = tf.layers.dense(x, units=size, activation=tf.nn.relu, name='dense_{}'.format(i + 1))
-			x = tf.layers.dropout(dense, rate=drop_rate, training=is_training,
+			#The paper discussed introducing diversity in generation at inference time
+			#by using a dropout of 0.5 only in prenet layers.
+			#In this implementation we're supposing they meant to keep the dropout even at inference time
+			#So we set training=True at all times (even during synthesis)
+			x = tf.layers.dropout(dense, rate=drop_rate, training=True, 
 								  name='dropout_{}_'.format(i + 1) + scope)
 	return x
 

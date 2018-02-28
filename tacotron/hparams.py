@@ -29,7 +29,7 @@ hparams = tf.contrib.training.HParams(
 	hidden_dim = 128,
 	embedding_dim = 512,
 	num_decoder_layers=2,
-	max_iters=200, #Max decoder steps during inference (feel free to change it)
+	max_iters=808, #Max decoder steps during inference (feel free to change it)
 
 	#Training
 	batch_size = 32,
@@ -43,9 +43,23 @@ hparams = tf.contrib.training.HParams(
 	adam_beta2 = 0.999,
 	adam_epsilon = 10e-6,
 
+	#Eval sentences
+	sentences = [
+	# From July 8, 2017 New York Times:
+	'Scientists at the CERN laboratory say they have discovered a new particle.',
+	'There’s a way to measure the acute emotional intelligence that has never gone out of style.',
+	'President Trump met with other leaders at the Group of 20 conference.',
+	'The Senate\'s bill to repeal and replace the Affordable Care Act is now imperiled.',
+	# From Google's Tacotron example page:
+	'Generative adversarial network or variational auto-encoder.',
+	'The buses aren\'t the problem, they actually provide a solution.',
+	'Does the quick brown fox jump over the lazy dog?',
+	'Talib Kweli confirmed to AllHipHop that he will be releasing an album in the next year.',
+	]
+
 	)
 
 def hparams_debug_string():
   values = hparams.values()
-  hp = ['  %s: %s' % (name, values[name]) for name in sorted(values)]
+  hp = ['  %s: %s' % (name, values[name]) for name in sorted(values) if name != 'sentences']
   return 'Hyperparameters:\n' + '\n'.join(hp)

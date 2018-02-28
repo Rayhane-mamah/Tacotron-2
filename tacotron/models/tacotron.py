@@ -14,7 +14,7 @@ class Tacotron():
 	def __init__(self, hparams):
 		self._hparams = hparams
 
-	def initialize(self, inputs, input_lengths, mel_targets=None):
+	def initialize(self, inputs, input_lengths, mel_targets=None, gta=False):
 		"""
 		Initializes the model for inference
 
@@ -30,7 +30,9 @@ class Tacotron():
 			spectrogram. Only needed for training.
 		"""
 		with tf.variable_scope('inference') as scope:
-			is_training = mel_targets is not None
+			is_training = mel_targets is not None and not gta
+			print('training: ', is_training)
+			print('gta: ', gta)
 			batch_size = tf.shape(inputs)[0]
 			hp = self._hparams
 
@@ -66,7 +68,7 @@ class Tacotron():
 				cell_state=tuple(encoder_states for _ in range(hp.num_decoder_layers)))
 
 			#Define the helper for our decoder
-			if is_training:
+			if is_training or gta:
 				helper = TacoTrainingHelper(inputs, mel_targets, hp.num_mels, hp.outputs_per_step)
 			else:
 				helper = TacoTestHelper(batch_size, hp.num_mels, hp.outputs_per_step)
