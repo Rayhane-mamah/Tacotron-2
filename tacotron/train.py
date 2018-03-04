@@ -22,7 +22,7 @@ def add_stats(model):
 		tf.summary.scalar('before_loss', model.before_loss)
 		tf.summary.scalar('after_loss', model.after_loss)
 		tf.summary.scalar('regularization_loss', model.regularization_loss)
-		tf.summary.scalar('stop_token_loss', model.stop_error)
+		tf.summary.scalar('stop_token_loss', model.stop_token_loss)
 		tf.summary.scalar('loss', model.loss)
 		return tf.summary.merge_all()
 

@@ -1,4 +1,6 @@
 """Seq2seq layer operations for use in neural networks.
+Customized to support dynamic decoding of Tacotron 2.
+Only use this dynamic decoder with Tacotron 2. For other applications use the original one from tensorflow.
 """
 
 from __future__ import absolute_import
@@ -18,6 +20,7 @@ from tensorflow.python.ops import variable_scope
 from tensorflow.python.util import nest
 
 import tensorflow as tf
+from .helpers import TacoTrainingHelper, TacoTestHelper
 
 
 def _transpose_batch_time(x):
@@ -142,7 +145,7 @@ def dynamic_decode(decoder,
 					  finished, unused_error):
 			return math_ops.logical_not(math_ops.reduce_all(finished))
 
-		def body(time, outputs_ta, state, inputs, finished, error):
+		def body(time, outputs_ta, state, inputs, finished, loss):
 			"""Internal while_loop body.
 			Args:
 				time: scalar int32 tensor.
@@ -154,7 +157,7 @@ def dynamic_decode(decoder,
 				`(time + 1, outputs_ta, next_state, next_inputs, next_finished)`.
 			"""
 			(next_outputs, decoder_state, next_inputs,
-			 decoder_finished, stop_error) = decoder.step(time, inputs, state, error)
+			 decoder_finished) = decoder.step(time, inputs, state)
 
 			next_finished = math_ops.logical_or(decoder_finished, finished)
 			if maximum_iterations is not None:
@@ -194,7 +197,15 @@ def dynamic_decode(decoder,
 			outputs_ta = nest.map_structure(lambda ta, out: ta.write(time, out),
 											outputs_ta, emit)
 
-			return (time + 1, outputs_ta, next_state, next_inputs, next_finished, stop_error)
+			#Cumulate <stop_token> loss along decoding steps
+			if isinstance(decoder._helper, TacoTrainingHelper):
+				stop_token_loss = loss + decoder._helper.stop_token_loss
+			elif isinstance(decoder._helper, TacoTestHelper):
+				stop_token_loss = loss
+			else:
+				raise TypeError('Helper used does not belong to any supported Tacotron helpers (TacoTestHelper, TacoTrainingHelper)')
+
+			return (time + 1, outputs_ta, next_state, next_inputs, next_finished, stop_token_loss)
 
 		res = control_flow_ops.while_loop(
 			condition,
@@ -210,10 +221,10 @@ def dynamic_decode(decoder,
 		final_state = res[2]
 
 		steps = tf.cast(res[0], tf.float32)
-		stop_error = res[5]
+		stop_token_loss = res[5]
 
-		#Average stop_error
-		avg_stop_error = stop_error / steps
+		#Average <stop_token> error over decoding steps
+		avg_stop_loss = stop_token_loss / steps
 
 		final_outputs = nest.map_structure(
 			lambda ta: ta.stack(), final_outputs_ta)
@@ -221,4 +232,4 @@ def dynamic_decode(decoder,
 			final_outputs = nest.map_structure(
 				_transpose_batch_time, final_outputs)
 
-	return final_outputs, final_state, avg_stop_error
+	return final_outputs, final_state, avg_stop_loss

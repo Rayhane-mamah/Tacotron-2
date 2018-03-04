@@ -1,22 +1,21 @@
+"""A set of RNN wrappers usefull for tacotron 2 architecture
+All notations and variable names were used in concordance with originial tensorflow implementation
+Some tensors were passed through wrappers to make sure we respect the described architecture
+"""
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.rnn import RNNCell
 from .modules import prenet, projection
+from tensorflow.python.framework import ops
 from hparams import hparams
 
 
-class TacotronDecoderWrapper(RNNCell):
-  """Computes custom Tacotron decoder and return decoder output and state at each step
-  
-  decoder architecture:
-    Prenet: 2 dense layers, 128 units each
-      * concat(Prenet output + context vector) 
-    RNNStack (LSTM): 2 uni-directional LSTM layers with 512 units each
-      * concat(LSTM output + context vector)
-    Linear projection layer: output_dim = decoder_output
-  """
+
+class DecoderPrenetWrapper(RNNCell):
+  '''Runs RNN inputs through a prenet before sending them to the cell.'''
   def __init__(self, cell, is_training):
-    super(TacotronDecoderWrapper, self).__init__()
+    super(DecoderPrenetWrapper, self).__init__()
     self._cell = cell
     self._is_training = is_training
 
@@ -26,31 +25,107 @@ class TacotronDecoderWrapper(RNNCell):
 
   @property
   def output_size(self):
-    #return (self.batch_size, hparams.num_mels)
     return self._cell.output_size
 
   def call(self, inputs, state):
-    #Get context vector from cell state
-    context_vector = state.attention
-    cell_state = state.cell_state
-
-    #Compute prenet output
-    prenet_outputs = prenet(inputs, self._is_training, scope='decoder_prenet_layer')
-
-    #Concat prenet output and context vector
-    concat_output_prenet = tf.concat([prenet_outputs, context_vector], axis=-1)
-
-    #Compute LSTM output
-    LSTM_output, next_cell_state = self._cell(concat_output_prenet, cell_state)
-
-    #Concat LSTM output and context vector
-    concat_output_LSTM = tf.concat([LSTM_output, context_vector], axis=-1)
-
-    #Linear projection
-    proj_shape = hparams.num_mels
-    cell_output = (projection(concat_output_LSTM, proj_shape, scope='decoder_projection_layer'), LSTM_output)
-
-    return cell_output, next_cell_state
+    prenet_out = prenet(inputs, self._is_training, hparams.prenet_layers, scope='decoder_attention_prenet')
+    self._prenet_out = prenet_out
+    return self._cell(prenet_out, state)
 
   def zero_state(self, batch_size, dtype):
     return self._cell.zero_state(batch_size, dtype)
+
+
+class ConcatPrenetAndAttentionWrapper(RNNCell):
+  '''Concatenates prenet output with the attention context vector.
+  This is expected to wrap a cell wrapped with an AttentionWrapper constructed with
+  attention_layer_size=None and output_attention=False. Such a cell's state will include an
+  "attention" field that is the context vector.
+  '''
+  def __init__(self, cell):
+    super(ConcatPrenetAndAttentionWrapper, self).__init__()
+    self._cell = cell
+
+  @property
+  def state_size(self):
+    return self._cell.state_size
+
+  @property
+  def output_size(self):
+    #attention is stored in attentionwrapper cell state
+    return self._cell.output_size + self._cell.state_size.attention
+
+  def call(self, inputs, state):
+    #We assume paper writers mentionned the attention network output when
+    #they say "The pre-net output and attention context vector are concatenated and
+    #passed through a stack of 2 uni-directional LSTM layers"
+    #We rely on the original tacotron architecture for this hypothesis.
+    output, res_state = self._cell(inputs, state)
+
+    #Store attention in this wrapper to make access easier from future wrappers
+    self._context_vector = res_state.attention
+    return tf.concat([output, self._context_vector], axis=-1), res_state
+
+  def zero_state(self, batch_size, dtype):
+    return self._cell.zero_state(batch_size, dtype)
+
+
+class ConcatLSTMOutputAndAttentionWrapper(RNNCell):
+  '''Concatenates decoder RNN cell output with the attention context vector.
+  This is expected to wrap a cell wrapped with an AttentionWrapper constructed with
+  attention_layer_size=None and output_attention=False. Such a cell's state will include an
+  "attention" field that is the context vector.
+  '''
+  def __init__(self, cell):
+    super(ConcatLSTMOutputAndAttentionWrapper, self).__init__()
+    self._cell = cell
+    self._prenet_attention_cell = self._cell._cells[0]
+
+  @property
+  def state_size(self):
+    return self._cell.state_size
+
+  @property
+  def output_size(self):
+    return self._cell.output_size + self._prenet_attention_cell.state_size.attention
+
+  def call(self, inputs, state):
+    output, res_state = self._cell(inputs, state)
+    context_vector = self._prenet_attention_cell._context_vector
+    self.lstm_concat_context = tf.concat([output, context_vector], axis=-1)
+    return self.lstm_concat_context, res_state
+
+  def zero_state(self, batch_size, dtype):
+    return self._cell.zero_state(batch_size, dtype)
+
+
+# class LinearProjectionWrapper(RNNCell):
+#   """Operator adding an output projection to the given cell.
+#   This wrapper will perform a linear transformation with specified activation function.(Default to None)
+#   """
+#   def __init__(self, cell, projection_dim, activation=None):
+#     super(LinearProjectionWrapper, self).__init__()
+#     self._cell = cell
+#     self._projection_dim = projection_dim
+#     self._activation = activation
+
+#   @property
+#   def state_size(self):
+#     return self._cell.state_size
+
+#   @property
+#   def output_size(self):
+#     return self._projection_dim
+
+#   def zero_state(self, batch_size, dtype):
+#     with ops.name_scope(type(self).__name__ + "ZeroState", values=[batch_size]):
+#       return self._cell.zero_state(batch_size, dtype)
+
+#   def call(self, inputs, state):
+#     """Run the cell and output projection on inputs, starting from state."""
+#     output, res_state = self._cell(inputs, state)
+#     projected = projection(output, self._projection_dim)
+#     if self._activation:
+#       projected = self._activation(projected)
+
+#     return projected, res_state

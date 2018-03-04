@@ -3,11 +3,13 @@ from utils.symbols import symbols
 from utils.infolog import log
 from .helpers import TacoTrainingHelper, TacoTestHelper
 from .modules import *
-from .rnn_wrappers import TacotronDecoderWrapper
 from models.zoneout_LSTM import ZoneoutLSTMCell
-from .dynamic_decoder import dynamic_decode
+from tensorflow.contrib.seq2seq import AttentionWrapper
+from .rnn_wrappers import *
+from tensorflow.contrib.rnn import MultiRNNCell, OutputProjectionWrapper
+from .attention import LocationBasedAttention
 from .custom_decoder import CustomDecoder
-from .attention_wrapper import AttentionWrapper, LocationBasedAttention
+from .dynamic_decoder import dynamic_decode
 
 
 class Tacotron():
@@ -31,8 +33,6 @@ class Tacotron():
 		"""
 		with tf.variable_scope('inference') as scope:
 			is_training = mel_targets is not None and not gta
-			print('training: ', is_training)
-			print('gta: ', gta)
 			batch_size = tf.shape(inputs)[0]
 			hp = self._hparams
 
@@ -43,57 +43,69 @@ class Tacotron():
 			embedded_inputs = tf.nn.embedding_lookup(embedding_table, inputs)
 
 			#Encoder
-			enc_conv_outputs = enc_conv_layers(embedded_inputs, is_training)    
+			enc_conv_outputs = enc_conv_layers(embedded_inputs, is_training,
+				kernel_size=hp.enc_conv_kernel_size, channels=hp.enc_conv_channels)    
 			#Paper doesn't specify what to do with final encoder state
-			#We send them however to the attention mechanism as source state
-			#(direct link between source and targets cells)
+			#So we will simply drop it
 			encoder_outputs, encoder_states = bidirectional_LSTM(enc_conv_outputs, input_lengths,
-				'encoder_LSTM', is_training=is_training)                                        
+				'encoder_LSTM', is_training=is_training, size=hp.encoder_lstm_units,
+				zoneout=hp.zoneout_rate)     
 
-			#DecoderWrapper
-			decoder_cell = TacotronDecoderWrapper(
-				unidirectional_LSTM(is_training, layers=hp.num_decoder_layers, size=512),
-				is_training)
-
-			#AttentionWrapper on top of TacotronDecoderWrapper
-			attention_decoder = AttentionWrapper(
-				decoder_cell,
+			#Attention
+			attention_cell = AttentionWrapper(
+				DecoderPrenetWrapper(ZoneoutLSTMCell(hp.attention_dim, is_training,
+												zoneout_factor_cell=hp.zoneout_rate,
+												zoneout_factor_output=hp.zoneout_rate), is_training),
 				LocationBasedAttention(hp.attention_dim, encoder_outputs),
 				alignment_history=True,
 				output_attention=False,
-				name='attention_decoder_wrapper')
+				name='attention_cell')
 
-			#We pass (num_decoder_layers times) encoder final states to the decoder of #layers (num_decoder_layers)
-			decoder_init_state = attention_decoder.zero_state(batch_size=batch_size, dtype=tf.float32).clone(
-				cell_state=tuple(encoder_states for _ in range(hp.num_decoder_layers)))
+			#Concat Prenet output with context vector
+			concat_cell = ConcatPrenetAndAttentionWrapper(attention_cell)
+
+			#Decoder layers (attention pre-net + 2 unidirectional LSTM Cells)
+			decoder_cell = unidirectional_LSTM(concat_cell, is_training,
+				layers=hp.decoder_layers, size=hp.decoder_lstm_units,
+				zoneout=hp.zoneout_rate)
+
+			#Concat LSTM output with context vector
+			concat_decoder_cell = ConcatLSTMOutputAndAttentionWrapper(decoder_cell)
+
+			#Projection to mel-spectrogram dimension (linear transformation)
+			output_cell = OutputProjectionWrapper(concat_decoder_cell, hp.num_mels * hp.outputs_per_step)
 
 			#Define the helper for our decoder
-			if is_training or gta:
-				helper = TacoTrainingHelper(inputs, mel_targets, hp.num_mels, hp.outputs_per_step)
+			if (is_training or gta) == True:
+				self.helper = TacoTrainingHelper(inputs, mel_targets, hp.num_mels, hp.outputs_per_step)
 			else:
-				helper = TacoTestHelper(batch_size, hp.num_mels, hp.outputs_per_step)
+				self.helper = TacoTestHelper(batch_size, hp.num_mels, hp.outputs_per_step)
 
 			#We"ll only limit decoder time steps during inference (consult hparams.py to modify the value)
 			max_iterations = None if is_training else hp.max_iters
 
+			#initial decoder state
+			decoder_init_state = output_cell.zero_state(batch_size=batch_size, dtype=tf.float32)
+
 			#Decode
-			(decoder_output, _), final_decoder_state, self.stop_error = dynamic_decode(
-				CustomDecoder(attention_decoder, helper, decoder_init_state),
-				impute_finished=True, maximum_iterations=max_iterations)
+			(decoder_output, _), final_decoder_state, self.stop_token_loss = dynamic_decode(
+				CustomDecoder(output_cell, self.helper, decoder_init_state),
+				impute_finished=True, #Cut out padded parts
+				maximum_iterations=max_iterations)
 
 			#Compute residual using post-net
-			residual = postnet(decoder_output, is_training)
+			residual = postnet(decoder_output, is_training,
+				kernel_size=hp.postnet_kernel_size, channels=hp.postnet_channels)
 
-			#Project residual to same dimension as mel spectogram
-			proj_dim = hp.num_mels
-			projected_residual = projection(residual, shape=proj_dim,
+			#Project residual to same dimension as mel spectrogram
+			projected_residual = projection(residual, shape=hp.num_mels,
 				scope='residual_projection')
 
-			#Compute the mel spectogram
+			#Compute the mel spectrogram
 			mel_outputs = decoder_output + projected_residual
 
 			#Grab alignments from the final decoder state
-			alignments = tf.transpose(final_decoder_state.alignment_history.stack(), [1, 2, 0])
+			alignments = tf.transpose(final_decoder_state[0].alignment_history.stack(), [1, 2, 0])
 
 			self.inputs = inputs
 			self.input_lengths = input_lengths
@@ -131,7 +143,7 @@ class Tacotron():
 			self.after_loss = after
 			self.regularization_loss = regularization
 
-			self.loss = self.before_loss + self.after_loss + self.regularization_loss + self.stop_error
+			self.loss = self.before_loss + self.after_loss + self.stop_token_loss + self.regularization_loss 
 
 	def add_optimizer(self, global_step):
 		'''Adds optimizer. Sets "gradients" and "optimize" fields. add_loss must have been called.
@@ -148,11 +160,17 @@ class Tacotron():
 			else:
 				self.learning_rate = tf.convert_to_tensor(hp.initial_learning_rate)
 
-			self.optimize = tf.train.AdamOptimizer(self.learning_rate, 
-											   hp.adam_beta1, 
-											   hp.adam_beta2,
-											   hp.adam_epsilon).minimize(self.loss,
-																	global_step=global_step)
+			optimizer = tf.train.AdamOptimizer(self.learning_rate, hp.adam_beta1, hp.adam_beta2, hp.adam_epsilon)
+			gradients, variables = zip(*optimizer.compute_gradients(self.loss))
+			self.gradients = gradients
+			#Clip the gradients to avoid rnn gradient explosion
+			clipped_gradients, _ = tf.clip_by_global_norm(gradients, 1.0)
+
+			# Add dependency on UPDATE_OPS; otherwise batchnorm won't work correctly. See:
+			# https://github.com/tensorflow/tensorflow/issues/1122
+			with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+				self.optimize = optimizer.apply_gradients(zip(clipped_gradients, variables),
+					global_step=global_step)
 
 	def _learning_rate_decay(self, init_lr, global_step):
 		# Exponential decay starting after 50,000 iterations

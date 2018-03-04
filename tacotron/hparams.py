@@ -19,29 +19,35 @@ hparams = tf.contrib.training.HParams(
 	cmu_dict=False,
 
 	#Model
-	outputs_per_step = 1,
-	attention_dim = 128,
-	parameter_init = 0.5,
-	sharpening_factor = 1.0,
-	max_decode_length = None,
-	num_classes = None,
-	time_major = False,
-	hidden_dim = 128,
-	embedding_dim = 512,
-	num_decoder_layers=2,
+	outputs_per_step = 1, #number of frames to generate at each decoding step
+	embedding_dim = 512, #dimension of embedding space
+	enc_conv_num_layers=3, #number of encoder convolutional layers
+	enc_conv_kernel_size=(5, ), #size of encoder convolution filters for each layer
+	enc_conv_channels=512, #number of encoder convolutions filters for each layer
+	encoder_lstm_units=256, #number of lstm units for each direction (forward and backward)
+	attention_dim = 128, #dimension of attention space
+	attention_stddev_init = 0.1, #Initial standard deviation for attention projection (normal initializer)
+	prenet_layers=[128, 128], #number of layers and number of units of prenet
+	decoder_layers=2, #number of decoder lstm layers
+	decoder_lstm_units=512, #number of decoder lstm units on each layer
+	postnet_num_layers=5, #number of postnet convolutional layers
+	postnet_kernel_size=(5, ), #size of postnet convolution filters for each layer
+	postnet_channels=512, #number of postnet convolution filters for each layer
 	max_iters=808, #Max decoder steps during inference (feel free to change it)
 
 	#Training
-	batch_size = 32,
-	reg_weight = 10e-6,
-	decay_learning_rate = True,
-	decay_steps = 50000,
-	decay_rate = 0.97,
-	initial_learning_rate = 10e-3,
-	final_learning_rate = 10e-5,
-	adam_beta1 = 0.9,
-	adam_beta2 = 0.999,
-	adam_epsilon = 10e-6,
+	batch_size = 16, #number of training samples on each training steps
+	reg_weight = 10e-6, #regularization weight (for l2 regularization)
+	decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
+	decay_steps = 50000, #starting point for learning rate decay (and determines the decay slope)
+	decay_rate = 0.97, #learning rate decay rate
+	initial_learning_rate = 10e-3, #starting learning rate
+	final_learning_rate = 10e-5, #minimal learning rate
+	adam_beta1 = 0.9, #AdamOptimizer beta1 parameter
+	adam_beta2 = 0.999, #AdamOptimizer beta2 parameter
+	adam_epsilon = 10e-6, #AdamOptimizer beta3 parameter
+	zoneout_rate=0.1, #zoneout rate for all LSTM cells in the network
+	dropout_rate=0.5, #dropout rate for all convolutional layers + prenet
 
 	#Eval sentences
 	sentences = [
@@ -52,8 +58,22 @@ hparams = tf.contrib.training.HParams(
 	'The Senate\'s bill to repeal and replace the Affordable Care Act is now imperiled.',
 	# From Google's Tacotron example page:
 	'Generative adversarial network or variational auto-encoder.',
-	'The buses aren\'t the problem, they actually provide a solution.',
-	'Does the quick brown fox jump over the lazy dog?',
+	'Basilar membrane and otolaryngology are not auto-correlations.',
+	'He has read the whole thing.',
+	'He reads books.',
+	"Don't desert me here in the desert!",
+	'He thought it was time to present the present.',
+	'Thisss isrealy awhsome.',
+	'Punctuation sensitivity, is working.',
+	'Punctuation sensitivity is working.',
+	"The buses aren't the problem, they actually provide a solution.",
+	"The buses aren't the PROBLEM, they actually provide a SOLUTION.",
+	"The quick brown fox jumps over the lazy dog.",
+	"Does the quick brown fox jump over the lazy dog?",
+	"Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?",
+	"She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.",
+	"The blue lagoon is a nineteen eighty American romance adventure film.",
+	"Tajima Airport serves Toyooka.",
 	'Talib Kweli confirmed to AllHipHop that he will be releasing an album in the next year.',
 	]
 

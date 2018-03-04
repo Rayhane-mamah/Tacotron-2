@@ -17,9 +17,13 @@ def run_eval(args, checkpoint_path):
 	#Create output path if it doesn't exist
 	os.makedirs(eval_dir, exist_ok=True)
 
-	for i, text in enumerate(tqdm(hparams.sentences)):
-		start = time.time()
-		synth.synthesize(text, i, eval_dir, None)
+	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
+		file.write('"input"|"generated_mel"\n')
+		for i, text in enumerate(tqdm(hparams.sentences)):
+			start = time.time()
+			mel_filename = synth.synthesize(text, i+1, eval_dir, None)
+
+			file.write('"{}"|"{}"\n'.format(text, mel_filename))
 	print('synthesized mel spectrograms at {}'.format(eval_dir))
 
 def run_synthesis(args, checkpoint_path):
@@ -42,10 +46,14 @@ def run_synthesis(args, checkpoint_path):
 	os.makedirs(synth_dir, exist_ok=True)
 
 	print('starting synthesis')
-	for i, meta in enumerate(tqdm(metadata)):
-		text = meta[2]
-		mel_filename = os.path.join(args.input_dir, meta[0])
-		synth.synthesize(text, i, synth_dir, mel_filename)
+	with open(os.path.join(synth_dir, 'map.txt'), 'w') as file:
+		file.write('"input"|"frames"|"target_mel"|"generated_mel"\n')
+		for i, meta in enumerate(tqdm(metadata)):
+			text = meta[2]
+			mel_filename = os.path.join(args.input_dir, meta[0])
+			mel_output_filename = synth.synthesize(text, i+1, synth_dir, mel_filename)
+
+			file.write('"{}"|"{}"|"{}"|"{}"\n'.format(text, meta[1], mel_filename, mel_output_filename))
 	print('synthesized mel spectrograms at {}'.format(synth_dir))
 
 

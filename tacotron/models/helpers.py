@@ -1,15 +1,14 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.seq2seq import Helper
-from .modules import stop_token_projection
 
 
-# Adapted from tf.contrib.seq2seq.GreedyEmbeddingHelper
 class TacoTestHelper(Helper):
-	def __init__(self, batch_size, output_dim, r=1):
+	def __init__(self, batch_size, output_dim, r):
 		with tf.name_scope('TacoTestHelper'):
 			self._batch_size = batch_size
 			self._output_dim = output_dim
+			self._end_token = tf.tile([0.0], [output_dim * r])
 
 	@property
 	def batch_size(self):
@@ -29,28 +28,19 @@ class TacoTestHelper(Helper):
 	def sample(self, time, outputs, state, name=None):
 		return tf.tile([0], [self._batch_size])  # Return all 0; we ignore them
 
-	def next_inputs(self, time, cell_outputs, state, LSTM_output, sample_ids, name=None):
+	def next_inputs(self, time, outputs, state, sample_ids, stop_token_prediction, name=None):
 		'''Stop on EOS. Otherwise, pass the last output as the next input and pass through state.'''
 		with tf.name_scope('TacoTestHelper'):
-			#At inference time, stop_error = None
-			stop_error = None # we don't need it
-
-			context = state.attention # Get context vector
-			#finished = tf.reduce_all(tf.equal(outputs, self._end_token), axis=1)
-
-			#Predict if the encoder should stop (dynamic end token)
-			concat = tf.concat([LSTM_output, context], axis=-1)
-			scalar = tf.squeeze(stop_token_projection(concat, activation=tf.nn.sigmoid), [1])
-			finished = tf.cast(tf.round(scalar), tf.bool)
-
+			finished = tf.cast(tf.round(stop_token_prediction), tf.bool)
+			
 			# Feed last output frame as next input. outputs is [N, output_dim * r]
-			next_inputs = cell_outputs
+			next_inputs = outputs[:, -self._output_dim:]
 			next_state = state
-			return (finished, next_inputs, next_state, stop_error)
+			return (finished, next_inputs, next_state)
 
 
 class TacoTrainingHelper(Helper):
-	def __init__(self, inputs, targets, output_dim, r=1):
+	def __init__(self, inputs, targets, output_dim, r):
 		# inputs is [N, T_in], targets is [N, T_out, D]
 		with tf.name_scope('TacoTrainingHelper'):
 			self._batch_size = tf.shape(inputs)[0]
@@ -59,9 +49,13 @@ class TacoTrainingHelper(Helper):
 			# Feed every r-th target frame as input
 			self._targets = targets[:, r-1::r, :]
 
+			#<stop_token> (same value as <pad_token>) to train dynamic stop
+			self._end_token = tf.tile([0.0], [output_dim * r])
+
 			# Use full length for every target because we don't want to mask the padding frames
 			num_steps = tf.shape(self._targets)[1]
 			self._lengths = tf.tile([num_steps], [self._batch_size])
+			self._num_steps = tf.cast(num_steps, tf.float32)
 
 	@property
 	def batch_size(self):
@@ -81,24 +75,23 @@ class TacoTrainingHelper(Helper):
 	def sample(self, time, outputs, state, name=None):
 		return tf.tile([0], [self._batch_size])  # Return all 0; we ignore them
 
-	def next_inputs(self, time, cell_outputs, state, LSTM_output, sample_ids, name=None):
+	def next_inputs(self, time, outputs, state, sample_ids, stop_token_prediction, name=None):
 		with tf.name_scope(name or 'TacoTrainingHelper'):
-			context = state.attention #Get context vector
-			finished = (time + 1 >= self._lengths) #return true finished
+			#A sequence is finished if we reach the full true length or we encounter padding
+			#It is essential to train the model on stopping when encountering padding 
+			#to gain the desired dynamic generation
+			true_finished = tf.logical_or((time + 1 >= self._lengths), tf.reduce_all(tf.equal(outputs, self._end_token), axis=1))
 
-			#Compute model prediction to stop token
-			concat = tf.concat([LSTM_output, context], axis=-1)
-			finished_p = tf.squeeze(stop_token_projection(concat), [1])
+			#Compute stop_token_loss of actual decoding step (for dynamic stop training)
+			self.stop_token_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+				labels=tf.cast(true_finished, tf.float32), 
+				logits=stop_token_prediction)) / self._num_steps
 
-			#Compute the stop token error for infer time
-			stop_error = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(finished, tf.float32), 
-																				logits=finished_p))
-			next_inputs = self._targets[:, time, :] #teacher-forcing: return true frame
-			next_state = state
-			return (finished, next_inputs, next_state, stop_error)
+			next_inputs = self._targets[:, time, :] #Teacher-forcing: return true frame
+			next_state = state #No change on the cell states
+			return (true_finished, next_inputs, next_state) #return true "finished" state
 
 
 def _go_frames(batch_size, output_dim):
 	'''Returns all-zero <GO> frames for a given batch size and output dimension'''
 	return tf.tile([[0.0]], [batch_size, output_dim])
-

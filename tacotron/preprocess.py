@@ -27,7 +27,7 @@ def write_metadata(metadata, out_dir):
 def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--base_dir', default=os.path.dirname(os.path.realpath(__file__)))
-	parser.add_argument('--input', default='LJSpeech-1.0')
+	parser.add_argument('--input', default='LJSpeech-1.1')
 	parser.add_argument('--output', default='training')
 	parser.add_argument('--n_jobs', type=int, default=cpu_count())
 	args = parser.parse_args()
