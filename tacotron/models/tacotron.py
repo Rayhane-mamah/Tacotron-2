@@ -4,10 +4,10 @@ from utils.infolog import log
 from .helpers import TacoTrainingHelper, TacoTestHelper
 from .modules import *
 from models.zoneout_LSTM import ZoneoutLSTMCell
-from tensorflow.contrib.seq2seq import AttentionWrapper
+from tensorflow.contrib.seq2seq import AttentionWrapper, LuongAttention
 from .rnn_wrappers import *
 from tensorflow.contrib.rnn import MultiRNNCell, OutputProjectionWrapper
-from .attention import LocationBasedAttention
+from .attention import LocationSensitiveAttention
 from .custom_decoder import CustomDecoder
 from .dynamic_decoder import dynamic_decode
 
@@ -56,7 +56,7 @@ class Tacotron():
 				DecoderPrenetWrapper(ZoneoutLSTMCell(hp.attention_dim, is_training,
 												zoneout_factor_cell=hp.zoneout_rate,
 												zoneout_factor_output=hp.zoneout_rate), is_training),
-				LocationBasedAttention(hp.attention_dim, encoder_outputs),
+				LocationSensitiveAttention(hp.attention_dim, encoder_outputs),
 				alignment_history=True,
 				output_attention=False,
 				name='attention_cell')

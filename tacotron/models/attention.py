@@ -1,14 +1,15 @@
 """Attention file for location based attention (compatible with tensorflow attention wrapper)"""
 
 import tensorflow as tf
-from tensorflow.contrib.seq2seq.python.ops.attention_wrapper import _BaseAttentionMechanism
+import numpy as np 
+from tensorflow.contrib.seq2seq.python.ops.attention_wrapper import _BaseMonotonicAttentionMechanism
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.layers import core as layers_core
 from tensorflow.python.ops import variable_scope
 from hparams import hparams
 
 
-def _location_based_score(W_query, attention_weights, W_keys):
+def _location_sensitive_score(W_query, attention_weights, W_keys):
 	"""Impelements Bahdanau-style (cumulative) scoring function.
 	This attention is described in:
 	J. K. Chorowski, D. Bahdanau, D. Serdyuk, K. Cho, and Y. Ben-
@@ -36,7 +37,7 @@ def _location_based_score(W_query, attention_weights, W_keys):
 	attention_weights = tf.expand_dims(attention_weights, axis=2)
 	# location features [batch_size, max_time, filters]
 	f = tf.layers.conv1d(attention_weights, filters=32,
-											kernel_size=31, padding='same',
+											kernel_size=(31, ), padding='same',
 											name='location_features')
 
 	# Projected location features [batch_size, max_time, attention_dim]
@@ -44,8 +45,7 @@ def _location_based_score(W_query, attention_weights, W_keys):
 		f,
 		num_outputs=num_units,
 		activation_fn=None,
-		weights_initializer=tf.truncated_normal_initializer(
-			stddev=hparams.attention_stddev_init),
+		weights_initializer=tf.truncated_normal_initializer(stddev=np.sqrt(1./16)),
 		biases_initializer=tf.zeros_initializer(),
 		scope='W_filter')
 
@@ -55,7 +55,7 @@ def _location_based_score(W_query, attention_weights, W_keys):
 	return tf.reduce_sum(v_a * tf.tanh(W_keys + tf.expand_dims(W_query, axis=1) + W_fil), axis=2)
 
 
-class LocationBasedAttention(_BaseAttentionMechanism):
+class LocationSensitiveAttention(_BaseMonotonicAttentionMechanism):
 	"""Impelements Bahdanau-style (cumulative) scoring function.
 	Usually referred to as "hybrid" attention (content-based + location-based)
 	This attention is described in:
@@ -71,7 +71,7 @@ class LocationBasedAttention(_BaseAttentionMechanism):
 				 memory_sequence_length=None,
 				 probability_fn=None,
 				 score_mask_value=tf.float32.min,
-				 name='LocationBasedAttention'):
+				 name='LocationSensitiveAttention'):
 		"""Construct the Attention mechanism.
 		Args:
 			num_units: The depth of the query mechanism.
@@ -92,7 +92,7 @@ class LocationBasedAttention(_BaseAttentionMechanism):
 		if probability_fn is None:
 			probability_fn = nn_ops.softmax
 		wrapped_probability_fn = lambda score, _: probability_fn(score)
-		super(LocationBasedAttention, self).__init__(
+		super(LocationSensitiveAttention, self).__init__(
 				query_layer=layers_core.Dense(
 						num_units, name='query_layer', use_bias=False),
 				memory_layer=layers_core.Dense(
@@ -119,11 +119,11 @@ class LocationBasedAttention(_BaseAttentionMechanism):
 				`max_time`).
 		"""
 		previous_alignments = state
-		with variable_scope.variable_scope(None, "location_based_attention", [query]):
+		with variable_scope.variable_scope(None, "Location_Sensitive_Attention", [query]):
 			# processed_query shape [batch_size, query_depth] -> [batch_size, attention_dim]
 			processed_query = self.query_layer(query) if self.query_layer else query
 			# energy shape [batch_size, max_time]
-			energy = _location_based_score(processed_query, previous_alignments, self._keys)
+			energy = _location_sensitive_score(processed_query, previous_alignments, self._keys)
 		# alignments shape = energy shape = [batch_size, max_time]
 		alignments = self._probability_fn(energy, previous_alignments)
 		#Seems pretty useless but tensorflow attention wrapper requires it to work properly

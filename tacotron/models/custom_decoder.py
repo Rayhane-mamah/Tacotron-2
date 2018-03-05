@@ -118,7 +118,7 @@ class CustomDecoder(decoder.Decoder):
 		Returns:
 			`(outputs, next_state, next_inputs, finished)`.
 		"""
-		with ops.name_scope(name, "BasicDecoderStep", (time, inputs, state)):
+		with ops.name_scope(name, "CustomDecoderStep", (time, inputs, state)):
 			#Call outputprojection wrapper cell
 			cell_outputs, cell_state = self._cell(inputs, state)
 
