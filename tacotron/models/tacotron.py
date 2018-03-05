@@ -4,7 +4,7 @@ from utils.infolog import log
 from .helpers import TacoTrainingHelper, TacoTestHelper
 from .modules import *
 from models.zoneout_LSTM import ZoneoutLSTMCell
-from tensorflow.contrib.seq2seq import AttentionWrapper, LuongAttention
+from tensorflow.contrib.seq2seq import AttentionWrapper
 from .rnn_wrappers import *
 from tensorflow.contrib.rnn import MultiRNNCell, OutputProjectionWrapper
 from .attention import LocationSensitiveAttention

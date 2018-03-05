@@ -1,4 +1,5 @@
 import tensorflow as tf 
+import numpy as np 
 
 
 # Default hyperparameters
@@ -26,7 +27,6 @@ hparams = tf.contrib.training.HParams(
 	enc_conv_channels=512, #number of encoder convolutions filters for each layer
 	encoder_lstm_units=256, #number of lstm units for each direction (forward and backward)
 	attention_dim = 128, #dimension of attention space
-	attention_stddev_init = 0.1, #Initial standard deviation for attention projection (normal initializer)
 	prenet_layers=[128, 128], #number of layers and number of units of prenet
 	decoder_layers=2, #number of decoder lstm layers
 	decoder_lstm_units=512, #number of decoder lstm units on each layer

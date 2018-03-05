@@ -1,12 +1,11 @@
 """Attention file for location based attention (compatible with tensorflow attention wrapper)"""
 
 import tensorflow as tf
-import numpy as np 
 from tensorflow.contrib.seq2seq.python.ops.attention_wrapper import _BaseMonotonicAttentionMechanism
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.layers import core as layers_core
 from tensorflow.python.ops import variable_scope
-from hparams import hparams
+
 
 
 def _location_sensitive_score(W_query, attention_weights, W_keys):
@@ -37,15 +36,15 @@ def _location_sensitive_score(W_query, attention_weights, W_keys):
 	attention_weights = tf.expand_dims(attention_weights, axis=2)
 	# location features [batch_size, max_time, filters]
 	f = tf.layers.conv1d(attention_weights, filters=32,
-											kernel_size=(31, ), padding='same',
-											name='location_features')
+		kernel_size=(31, ), padding='same',
+		name='location_features')
 
 	# Projected location features [batch_size, max_time, attention_dim]
 	W_fil = tf.contrib.layers.fully_connected(
 		f,
 		num_outputs=num_units,
 		activation_fn=None,
-		weights_initializer=tf.truncated_normal_initializer(stddev=np.sqrt(1./16)),
+		weights_initializer=tf.contrib.layers.xavier_initializer(),
 		biases_initializer=tf.zeros_initializer(),
 		scope='W_filter')
 
