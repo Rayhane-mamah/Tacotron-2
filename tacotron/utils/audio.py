@@ -20,12 +20,18 @@ def inv_preemphasis(x):
 	return signal.lfilter([1], [1, -hparams.preemphasis], x)
 
 def spectrogram(y):
-	D = _stft(preemphasis(y))
+	if hparams.lfilter:
+		D = _stft(preemphasis(y))
+	else:
+		D = _stft(y)
 	S = _amp_to_db(np.abs(D)) - hparams.ref_level_db
 	return _normalize(S)
 
 def melspectrogram(y):
-	D = _stft(preemphasis(y))
+	if hparams.lfilter:
+		D = _stft(preemphasis(y))
+	else:
+		D = _stft(y)
 	S = _amp_to_db(_linear_to_mel(np.abs(D)))
 	return _normalize(S)
 
@@ -39,18 +45,18 @@ def find_endpoint(wav, threshhold_db=-40, min_silence_sec=0.8):
 	return len(wav)
 
 def _stft(y):
-	n_fft, hop_length, win_lenght = _stft_params()
-	return librosa.stft(y=y, n_fft=n_fft, hop_length=hop_length, win_length=win_lenght)
+	n_fft, hop_length, win_length = _stft_params()
+	return librosa.stft(y=y, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
 
 def istft(y):
-	_, hop_length, win_lenght = _stft_params()
-	return librosa.istft(y=y, hop_length=hop_length, win_lenght=win_lenght)
+	_, hop_length, win_length = _stft_params()
+	return librosa.istft(y=y, hop_length=hop_length, win_length=win_length)
 
 def _stft_params():
 	n_fft = (hparams.num_freq - 1) * 2
 	hop_length = int(hparams.frame_shift_ms / 1000 * hparams.sample_rate)
-	win_lenght = int(hparams.frame_length_ms / 1000 * hparams.sample_rate)
-	return n_fft, hop_length, win_lenght
+	win_length = int(hparams.frame_length_ms / 1000 * hparams.sample_rate)
+	return n_fft, hop_length, win_length
 
 # Conversions
 
@@ -64,7 +70,8 @@ def _linear_to_mel(spectogram):
 
 def _build_mel_basis():
 	n_fft = (hparams.num_freq - 1) * 2
-	return librosa.filters.mel(hparams.sample_rate, n_fft, n_mels=hparams.num_mels)
+	return librosa.filters.mel(hparams.sample_rate, n_fft, n_mels=hparams.num_mels,
+							   fmin=hparams.fmin, fmax=hparams.fmax,)
 
 def _amp_to_db(x):
 	return 20 * np.log10(np.maximum(1e-5, x)) + 0.01

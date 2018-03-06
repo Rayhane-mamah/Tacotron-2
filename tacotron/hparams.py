@@ -9,15 +9,17 @@ hparams = tf.contrib.training.HParams(
 	cleaners='english_cleaners',
 
 	#Audio
-	num_mels=80,
+	num_mels=80, 
 	num_freq=1025,
-	sample_rate=24000,
-	frame_length_ms=50,
-	frame_shift_ms=12.5,
+	sample_rate=22050, #22050 Hz (corresponding to ljspeech dataset)
+	frame_length_ms= 50,
+	frame_shift_ms= 12.5,
+	lfilter=True, #whether to use preemphasis
 	preemphasis=0.97,
 	min_level_db=-100,
 	ref_level_db=20,
-	cmu_dict=False,
+	fmin=125,
+	fmax=7600,
 
 	#Model
 	outputs_per_step = 1, #number of frames to generate at each decoding step
@@ -33,10 +35,10 @@ hparams = tf.contrib.training.HParams(
 	postnet_num_layers=5, #number of postnet convolutional layers
 	postnet_kernel_size=(5, ), #size of postnet convolution filters for each layer
 	postnet_channels=512, #number of postnet convolution filters for each layer
-	max_iters=808, #Max decoder steps during inference (feel free to change it)
+	max_iters=810, #Max decoder steps during inference (feel free to change it)
 
 	#Training
-	batch_size = 16, #number of training samples on each training steps
+	batch_size = 32, #number of training samples on each training steps
 	reg_weight = 10e-6, #regularization weight (for l2 regularization)
 	decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	decay_steps = 50000, #starting point for learning rate decay (and determines the decay slope)
