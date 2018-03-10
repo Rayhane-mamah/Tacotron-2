@@ -97,35 +97,3 @@ class ConcatLSTMOutputAndAttentionWrapper(RNNCell):
 
   def zero_state(self, batch_size, dtype):
     return self._cell.zero_state(batch_size, dtype)
-
-
-# class LinearProjectionWrapper(RNNCell):
-#   """Operator adding an output projection to the given cell.
-#   This wrapper will perform a linear transformation with specified activation function.(Default to None)
-#   """
-#   def __init__(self, cell, projection_dim, activation=None):
-#     super(LinearProjectionWrapper, self).__init__()
-#     self._cell = cell
-#     self._projection_dim = projection_dim
-#     self._activation = activation
-
-#   @property
-#   def state_size(self):
-#     return self._cell.state_size
-
-#   @property
-#   def output_size(self):
-#     return self._projection_dim
-
-#   def zero_state(self, batch_size, dtype):
-#     with ops.name_scope(type(self).__name__ + "ZeroState", values=[batch_size]):
-#       return self._cell.zero_state(batch_size, dtype)
-
-#   def call(self, inputs, state):
-#     """Run the cell and output projection on inputs, starting from state."""
-#     output, res_state = self._cell(inputs, state)
-#     projected = projection(output, self._projection_dim)
-#     if self._activation:
-#       projected = self._activation(projected)
-
-#     return projected, res_state

@@ -224,7 +224,7 @@ def dynamic_decode(decoder,
 		stop_token_loss = res[5]
 
 		#Average <stop_token> error over decoding steps
-		avg_stop_loss = stop_token_loss / steps
+		#avg_stop_loss = stop_token_loss / steps
 
 		final_outputs = nest.map_structure(
 			lambda ta: ta.stack(), final_outputs_ta)
@@ -232,4 +232,4 @@ def dynamic_decode(decoder,
 			final_outputs = nest.map_structure(
 				_transpose_batch_time, final_outputs)
 
-	return final_outputs, final_state, avg_stop_loss
+	return final_outputs, final_state, stop_token_loss

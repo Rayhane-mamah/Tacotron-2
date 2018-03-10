@@ -54,12 +54,9 @@ def _process_utterance(out_dir, index, wav_path, text):
 	# Load the audio as numpy array
 	wav = audio.load_wav(wav_path)
 
-	# Compute the linear-scale spectrogram from the wav to calculate n_frames
-	spectrogram = audio.spectrogram(wav).astype(np.float32)
-	n_frames = spectrogram.shape[1]
-
 	# Compute the mel scale spectrogram from the wav
 	mel_spectrogram = audio.melspectrogram(wav).astype(np.float32)
+	n_frames = mel_spectrogram.shape[1]
 
 	# Write the spectrogram to disk
 	mel_filename = 'ljspeech-mel-{:05d}.npy'.format(index)

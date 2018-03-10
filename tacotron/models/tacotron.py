@@ -4,7 +4,7 @@ from utils.infolog import log
 from .helpers import TacoTrainingHelper, TacoTestHelper
 from .modules import *
 from models.zoneout_LSTM import ZoneoutLSTMCell
-from tensorflow.contrib.seq2seq import AttentionWrapper
+from tensorflow.contrib.seq2seq import AttentionWrapper, LuongAttention
 from .rnn_wrappers import *
 from tensorflow.contrib.rnn import MultiRNNCell, OutputProjectionWrapper
 from .attention import LocationSensitiveAttention
@@ -53,9 +53,9 @@ class Tacotron():
 
 			#Attention
 			attention_cell = AttentionWrapper(
-				DecoderPrenetWrapper(ZoneoutLSTMCell(hp.attention_dim, is_training,
-												zoneout_factor_cell=hp.zoneout_rate,
-												zoneout_factor_output=hp.zoneout_rate), is_training),
+				DecoderPrenetWrapper(ZoneoutLSTMCell(hp.attention_dim, is_training, #Separate LSTM for attention mechanism
+					zoneout_factor_cell=hp.zoneout_rate,							#based on original tacotron architecture
+					zoneout_factor_output=hp.zoneout_rate), is_training),
 				LocationSensitiveAttention(hp.attention_dim, encoder_outputs),
 				alignment_history=True,
 				output_attention=False,
@@ -72,7 +72,7 @@ class Tacotron():
 			#Concat LSTM output with context vector
 			concat_decoder_cell = ConcatLSTMOutputAndAttentionWrapper(decoder_cell)
 
-			#Projection to mel-spectrogram dimension (linear transformation)
+			#Projection to mel-spectrogram dimension (times number of outputs per step) (linear transformation)
 			output_cell = OutputProjectionWrapper(concat_decoder_cell, hp.num_mels * hp.outputs_per_step)
 
 			#Define the helper for our decoder
@@ -81,7 +81,7 @@ class Tacotron():
 			else:
 				self.helper = TacoTestHelper(batch_size, hp.num_mels, hp.outputs_per_step)
 
-			#We"ll only limit decoder time steps during inference (consult hparams.py to modify the value)
+			#We'll only limit decoder time steps during inference (consult hparams.py to modify the value)
 			max_iterations = None if is_training else hp.max_iters
 
 			#initial decoder state
@@ -90,15 +90,19 @@ class Tacotron():
 			#Decode
 			(decoder_output, _), final_decoder_state, self.stop_token_loss = dynamic_decode(
 				CustomDecoder(output_cell, self.helper, decoder_init_state),
-				impute_finished=True, #Cut out padded parts
+				impute_finished=True, #Cut out padded parts (enabled)
 				maximum_iterations=max_iterations)
+
+			# Reshape outputs to be one output per entry 
+			decoder_output = tf.reshape(decoder_output, [batch_size, -1, hp.num_mels])
 
 			#Compute residual using post-net
 			residual = postnet(decoder_output, is_training,
 				kernel_size=hp.postnet_kernel_size, channels=hp.postnet_channels)
 
 			#Project residual to same dimension as mel spectrogram
-			projected_residual = projection(residual, shape=hp.num_mels,
+			projected_residual = projection(residual,
+				shape=hp.num_mels,
 				scope='residual_projection')
 
 			#Compute the mel spectrogram
@@ -136,7 +140,8 @@ class Tacotron():
 			# Get all trainable variables
 			all_vars = tf.trainable_variables()
 			# Compute the regularization term
-			regularization = tf.add_n([tf.nn.l2_loss(v) for v in all_vars]) * hp.reg_weight
+			regularization = tf.add_n([tf.nn.l2_loss(v) for v in all_vars
+				if not('bias' in v.name or 'Bias' in v.name)]) * hp.reg_weight
 
 			# Compute final loss term
 			self.before_loss = before
@@ -173,15 +178,16 @@ class Tacotron():
 					global_step=global_step)
 
 	def _learning_rate_decay(self, init_lr, global_step):
-		# Exponential decay starting after 50,000 iterations
+		# Exponential decay starting after 50,000 iterations (ignored for now)
 		# We won't drop learning rate below 10e-5
 		hp = self._hparams
 		step = tf.cast(global_step + 1, dtype=tf.float32)
-		if tf.greater(step, self.decay_steps) == True:
-			lr = tf.train.exponential_decay(init_lr, 
-											global_step - decay_steps + 1, 
-											self.decay_steps, 
-											self.decay_rate,
-											name='exponential_decay')
-			return max(hp.final_learning_rate, lr)
-		return init_lr
+		#Testing decaying rate since beginning (as the model seems to train faster than expected)
+		#if tf.greater(step, self.decay_steps) == True:
+		lr = tf.train.exponential_decay(init_lr, 
+										global_step - self.decay_steps + 1, 
+										self.decay_steps, 
+										self.decay_rate,
+										name='exponential_decay')
+		return tf.maximum(hp.final_learning_rate, lr)
+		#return init_lr

@@ -20,9 +20,11 @@ hparams = tf.contrib.training.HParams(
 	ref_level_db=20,
 	fmin=125,
 	fmax=7600,
+	power=1.3,
+	griffin_lim_iters=60,
 
 	#Model
-	outputs_per_step = 1, #number of frames to generate at each decoding step
+	outputs_per_step = 5, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
 	embedding_dim = 512, #dimension of embedding space
 	enc_conv_num_layers=3, #number of encoder convolutional layers
 	enc_conv_kernel_size=(5, ), #size of encoder convolution filters for each layer
@@ -35,19 +37,19 @@ hparams = tf.contrib.training.HParams(
 	postnet_num_layers=5, #number of postnet convolutional layers
 	postnet_kernel_size=(5, ), #size of postnet convolution filters for each layer
 	postnet_channels=512, #number of postnet convolution filters for each layer
-	max_iters=810, #Max decoder steps during inference (feel free to change it)
+	max_iters=175, #Max decoder steps during inference (feel free to change it)
 
 	#Training
 	batch_size = 32, #number of training samples on each training steps
-	reg_weight = 10e-6, #regularization weight (for l2 regularization)
+	reg_weight = 10**(-6), #regularization weight (for l2 regularization)
 	decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	decay_steps = 50000, #starting point for learning rate decay (and determines the decay slope)
-	decay_rate = 0.97, #learning rate decay rate
-	initial_learning_rate = 10e-3, #starting learning rate
-	final_learning_rate = 10e-5, #minimal learning rate
+	decay_rate = 0.4, #learning rate decay rate
+	initial_learning_rate = 10**(-3), #starting learning rate
+	final_learning_rate = 10**(-5), #minimal learning rate
 	adam_beta1 = 0.9, #AdamOptimizer beta1 parameter
 	adam_beta2 = 0.999, #AdamOptimizer beta2 parameter
-	adam_epsilon = 10e-6, #AdamOptimizer beta3 parameter
+	adam_epsilon = 10**(-6), #AdamOptimizer beta3 parameter
 	zoneout_rate=0.1, #zoneout rate for all LSTM cells in the network
 	dropout_rate=0.5, #dropout rate for all convolutional layers + prenet
 

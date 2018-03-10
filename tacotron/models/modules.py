@@ -13,7 +13,8 @@ def conv1d(inputs, kernel_size, channels, activation, is_training, scope):
 			filters=channels,
 			kernel_size=kernel_size,
 			activation=activation,
-			padding='same')
+			padding='same',
+			kernel_initializer=tf.contrib.layers.xavier_initializer())
 		batched = tf.layers.batch_normalization(conv1d_output, training=is_training)
 		return tf.layers.dropout(batched, rate=drop_rate, training=is_training,
 		 						name='dropout_{}'.format(scope))
@@ -91,7 +92,9 @@ def prenet(inputs, is_training, layer_sizes=[128, 128], scope=None):
 
 	with tf.variable_scope(scope):
 		for i, size in enumerate(layer_sizes):
-			dense = tf.layers.dense(x, units=size, activation=tf.nn.relu, name='dense_{}'.format(i + 1))
+			dense = tf.layers.dense(x, units=size, activation=tf.nn.relu,
+				kernel_initializer=tf.contrib.layers.xavier_initializer(),
+				name='dense_{}'.format(i + 1))
 			#The paper discussed introducing diversity in generation at inference time
 			#by using a dropout of 0.5 only in prenet layers.
 			x = tf.layers.dropout(dense, rate=drop_rate, training=is_training, 
@@ -115,7 +118,7 @@ def stop_token_projection(x, shape=1, activation=lambda _: _, weights_name='stop
 	inference time for stop token prediction
 	"""
 
-	st_W = tf.get_variable(weights_name, shape=[x.shape[-1], 1], dtype=tf.float32, initializer=tf.truncated_normal_initializer())
+	st_W = tf.get_variable(weights_name, shape=[x.shape[-1], 1], dtype=tf.float32, initializer=tf.contrib.layers.xavier_initializer())
 	st_b = tf.get_variable(bias_name, shape=[1], dtype=tf.float32, initializer=tf.zeros_initializer())
 
 	output = activation(tf.add(tf.matmul(x, st_W), st_b))

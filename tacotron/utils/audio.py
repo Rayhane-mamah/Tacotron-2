@@ -19,38 +19,40 @@ def preemphasis(x):
 def inv_preemphasis(x):
 	return signal.lfilter([1], [1, -hparams.preemphasis], x)
 
-def spectrogram(y):
-	if hparams.lfilter:
-		D = _stft(preemphasis(y))
-	else:
-		D = _stft(y)
-	S = _amp_to_db(np.abs(D)) - hparams.ref_level_db
-	return _normalize(S)
-
 def melspectrogram(y):
 	if hparams.lfilter:
 		D = _stft(preemphasis(y))
 	else:
 		D = _stft(y)
-	S = _amp_to_db(_linear_to_mel(np.abs(D)))
+	S = _amp_to_db(_linear_to_mel(np.abs(D))) - hparams.ref_level_db
 	return _normalize(S)
 
-def find_endpoint(wav, threshhold_db=-40, min_silence_sec=0.8):
-	window_length = int(hparams.sample_rate * min_silence_sec)
-	hop_length = int(window_length / 4)
-	threshhold = _db_to_amp(threshhold_db)
-	for x in range(hop_length, len(wav) - window_length, hop_length):
-		if np.max(wav[x: x+window_length]) < threshhold:
-			return x + hop_length
-	return len(wav)
+def inv_mel_spectrogram(mel_spectrogram):
+	'''Converts mel spectrogram to waveform using librosa'''
+	S = _mel_to_linear(_db_to_amp(_denormalize(mel_spectrogram) + hparams.ref_level_db))  # Convert back to linear
+	if hparams.lfilter:
+		return inv_preemphasis(_griffin_lim(S ** hparams.power)) # Reconstruct phase
+	return _griffin_lim(S ** hparams.power)
+
+def _griffin_lim(S):
+	'''librosa implementation of Griffin-Lim
+	Based on https://github.com/librosa/librosa/issues/434
+	'''
+	angles = np.exp(2j * np.pi * np.random.rand(*S.shape))
+	S_complex = np.abs(S).astype(np.complex)
+	y = _istft(S_complex * angles)
+	for i in range(hparams.griffin_lim_iters):
+		angles = np.exp(1j * np.angle(_stft(y)))
+		y = _istft(S_complex * angles)
+	return y
 
 def _stft(y):
 	n_fft, hop_length, win_length = _stft_params()
 	return librosa.stft(y=y, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
 
-def istft(y):
+def _istft(y):
 	_, hop_length, win_length = _stft_params()
-	return librosa.istft(y=y, hop_length=hop_length, win_length=win_length)
+	return librosa.istft(y, hop_length=hop_length, win_length=win_length)
 
 def _stft_params():
 	n_fft = (hparams.num_freq - 1) * 2
@@ -58,8 +60,8 @@ def _stft_params():
 	win_length = int(hparams.frame_length_ms / 1000 * hparams.sample_rate)
 	return n_fft, hop_length, win_length
 
-# Conversions
 
+# Conversions
 _mel_basis = None
 
 def _linear_to_mel(spectogram):
@@ -67,6 +69,12 @@ def _linear_to_mel(spectogram):
 	if _mel_basis is None:
 		_mel_basis = _build_mel_basis()
 	return np.dot(_mel_basis, spectogram)
+
+def _mel_to_linear(mel_spectrogram):
+	global _mel_basis
+	if _mel_basis is None:
+		_mel_basis = _build_mel_basis()
+	return np.dot(_mel_basis.T, mel_spectrogram)
 
 def _build_mel_basis():
 	n_fft = (hparams.num_freq - 1) * 2
@@ -76,7 +84,7 @@ def _build_mel_basis():
 def _amp_to_db(x):
 	return 20 * np.log10(np.maximum(1e-5, x)) + 0.01
 
-def _dp_to_amp(x):
+def _db_to_amp(x):
 	return np.power(10.0, (x - 0.01) * 0.05)
 
 def _normalize(S):

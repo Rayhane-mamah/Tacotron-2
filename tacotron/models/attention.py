@@ -1,7 +1,7 @@
 """Attention file for location based attention (compatible with tensorflow attention wrapper)"""
 
 import tensorflow as tf
-from tensorflow.contrib.seq2seq.python.ops.attention_wrapper import _BaseMonotonicAttentionMechanism
+from tensorflow.contrib.seq2seq.python.ops.attention_wrapper import _BaseAttentionMechanism
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.layers import core as layers_core
 from tensorflow.python.ops import variable_scope
@@ -37,6 +37,7 @@ def _location_sensitive_score(W_query, attention_weights, W_keys):
 	# location features [batch_size, max_time, filters]
 	f = tf.layers.conv1d(attention_weights, filters=32,
 		kernel_size=(31, ), padding='same',
+		kernel_initializer=tf.contrib.layers.xavier_initializer(),
 		name='location_features')
 
 	# Projected location features [batch_size, max_time, attention_dim]
@@ -49,12 +50,13 @@ def _location_sensitive_score(W_query, attention_weights, W_keys):
 		scope='W_filter')
 
 	v_a = tf.get_variable(
-		'v_a', shape=[num_units], dtype=tf.float32)
+		'v_a', shape=[num_units], dtype=tf.float32,
+		initializer=tf.contrib.layers.xavier_initializer())
 
 	return tf.reduce_sum(v_a * tf.tanh(W_keys + tf.expand_dims(W_query, axis=1) + W_fil), axis=2)
 
 
-class LocationSensitiveAttention(_BaseMonotonicAttentionMechanism):
+class LocationSensitiveAttention(_BaseAttentionMechanism):
 	"""Impelements Bahdanau-style (cumulative) scoring function.
 	Usually referred to as "hybrid" attention (content-based + location-based)
 	This attention is described in:

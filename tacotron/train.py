@@ -24,6 +24,10 @@ def add_stats(model):
 		tf.summary.scalar('regularization_loss', model.regularization_loss)
 		tf.summary.scalar('stop_token_loss', model.stop_token_loss)
 		tf.summary.scalar('loss', model.loss)
+		tf.summary.scalar('learning_rate', model.learning_rate) #control learning rate decay speed
+		gradient_norms = [tf.norm(grad) for grad in model.gradients]
+		tf.summary.histogram('gradient_norm', gradient_norms)
+		tf.summary.scalar('max_gradient_norm', tf.reduce_max(gradient_norms)) #visualize gradients (in case of explosion)
 		return tf.summary.merge_all()
 
 def time_string():
@@ -33,6 +37,8 @@ def train(log_dir, args):
 	save_dir = os.path.join(log_dir, 'pretrained/')
 	checkpoint_path = os.path.join(save_dir, 'model.ckpt')
 	input_path = os.path.join(args.base_dir, args.input)
+	plot_dir = os.path.join(log_dir, 'plots')
+	os.makedirs(plot_dir, exist_ok=True)
 	log('Checkpoint path: {}'.format(checkpoint_path))
 	log('Loading training data from: {}'.format(input_path))
 	log('Using model: {}'.format(args.model))
@@ -122,18 +128,25 @@ def train(log_dir, args):
 					saver.save(sess, checkpoint_path, global_step=step)
 					# Unlike the original tacotron, we won't save audio
 					# because we yet have to use wavenet as vocoder
-					log('Saving alignement..')
-					input_seq, prediction, alignment = sess.run([model.inputs[0],
-																 model.mel_outputs[0],
-																 model.alignments[0],
-																 ])
+					log('Saving alignement and Mel-Spectrograms..')
+					input_seq, prediction, alignment, target = sess.run([model.inputs[0],
+							 model.mel_outputs[0],
+							 model.alignments[0],
+							 model.mel_targets[0],
+							 ])
 					#save predicted spectrogram to disk (for plot and manual evaluation purposes)
 					mel_filename = 'ljspeech-mel-prediction-step-{}.npy'.format(step)
 					np.save(os.path.join(log_dir, mel_filename), prediction, allow_pickle=False)
 
-					#save alignment plot to disk (evaluation purposes)
-					plot.plot_alignment(alignment, os.path.join(log_dir, 'step-{}-align.png'.format(step)),
+					#save alignment plot to disk (control purposes)
+					plot.plot_alignment(alignment, os.path.join(plot_dir, 'step-{}-align.png'.format(step)),
 						info='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, loss))
+					#save real mel-spectrogram plot to disk (control purposes)
+					plot.plot_spectrogram(target, os.path.join(plot_dir, 'step-{}-real-mel-spectrogram.png'.format(step)),
+						info='{}, {}, step={}, Real'.format(args.model, time_string(), step, loss))
+					#save predicted mel-spectrogram plot to disk (control purposes)
+					plot.plot_spectrogram(prediction, os.path.join(plot_dir, 'step-{}-pred-mel-spectrogram.png'.format(step)),
+						info='{}, {}, step={}, loss={:.5}'.format(args.model, time_string(), step, loss))
 					log('Input at step {}: {}'.format(step, sequence_to_text(input_seq)))
 
 		except Exception as e:
