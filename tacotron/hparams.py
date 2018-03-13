@@ -79,6 +79,9 @@ hparams = tf.contrib.training.HParams(
 	"The blue lagoon is a nineteen eighty American romance adventure film.",
 	"Tajima Airport serves Toyooka.",
 	'Talib Kweli confirmed to AllHipHop that he will be releasing an album in the next year.',
+	#From Training data:
+	'the rest being provided with barrack beds, and in dimensions varying from thirty feet by fifteen to fifteen feet by ten.',
+	'in giltspur street compter, where he was first lodged',
 	]
 
 	)

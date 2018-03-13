@@ -72,10 +72,10 @@ def _linear_to_mel(spectogram):
 	return np.dot(_mel_basis, spectogram)
 
 def _mel_to_linear(mel_spectrogram):
-    global _inv_mel_basis
-    if _inv_mel_basis is None:
-        _inv_mel_basis = np.linalg.pinv(_build_mel_basis())
-    return np.maximum(1e-10, np.dot(_inv_mel_basis, mel_spectrogram))
+	global _inv_mel_basis
+	if _inv_mel_basis is None:
+		_inv_mel_basis = np.linalg.pinv(_build_mel_basis())
+	return np.maximum(1e-10, np.dot(_inv_mel_basis, mel_spectrogram))
 
 def _build_mel_basis():
 	n_fft = (hparams.num_freq - 1) * 2

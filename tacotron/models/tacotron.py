@@ -178,16 +178,13 @@ class Tacotron():
 					global_step=global_step)
 
 	def _learning_rate_decay(self, init_lr, global_step):
-		# Exponential decay starting after 50,000 iterations (ignored for now)
+		# Exponential decay
 		# We won't drop learning rate below 10e-5
 		hp = self._hparams
 		step = tf.cast(global_step + 1, dtype=tf.float32)
-		#Testing decaying rate since beginning (as the model seems to train faster than expected)
-		#if tf.greater(step, self.decay_steps) == True:
 		lr = tf.train.exponential_decay(init_lr, 
 										global_step - self.decay_steps + 1, 
 										self.decay_steps, 
 										self.decay_rate,
 										name='exponential_decay')
 		return tf.maximum(hp.final_learning_rate, lr)
-		#return init_lr
