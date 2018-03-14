@@ -10,48 +10,65 @@ hparams = tf.contrib.training.HParams(
 
 	#Audio
 	num_mels=80, 
+
 	num_freq=1025,
 	sample_rate=22050, #22050 Hz (corresponding to ljspeech dataset)
 	frame_length_ms= 50,
 	frame_shift_ms= 12.5,
-	lfilter=True, #whether to use preemphasis
+
+	lfilter=False, #whether to use preemphasis
 	preemphasis=0.97,
+
 	min_level_db=-100,
 	ref_level_db=20,
 	fmin=125,
 	fmax=7600,
+	
 	power=1.3,
 	griffin_lim_iters=60,
 
 	#Model
 	outputs_per_step = 5, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
+
 	embedding_dim = 512, #dimension of embedding space
+
 	enc_conv_num_layers=3, #number of encoder convolutional layers
 	enc_conv_kernel_size=(5, ), #size of encoder convolution filters for each layer
 	enc_conv_channels=512, #number of encoder convolutions filters for each layer
 	encoder_lstm_units=256, #number of lstm units for each direction (forward and backward)
+
 	attention_dim = 128, #dimension of attention space
-	prenet_layers=[128, 128], #number of layers and number of units of prenet
+	attention_filters = 20, #number of attention convolution filters
+	attention_kernel = (7, ), #kernel size of attention convolution
+
+	prenet_layers=[256, 128], #number of layers and number of units of prenet
 	decoder_layers=2, #number of decoder lstm layers
-	decoder_lstm_units=512, #number of decoder lstm units on each layer
+	decoder_lstm_units=1024, #number of decoder lstm units on each layer
+	max_iters=175, #Max decoder steps during inference (feel free to change it)
+
 	postnet_num_layers=5, #number of postnet convolutional layers
 	postnet_kernel_size=(5, ), #size of postnet convolution filters for each layer
 	postnet_channels=512, #number of postnet convolution filters for each layer
-	max_iters=175, #Max decoder steps during inference (feel free to change it)
+
 
 	#Training
 	batch_size = 32, #number of training samples on each training steps
 	reg_weight = 10**(-6), #regularization weight (for l2 regularization)
+
 	decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	decay_steps = 50000, #starting point for learning rate decay (and determines the decay slope)
 	decay_rate = 0.4, #learning rate decay rate
 	initial_learning_rate = 10**(-3), #starting learning rate
 	final_learning_rate = 10**(-5), #minimal learning rate
+
 	adam_beta1 = 0.9, #AdamOptimizer beta1 parameter
 	adam_beta2 = 0.999, #AdamOptimizer beta2 parameter
 	adam_epsilon = 10**(-6), #AdamOptimizer beta3 parameter
+
 	zoneout_rate=0.1, #zoneout rate for all LSTM cells in the network
 	dropout_rate=0.5, #dropout rate for all convolutional layers + prenet
+
+	impute_finished=False, #Whether to cut off padded mel targets parts (under test)
 
 	#Eval sentences
 	sentences = [

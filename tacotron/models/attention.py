@@ -5,6 +5,8 @@ from tensorflow.contrib.seq2seq.python.ops.attention_wrapper import _BaseAttenti
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.layers import core as layers_core
 from tensorflow.python.ops import variable_scope
+from hparams import hparams
+
 
 
 
@@ -35,9 +37,10 @@ def _location_sensitive_score(W_query, attention_weights, W_keys):
 	# [batch_size, max_time] -> [batch_size, max_time, 1]
 	attention_weights = tf.expand_dims(attention_weights, axis=2)
 	# location features [batch_size, max_time, filters]
-	f = tf.layers.conv1d(attention_weights, filters=32,
-		kernel_size=(31, ), padding='same',
+	f = tf.layers.conv1d(attention_weights, filters=hparams.attention_filters,
+		kernel_size=hparams.attention_kernel, padding='same',
 		kernel_initializer=tf.contrib.layers.xavier_initializer(),
+		use_bias=False,
 		name='location_features')
 
 	# Projected location features [batch_size, max_time, attention_dim]
@@ -46,7 +49,7 @@ def _location_sensitive_score(W_query, attention_weights, W_keys):
 		num_outputs=num_units,
 		activation_fn=None,
 		weights_initializer=tf.contrib.layers.xavier_initializer(),
-		biases_initializer=tf.zeros_initializer(),
+		biases_initializer=None,
 		scope='W_filter')
 
 	v_a = tf.get_variable(

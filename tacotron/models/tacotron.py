@@ -90,7 +90,7 @@ class Tacotron():
 			#Decode
 			(decoder_output, _), final_decoder_state, self.stop_token_loss = dynamic_decode(
 				CustomDecoder(output_cell, self.helper, decoder_init_state),
-				impute_finished=True, #Cut out padded parts (enabled)
+				impute_finished=hp.impute_finished,
 				maximum_iterations=max_iterations)
 
 			# Reshape outputs to be one output per entry 
@@ -183,8 +183,8 @@ class Tacotron():
 		hp = self._hparams
 		step = tf.cast(global_step + 1, dtype=tf.float32)
 		lr = tf.train.exponential_decay(init_lr, 
-										global_step - self.decay_steps + 1, 
-										self.decay_steps, 
-										self.decay_rate,
-										name='exponential_decay')
+			global_step - self.decay_steps + 1, 
+			self.decay_steps, 
+			self.decay_rate,
+			name='exponential_decay')
 		return tf.maximum(hp.final_learning_rate, lr)

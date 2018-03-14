@@ -43,6 +43,8 @@ class Synthesizer:
 
 		mels = self.session.run(self.mel_outputs, feed_dict=feed_dict)
 
+		mels = mels.reshape(-1, 80) #Thanks to @imdatsolak for pointing this out
+
 		# Write the spectrogram to disk
 		#Note: outputs mel-spectrogram files and input ones have same names, just different folders
 		mel_filename = os.path.join(out_dir, 'ljspeech-mel-{:05d}.npy'.format(index))
