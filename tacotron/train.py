@@ -163,7 +163,7 @@ def main():
 	parser.add_argument('--restore', type=bool, default=True, help='Set this to False to do a fresh training')
 	parser.add_argument('--summary_interval', type=int, default=10,
 		help='Steps between running summary ops')
-	parser.add_argument('--checkpoint_interval', type=int, default=10,
+	parser.add_argument('--checkpoint_interval', type=int, default=100,
 		help='Steps between writing checkpoints')
 	parser.add_argument('--tf_log_level', type=int, default=1, help='Tensorflow C++ log level.')
 	args = parser.parse_args()
