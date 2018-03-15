@@ -21,16 +21,16 @@ class ZoneoutLSTMCell(RNNCell):
     """
 
     def __init__(self, num_units, is_training, input_size=None,
-                 use_peepholes=False, cell_clip=None,
-                 #initializer=orthogonal_initializer(),
-                 initializer=tf.contrib.layers.xavier_initializer(),
-                 num_proj=None, proj_clip=None, ext_proj=None,
-                 forget_bias=1.0,
-                 state_is_tuple=True,
-                 activation=tf.tanh,
-                 zoneout_factor_cell=0.0,
-                 zoneout_factor_output=0.0,
-                 reuse=None):
+         use_peepholes=False, cell_clip=None,
+         #initializer=orthogonal_initializer(),
+         initializer=tf.contrib.layers.xavier_initializer(),
+         num_proj=None, proj_clip=None, ext_proj=None,
+         forget_bias=1.0,
+         state_is_tuple=True,
+         activation=tf.tanh,
+         zoneout_factor_cell=0.0,
+         zoneout_factor_output=0.0,
+         reuse=None):
         """Initialize the parameters for an LSTM cell.
         Args:
           num_units: int, The number of units in the LSTM cell.

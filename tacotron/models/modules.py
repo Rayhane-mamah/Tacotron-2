@@ -1,7 +1,8 @@
 import tensorflow as tf 
 from .zoneout_LSTM import ZoneoutLSTMCell
-from tensorflow.contrib.rnn import LSTMStateTuple
+from tensorflow.contrib.rnn import RNNCell
 from hparams import hparams
+from tensorflow.python.layers import base
 
 
 def conv1d(inputs, kernel_size, channels, activation, is_training, scope):
@@ -17,110 +18,219 @@ def conv1d(inputs, kernel_size, channels, activation, is_training, scope):
 			kernel_initializer=tf.contrib.layers.xavier_initializer())
 		batched = tf.layers.batch_normalization(conv1d_output, training=is_training)
 		return tf.layers.dropout(batched, rate=drop_rate, training=is_training,
-		 						name='dropout_{}'.format(scope))
+								name='dropout_{}'.format(scope))
 
-def enc_conv_layers(inputs, is_training, kernel_size=(5, ), channels=512, activation=tf.nn.relu, scope=None):
-	if scope is None:
-		scope = 'enc_conv_layers'
 
-	with tf.variable_scope(scope):
-		x = inputs
-		for i in range(hparams.enc_conv_num_layers):
-			x = conv1d(x, kernel_size, channels, activation,
-							 	is_training, 'conv_layer_{}_'.format(i + 1)+scope)
-	return x
-
-def postnet(inputs, is_training, kernel_size=(5, ), channels=512, activation=tf.nn.tanh, scope=None):
-	if scope is None:
-		scope = 'dec_conv_layers'
-
-	with tf.variable_scope(scope):
-		x = inputs
-		for i in range(hparams.postnet_num_layers - 1):
-			x = conv1d(x, kernel_size, channels, activation,
-								is_training, 'conv_layer_{}_'.format(i + 1)+scope)
-		x = conv1d(x, kernel_size, channels, lambda _: _, is_training, 'conv_layer_{}_'.format(5)+scope)
-	return x
-
-def bidirectional_LSTM(inputs, input_lengths, scope, is_training, size=256, zoneout=0.1):
-	with tf.variable_scope(scope):
-		outputs, (fw_state, bw_state) = tf.nn.bidirectional_dynamic_rnn(
-												  ZoneoutLSTMCell(size, 
-												  				  is_training, 
-												  				  zoneout_factor_cell=zoneout,
-												  				  zoneout_factor_output=zoneout),
-												  ZoneoutLSTMCell(size, 
-												  				  is_training,
-												  				  zoneout_factor_cell=zoneout,
-                 												  zoneout_factor_output=zoneout),
-												  inputs,
-												  sequence_length=input_lengths,
-												  dtype=tf.float32)
-
-		#Concatenate c states and h states from forward
-		#and backward cells
-		encoder_final_state_c = tf.concat(
-			(fw_state.c, bw_state.c), 1)
-		encoder_final_state_h = tf.concat(
-			(fw_state.h, bw_state.h), 1)
-
-		#Get the final state, we don't really use it in our case
-		#I'll keep it just in case
-		final_state = LSTMStateTuple(
-			c=encoder_final_state_c,
-			h=encoder_final_state_h)
-
-		return tf.concat(outputs, axis=2), final_state # Concat forward + backward outputs and return with final states
-
-def unidirectional_LSTM(input_cell, is_training, layers=2, size=512, zoneout=0.1):
-	#Create a set of LSTM layers
-	rnn_layers = [ZoneoutLSTMCell(size, is_training, 
-								  zoneout_factor_cell=zoneout,
-								  zoneout_factor_output=zoneout) for i in range(layers)]
-
-	#Add the first concatenation layer wrapper
-	rnn_layers = [input_cell] + rnn_layers
-
-	return tf.nn.rnn_cell.MultiRNNCell(rnn_layers, state_is_tuple=True)
-
-def prenet(inputs, is_training, layer_sizes=[128, 128], scope=None):
-	x = inputs
-	drop_rate = hparams.dropout_rate
-
-	if scope is None:
-		scope = 'prenet'
-
-	with tf.variable_scope(scope):
-		for i, size in enumerate(layer_sizes):
-			dense = tf.layers.dense(x, units=size, activation=tf.nn.relu,
-				kernel_initializer=tf.contrib.layers.xavier_initializer(),
-				name='dense_{}'.format(i + 1))
-			#The paper discussed introducing diversity in generation at inference time
-			#by using a dropout of 0.5 only in prenet layers.
-			x = tf.layers.dropout(dense, rate=drop_rate, training=is_training, 
-								  name='dropout_{}_'.format(i + 1) + scope)
-	return x
-
-def projection(x, shape=80, activation=None, scope=None):
-	if scope is None:
-		scope = 'linear_projection'
-
-	with tf.variable_scope(scope):
-		# if activation==None, this returns a simple linear projection
-		# else the projection will be passed through an activation function
-		output = tf.contrib.layers.fully_connected(x, shape, activation_fn=activation, 
-												   biases_initializer=tf.zeros_initializer(),
-												   scope=scope)
-		return output
-
-def stop_token_projection(x, shape=1, activation=lambda _: _, weights_name='stop_token_weights', bias_name='step_token_bias'):
-	"""Just making sure we use the same weights for training and
-	inference time for stop token prediction
+class EncoderConvolutions(base.Layer):
+	"""Encoder convolutional layers used to find local dependencies in inputs characters.
 	"""
+	def __init__(self, is_training, kernel_size=(5, ), channels=512, activation=tf.nn.relu, scope=None):
+		"""
+		Args:
+			is_training: Boolean, determines if the model is training or in inference to control dropout
+			kernel_size: tuple or integer, The size of convolution kernels
+			channels: integer, number of convolutional kernels
+			activation: callable, postnet activation function for each convolutional layer
+			scope: Postnet scope.
+		"""
+		super(EncoderConvolutions, self).__init__()
+		self.is_training = is_training
 
-	st_W = tf.get_variable(weights_name, shape=[x.shape[-1], 1], dtype=tf.float32, initializer=tf.contrib.layers.xavier_initializer())
-	st_b = tf.get_variable(bias_name, shape=[1], dtype=tf.float32, initializer=tf.zeros_initializer())
+		self.kernel_size = kernel_size
+		self.channels = channels
+		self.activation = activation
+		self.scope = 'enc_conv_layers' if scope is None else scope
 
-	output = activation(tf.add(tf.matmul(x, st_W), st_b))
+	def __call__(self, inputs):
+		with tf.variable_scope(self.scope):
+			x = inputs
+			for i in range(hparams.enc_conv_num_layers):
+				x = conv1d(x, self.kernel_size, self.channels, self.activation,
+					self.is_training, 'conv_layer_{}_'.format(i + 1)+self.scope)
+		return x
 
-	return output
+
+class Postnet(base.Layer):
+	"""Postnet that takes final decoder output and fine tunes it (using vision on past and future frames)
+	"""
+	def __init__(self, is_training, kernel_size=(5, ), channels=512, activation=tf.nn.tanh, scope=None):
+		"""
+		Args:
+			is_training: Boolean, determines if the model is training or in inference to control dropout
+			kernel_size: tuple or integer, The size of convolution kernels
+			channels: integer, number of convolutional kernels
+			activation: callable, postnet activation function for each convolutional layer
+			scope: Postnet scope.
+		"""
+		super(Postnet, self).__init__()
+		self.is_training = is_training
+
+		self.kernel_size = kernel_size
+		self.channels = channels
+		self.activation = activation
+		self.scope = 'postnet_convolutions' if scope is None else scope
+
+	def __call__(self, inputs):
+		with tf.variable_scope(self.scope):
+			x = inputs
+			for i in range(hparams.postnet_num_layers - 1):
+				x = conv1d(x, self.kernel_size, self.channels, self.activation,
+					self.is_training, 'conv_layer_{}_'.format(i + 1)+self.scope)
+			x = conv1d(x, self.kernel_size, self.channels, lambda _: _, self.is_training, 'conv_layer_{}_'.format(5)+self.scope)
+		return x
+
+
+class EncoderRNN(RNNCell):
+	"""Encoder bidirectional one layer LSTM
+	"""
+	def __init__(self, is_training, size=256, zoneout=0.1, scope=None):
+		"""
+		Args:
+			is_training: Boolean, determines if the model is training or in inference to control zoneout
+			size: integer, the number of LSTM units for each direction
+			zoneout: the zoneout factor
+			scope: EncoderRNN scope.
+		"""
+		super(EncoderRNN, self).__init__()
+		self.is_training = is_training
+
+		self.size = size
+		self.zoneout = zoneout
+		self.scope = 'encoder_LSTM' if scope is None else scope
+
+		#Create LSTM Cell
+		self._cell = ZoneoutLSTMCell(size, is_training,
+			zoneout_factor_cell=zoneout,
+			zoneout_factor_output=zoneout)
+
+	def __call__(self, inputs, input_lengths):
+		outputs, (fw_state, bw_state) = tf.nn.bidirectional_dynamic_rnn(
+			self._cell,
+			self._cell,
+			inputs,
+			sequence_length=input_lengths,
+			dtype=tf.float32)
+
+		return tf.concat(outputs, axis=2) # Concat and return forward + backward outputs
+
+
+class DecoderRNN(RNNCell):
+	"""Decoder two uni directional LSTM Cells
+	"""
+	def __init__(self, is_training, layers=2, size=1024, zoneout=0.1):
+		"""
+		Args:
+			is_training: Boolean, determines if the model is in training or inference to control zoneout
+			size: integer, the number of LSTM units in each layer
+			zoneout: the zoneout factor
+		"""
+		super(DecoderRNN, self).__init__()
+		self.is_training = is_training
+
+		self.layers = layers
+		self.size = size
+		self.zoneout = zoneout
+
+		#Create a set of LSTM layers
+		self.rnn_layers = [ZoneoutLSTMCell(size, is_training, 
+			zoneout_factor_cell=zoneout,
+			zoneout_factor_output=zoneout) for i in range(layers)]
+
+		self._cell = tf.contrib.rnn.MultiRNNCell(self.rnn_layers, state_is_tuple=True)
+
+	def __call__(self, inputs, states):
+		return self._cell(inputs, states)
+
+
+class Prenet(base.Layer):
+	"""Two fully connected layers used as an information bottleneck for the attention.
+	"""
+	def __init__(self, is_training, layer_sizes=[256, 256], activation=tf.nn.relu, scope=None):
+		"""
+		Args:
+			is_training: Boolean, determines if the model is in training or inference to control dropout
+			layer_sizes: list of integers, the length of the list represents the number of pre-net
+				layers and the list values represent the layers number of units
+			activation: callable, activation functions of the prenet layers.
+			scope: Prenet scope.
+		"""
+		super(Prenet, self).__init__()
+		self.drop_rate = hparams.dropout_rate
+
+		self.layer_sizes = layer_sizes
+		self.is_training = is_training
+		self.activation = activation
+		
+		self.scope = 'prenet' if scope is None else scope
+
+	def __call__(self, inputs):
+		x = inputs
+
+		with tf.variable_scope(self.scope):
+			for i, size in enumerate(self.layer_sizes):
+				dense = tf.layers.dense(x, units=size, activation=self.activation,
+					kernel_initializer=tf.contrib.layers.xavier_initializer(),
+					name='dense_{}'.format(i + 1))
+				#The paper discussed introducing diversity in generation at inference time
+				#by using a dropout of 0.5 only in prenet layers.
+				x = tf.layers.dropout(dense, rate=self.drop_rate, training=self.is_training,
+					name='dropout_{}'.format(i + 1) + self.scope)
+		return x
+
+
+class FrameProjection(base.Layer):
+	"""Projection layer to r * num_mels dimensions or num_mels dimensions
+	"""
+	def __init__(self, shape=80, activation=None, scope=None):
+		"""
+		Args:
+			shape: integer, dimensionality of output space (r*n_mels for decoder or n_mels for postnet)
+			activation: callable, activation function
+			scope: FrameProjection scope.
+		"""
+		super(FrameProjection, self).__init__()
+
+		self.shape = shape
+		self.activation = activation
+		
+		self.scope = 'Linear_projection' if scope is None else scope
+
+	def __call__(self, inputs):
+		with tf.variable_scope(self.scope):
+			#If activation==None, this returns a simple Linear projection
+			#else the projection will be passed through an activation function
+			output = tf.layers.dense(inputs, units=self.shape, activation=self.activation,
+				kernel_initializer=tf.contrib.layers.xavier_initializer(),
+				name='projection_{}'.format(self.scope))
+
+			return output
+
+
+class StopProjection(base.Layer):
+	"""Projection to a scalar and through a sigmoid activation
+	"""
+	def __init__(self, is_training, shape=hparams.outputs_per_step, activation=tf.nn.sigmoid, scope=None):
+		"""
+		Args:
+			is_training: Boolean, to control the use of sigmoid function as it is useless to use it
+				during training since it is integrate inside the sigmoid_crossentropy loss
+			shape: integer, dimensionality of output space. Defaults to 1 (scalar)
+			activation: callable, activation function. only used during inference
+			scope: StopProjection scope.
+		"""
+		super(StopProjection, self).__init__()
+		self.is_training = is_training
+		
+		self.shape = shape
+		self.activation = activation
+		self.scope = 'stop_token_projection' if scope is None else scope
+
+	def __call__(self, inputs):
+		with tf.variable_scope(self.scope):
+			output = tf.layers.dense(inputs, units=self.shape, kernel_initializer=tf.contrib.layers.xavier_initializer(),
+				activation=None, name='projection_{}'.format(self.scope))
+
+			#During training, don't use activation as it is integrated inside the sigmoid_cross_entropy loss function
+			if self.is_training:
+				return output
+			return self.activation(output)

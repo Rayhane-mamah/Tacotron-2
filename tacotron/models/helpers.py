@@ -77,19 +77,11 @@ class TacoTrainingHelper(Helper):
 
 	def next_inputs(self, time, outputs, state, sample_ids, stop_token_prediction, name=None):
 		with tf.name_scope(name or 'TacoTrainingHelper'):
-			#A sequence is finished if we reach the full true length or we encounter padding
-			#It is essential to train the model on stopping when encountering padding 
-			#to gain the desired dynamic generation
-			true_finished = tf.logical_or((time + 1 >= self._lengths), tf.reduce_all(tf.equal(outputs, self._end_token), axis=1))
-
-			#Compute stop_token_loss of actual decoding step (for dynamic stop training)
-			self.stop_token_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-				labels=tf.cast(true_finished, tf.float32), 
-				logits=stop_token_prediction)) / self._num_steps
+			finished = (time + 1 >= self._lengths)
 
 			next_inputs = self._targets[:, time, :] #Teacher-forcing: return true frame
 			next_state = state #No change on the cell states
-			return (true_finished, next_inputs, next_state) #return true "finished" state
+			return (finished, next_inputs, next_state) #return true "finished" state
 
 
 def _go_frames(batch_size, output_dim):

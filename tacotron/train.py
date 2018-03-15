@@ -61,7 +61,7 @@ def train(log_dir, args):
 	global_step = tf.Variable(step_count, name='global_step', trainable=False)
 	with tf.variable_scope('model') as scope:
 		model = create_model(args.model, hparams)
-		model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets)
+		model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets)
 		model.add_loss()
 		model.add_optimizer(global_step)
 		stats = add_stats(model)
@@ -163,7 +163,7 @@ def main():
 	parser.add_argument('--restore', type=bool, default=True, help='Set this to False to do a fresh training')
 	parser.add_argument('--summary_interval', type=int, default=10,
 		help='Steps between running summary ops')
-	parser.add_argument('--checkpoint_interval', type=int, default=100,
+	parser.add_argument('--checkpoint_interval', type=int, default=10,
 		help='Steps between writing checkpoints')
 	parser.add_argument('--tf_log_level', type=int, default=1, help='Tensorflow C++ log level.')
 	args = parser.parse_args()

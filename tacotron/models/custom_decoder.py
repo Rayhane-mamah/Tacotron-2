@@ -12,13 +12,12 @@ from tensorflow.python.framework import tensor_shape
 from tensorflow.python.layers import base as layers_base
 from tensorflow.python.ops import rnn_cell_impl
 from tensorflow.python.util import nest
-from .modules import stop_token_projection
 from .helpers import TacoTrainingHelper, TacoTestHelper
 
 
 
 class CustomDecoderOutput(
-		collections.namedtuple("CustomDecoderOutput", ("rnn_output", "sample_id"))):
+		collections.namedtuple("CustomDecoderOutput", ("rnn_output", "token_output", "sample_id"))):
 	pass
 
 
@@ -85,6 +84,7 @@ class CustomDecoder(decoder.Decoder):
 		# Return the cell output and the id
 		return CustomDecoderOutput(
 				rnn_output=self._rnn_output_size(),
+				token_output=1,
 				sample_id=self._helper.sample_ids_shape)
 
 	@property
@@ -95,6 +95,7 @@ class CustomDecoder(decoder.Decoder):
 		dtype = nest.flatten(self._initial_state)[0].dtype
 		return CustomDecoderOutput(
 				nest.map_structure(lambda _: dtype, self._rnn_output_size()),
+				tf.float32,
 				self._helper.sample_ids_dtype)
 
 	def initialize(self, name=None):
@@ -108,8 +109,7 @@ class CustomDecoder(decoder.Decoder):
 
 	def step(self, time, inputs, state, name=None):
 		"""Perform a custom decoding step.
-		The difference compared to basic decoder is that it tries to determine
-		when to stop decoding at each step
+		Enables for dyanmic <stop_token> prediction
 		Args:
 			time: scalar `int32` tensor.
 			inputs: A (structure of) input tensors.
@@ -120,7 +120,7 @@ class CustomDecoder(decoder.Decoder):
 		"""
 		with ops.name_scope(name, "CustomDecoderStep", (time, inputs, state)):
 			#Call outputprojection wrapper cell
-			cell_outputs, cell_state = self._cell(inputs, state)
+			(cell_outputs, stop_token), cell_state = self._cell(inputs, state)
 
 			#apply output_layer (if existant)
 			if self._output_layer is not None:
@@ -128,26 +128,12 @@ class CustomDecoder(decoder.Decoder):
 			sample_ids = self._helper.sample(
 					time=time, outputs=cell_outputs, state=cell_state)
 
-			#extract LSTM output concatenated to context vector using previous wrappers
-			lstm_cat_context = self._cell._cell.lstm_concat_context
-
-			#Predict dynamic <stop_token> (Preferred to handle it in decoder step rather that inside the helper)
-			#Basically this extra "output" is trying to determine when to output a <stop_token> (similarly to NMT)
-			#Since Tacotron is basically trying to infer real values instead of one of possible classes (case of NMT)
-			#it requires a "binary-classifier" to determine when to stop since it will never output a perfect <stop_token> by regression.
-			if isinstance(self._helper, TacoTrainingHelper):
-				finished_p = tf.squeeze(stop_token_projection(lstm_cat_context), [1])
-			elif isinstance(self._helper, TacoTestHelper):
-				finished_p = tf.squeeze(stop_token_projection(lstm_cat_context, activation=tf.nn.sigmoid), [1])
-			else:
-				raise TypeError('Helper used does not belong to any supported Tacotron helpers (TacoTestHelper, TacoTrainingHelper)')
-
 			(finished, next_inputs, next_state) = self._helper.next_inputs(
 					time=time,
 					outputs=cell_outputs,
 					state=cell_state,
 					sample_ids=sample_ids,
-					stop_token_prediction=finished_p)
+					stop_token_prediction=stop_token)
 
-		outputs = CustomDecoderOutput(cell_outputs, sample_ids)
+		outputs = CustomDecoderOutput(cell_outputs, stop_token, sample_ids)
 		return (outputs, next_state, next_inputs, finished)

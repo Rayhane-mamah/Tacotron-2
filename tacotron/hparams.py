@@ -23,7 +23,7 @@ hparams = tf.contrib.training.HParams(
 	ref_level_db=20,
 	fmin=125,
 	fmax=7600,
-	
+
 	power=1.3,
 	griffin_lim_iters=60,
 
@@ -41,7 +41,7 @@ hparams = tf.contrib.training.HParams(
 	attention_filters = 20, #number of attention convolution filters
 	attention_kernel = (7, ), #kernel size of attention convolution
 
-	prenet_layers=[256, 128], #number of layers and number of units of prenet
+	prenet_layers=[256, 256], #number of layers and number of units of prenet
 	decoder_layers=2, #number of decoder lstm layers
 	decoder_lstm_units=1024, #number of decoder lstm units on each layer
 	max_iters=175, #Max decoder steps during inference (feel free to change it)
