@@ -32,6 +32,11 @@ class TacoTestHelper(Helper):
 		'''Stop on EOS. Otherwise, pass the last output as the next input and pass through state.'''
 		with tf.name_scope('TacoTestHelper'):
 			finished = tf.cast(tf.round(stop_token_prediction), tf.bool)
+
+			if hparams.stop_at_any:
+				finished = tf.reduce_any(finished) #Recommended
+			else:
+				finished = tf.reduce_all(finished) #Safer bet
 			
 			# Feed last output frame as next input. outputs is [N, output_dim * r]
 			next_inputs = outputs[:, -self._output_dim:]
