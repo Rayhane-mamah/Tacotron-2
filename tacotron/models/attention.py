@@ -1,7 +1,7 @@
 """Attention file for location based attention (compatible with tensorflow attention wrapper)"""
 
 import tensorflow as tf
-from tensorflow.contrib.seq2seq.python.ops.attention_wrapper import _BaseAttentionMechanism
+from tensorflow.contrib.seq2seq.python.ops.attention_wrapper import BahdanauAttention
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.layers import core as layers_core
 from tensorflow.python.ops import array_ops
@@ -61,7 +61,7 @@ def _location_sensitive_score(W_query, attention_weights, W_keys):
 	return tf.reduce_sum(v_a * tf.tanh(W_keys + tf.expand_dims(W_query, axis=1) + W_fil), axis=2)
 
 
-class LocationSensitiveAttention(_BaseAttentionMechanism):
+class LocationSensitiveAttention(BahdanauAttention):
 	"""Impelements Bahdanau-style (cumulative) scoring function.
 	Usually referred to as "hybrid" attention (content-based + location-based)
 	This attention is described in:
@@ -75,8 +75,6 @@ class LocationSensitiveAttention(_BaseAttentionMechanism):
 				 num_units,
 				 memory,
 				 memory_sequence_length=None,
-				 probability_fn=None,
-				 score_mask_value=tf.float32.min,
 				 name='LocationSensitiveAttention'):
 		"""Construct the Attention mechanism.
 		Args:
@@ -86,30 +84,13 @@ class LocationSensitiveAttention(_BaseAttentionMechanism):
 			memory_sequence_length (optional): Sequence lengths for the batch entries
 				in memory.  If provided, the memory tensor rows are masked with zeros
 				for values past the respective sequence lengths.
-			probability_fn: (optional) A `callable`.  Converts the score to
-				probabilities.  The default is @{tf.nn.softmax}. Other options include
-				@{tf.contrib.seq2seq.hardmax} and @{tf.contrib.sparsemax.sparsemax}.
-				Its signature should be: `probabilities = probability_fn(score)`.
-			score_mask_value: (optional): The mask value for score before passing into
-				`probability_fn`. The default is -inf. Only used if
-				`memory_sequence_length` is not None.
 			name: Name to use when creating ops.
 		"""
-		if probability_fn is None:
-			probability_fn = nn_ops.softmax
-		wrapped_probability_fn = lambda score, _: probability_fn(score)
 		super(LocationSensitiveAttention, self).__init__(
-				query_layer=layers_core.Dense(
-						num_units, name='query_layer', use_bias=False),
-				memory_layer=layers_core.Dense(
-						num_units, name='memory_layer', use_bias=False),
+				num_units=num_units,
 				memory=memory,
-				probability_fn=wrapped_probability_fn,
 				memory_sequence_length=memory_sequence_length,
-				score_mask_value=score_mask_value,
 				name=name)
-		self._num_units = num_units
-		self._name = name
 
 	def get_alignments(self, query, previous_alignments):
 		"""Score the query based on the keys and values.

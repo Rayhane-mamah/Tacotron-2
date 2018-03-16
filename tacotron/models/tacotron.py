@@ -4,7 +4,7 @@ from utils.infolog import log
 from .helpers import TacoTrainingHelper, TacoTestHelper
 from .modules import *
 from models.zoneout_LSTM import ZoneoutLSTMCell
-from tensorflow.contrib.seq2seq import dynamic_decode, BahdanauAttention
+from tensorflow.contrib.seq2seq import dynamic_decode
 from .Architecture_wrappers import TacotronEncoderCell, TacotronDecoderCell
 from .attention import LocationSensitiveAttention
 from .custom_decoder import CustomDecoder
