@@ -64,7 +64,7 @@ class Tacotron():
 			#Attention Decoder Prenet
 			prenet = Prenet(is_training, layer_sizes=hp.prenet_layers)
 			#Attention Mechanism
-			attention_mechanism = BahdanauAttention(hp.attention_dim, encoder_outputs)
+			attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs)
 			#Decoder LSTM Cells
 			decoder_lstm = DecoderRNN(is_training, layers=hp.decoder_layers,
 				size=hp.decoder_lstm_units, zoneout=hp.zoneout_rate)

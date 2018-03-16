@@ -69,7 +69,7 @@ hparams = tf.contrib.training.HParams(
 	zoneout_rate=0.1, #zoneout rate for all LSTM cells in the network
 	dropout_rate=0.5, #dropout rate for all convolutional layers + prenet
 
-	impute_finished=True, #Whether to cut off padded mel targets parts (under test)
+	impute_finished=False, #Whether to cut off padded mel targets parts (under test)
 
 	#Eval sentences
 	sentences = [
