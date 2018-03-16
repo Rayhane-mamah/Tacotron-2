@@ -39,8 +39,8 @@ hparams = tf.contrib.training.HParams(
 	encoder_lstm_units=256, #number of lstm units for each direction (forward and backward)
 
 	attention_dim = 128, #dimension of attention space
-	attention_filters = 20, #number of attention convolution filters
-	attention_kernel = (7, ), #kernel size of attention convolution
+	attention_filters = 32, #number of attention convolution filters
+	attention_kernel = (31, ), #kernel size of attention convolution
 
 	prenet_layers=[256, 256], #number of layers and number of units of prenet
 	decoder_layers=2, #number of decoder lstm layers
@@ -69,7 +69,7 @@ hparams = tf.contrib.training.HParams(
 	zoneout_rate=0.1, #zoneout rate for all LSTM cells in the network
 	dropout_rate=0.5, #dropout rate for all convolutional layers + prenet
 
-	impute_finished=False, #Whether to cut off padded mel targets parts (under test)
+	impute_finished=True, #Whether to cut off padded mel targets parts (Recommended to set to True)
 
 	#Eval sentences
 	sentences = [

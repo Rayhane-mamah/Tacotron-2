@@ -84,7 +84,7 @@ class CustomDecoder(decoder.Decoder):
 		# Return the cell output and the id
 		return CustomDecoderOutput(
 				rnn_output=self._rnn_output_size(),
-				token_output=1,
+				token_output=self._helper.token_output_size,
 				sample_id=self._helper.sample_ids_shape)
 
 	@property

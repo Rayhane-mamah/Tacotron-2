@@ -12,7 +12,7 @@ from hparams import hparams
 
 
 
-def _location_sensitive_score(W_query, attention_weights, W_keys):
+def _location_sensitive_score(W_query, W_fil, W_keys):
 	"""Impelements Bahdanau-style (cumulative) scoring function.
 	This attention is described in:
 	J. K. Chorowski, D. Bahdanau, D. Serdyuk, K. Cho, and Y. Ben-
@@ -27,38 +27,20 @@ def _location_sensitive_score(W_query, attention_weights, W_keys):
   #######################################################################
 
   Args:
-	W_query: Tensor, shape '[batch_size, num_units]' to compare to location features.
-	attention_weights (alignments): previous attention weights, shape '[batch_size, max_time]'
+	W_query: Tensor, shape '[batch_size, 1, num_units]' to compare to location features.
+	W_location: processed previous alignments into location features, shape '[batch_size, max_time, attention_dim]'
   Returns:
-	A '[batch_size, max_time]'
+	A '[batch_size, max_time]' attention score (energy)
 	"""
 	dtype = W_query.dtype
 	# Get the number of hidden units from the trailing dimension of query
 	num_units = W_query.shape[-1].value or array_ops.shape(W_query)[-1]
 
-	# [batch_size, max_time] -> [batch_size, max_time, 1]
-	attention_weights = tf.expand_dims(attention_weights, axis=2)
-	# location features [batch_size, max_time, filters]
-	f = tf.layers.conv1d(attention_weights, filters=hparams.attention_filters,
-		kernel_size=hparams.attention_kernel, padding='same',
-		kernel_initializer=tf.contrib.layers.xavier_initializer(),
-		use_bias=False,
-		name='location_features')
-
-	# Projected location features [batch_size, max_time, attention_dim]
-	W_fil = tf.contrib.layers.fully_connected(
-		f,
-		num_outputs=num_units,
-		activation_fn=None,
-		weights_initializer=tf.contrib.layers.xavier_initializer(),
-		biases_initializer=None,
-		scope='W_filter')
-
 	v_a = tf.get_variable(
 		'v_a', shape=[num_units], dtype=tf.float32,
 		initializer=tf.contrib.layers.xavier_initializer())
 
-	return tf.reduce_sum(v_a * tf.tanh(W_keys + tf.expand_dims(W_query, axis=1) + W_fil), axis=2)
+	return tf.reduce_sum(v_a * tf.tanh(W_keys + W_query + W_fil), axis=2)
 
 
 class LocationSensitiveAttention(BahdanauAttention):
@@ -92,12 +74,18 @@ class LocationSensitiveAttention(BahdanauAttention):
 				memory_sequence_length=memory_sequence_length,
 				name=name)
 
-	def get_alignments(self, query, previous_alignments):
+		self.location_convolution = tf.layers.Conv1D(filters=hparams.attention_filters,
+			kernel_size=hparams.attention_kernel, padding='same', use_bias=False, 
+			name='location_features_convolution')
+		self.location_layer = tf.layers.Dense(units=num_units, use_bias=False, 
+			dtype=tf.float32, name='location_features_layer')
+
+	def __call__(self, query, state):
 		"""Score the query based on the keys and values.
 		Args:
 			query: Tensor of dtype matching `self.values` and shape
 				`[batch_size, query_depth]`.
-			previous_alignments: Tensor of dtype matching `self.values` and shape
+			state (previous alignments): Tensor of dtype matching `self.values` and shape
 				`[batch_size, alignments_size]`
 				(`alignments_size` is memory's `max_time`).
 		Returns:
@@ -105,34 +93,27 @@ class LocationSensitiveAttention(BahdanauAttention):
 				`[batch_size, alignments_size]` (`alignments_size` is memory's
 				`max_time`).
 		"""
+		previous_alignments = state
 		with variable_scope.variable_scope(None, "Location_Sensitive_Attention", [query]):
+
 			# processed_query shape [batch_size, query_depth] -> [batch_size, attention_dim]
 			processed_query = self.query_layer(query) if self.query_layer else query
+			# -> [batch_size, 1, attention_dim]
+			processed_query = tf.expand_dims(processed_query, 1)
+
+			# processed_location_features shape [batch_size, max_time, attention dimension]
+			# [batch_size, max_time] -> [batch_size, max_time, 1]
+			expanded_alignments = tf.expand_dims(previous_alignments, axis=2)
+			# location features [batch_size, max_time, filters]
+			f = self.location_convolution(expanded_alignments)
+			# Projected location features [batch_size, max_time, attention_dim]
+			processed_location_features = self.location_layer(f)
+
 			# energy shape [batch_size, max_time]
-			energy = _location_sensitive_score(processed_query, previous_alignments, self._keys)
+			energy = _location_sensitive_score(processed_query, processed_location_features, self.keys)
+
 		# alignments shape = energy shape = [batch_size, max_time]
 		alignments = self._probability_fn(energy, previous_alignments)
-		return alignments
 
-
-	def __call__(self, query_vector, previous_alignments):
-		"""Computes the context vector and alignments.
-		"""
-		alignments = self.get_alignments(query_vector, previous_alignments)
-
-		# Reshape from [batch_size, memory_time] to [batch_size, 1, memory_time]
-		expanded_alignments = array_ops.expand_dims(alignments, 1)
-
-		# Context is the inner product of alignments and values along the
-		# memory time dimension.
-		# alignments shape is
-		#   [batch_size, 1, memory_time]
-		# attention_mechanism.values shape is
-		#   [batch_size, memory_time, memory_size]
-		# the batched matmul is over memory_time, so the output shape is
-		#   [batch_size, 1, memory_size].
-		# we then squeeze out the singleton dim.
-		context = math_ops.matmul(expanded_alignments, self.values)
-		context = array_ops.squeeze(context, [1])
-
-		return context, alignments
+		next_state = alignments
+		return alignments, next_state

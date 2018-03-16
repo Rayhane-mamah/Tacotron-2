@@ -12,7 +12,7 @@ from tensorflow.python.util import nest
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import tensor_array_ops
 from tensorflow.python.framework import tensor_shape
-
+from tensorflow.contrib.seq2seq.python.ops.attention_wrapper import _compute_attention
 
 _zero_state_tensors = rnn_cell_impl._zero_state_tensors
 
@@ -155,13 +155,15 @@ class TacotronDecoderCell(RNNCell):
 		prenet_output = self._prenet(inputs)
 
 		#Compute the attention (context) vector and alignments using
-		#first decoder hidden state as query vector and previous alignments
-		#to extract location features
-		first_rnn_state, last_rnn_state = state.cell_state
-		decoder_hidden_state = tf.concat([first_rnn_state.h, last_rnn_state.h], axis=-1)
+		#the concatenation of last decoder timestep output with previous context vector 
+		# as query vector and previous alignments to extract location features
+		attention_inputs = tf.concat([inputs, state.attention], axis=-1)
 		previous_alignments = state.alignments
 		previous_alignment_history = state.alignment_history
-		context_vector, alignments = self._attention_mechanism(decoder_hidden_state, previous_alignments)
+		context_vector, alignments, _ = _compute_attention(self._attention_mechanism, 
+			attention_inputs,
+			previous_alignments,
+			attention_layer=None)
 
 		#Concat context vector and prenet output to form LSTM cells input
 		LSTM_input = tf.concat([prenet_output, context_vector], axis=-1)

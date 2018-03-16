@@ -8,11 +8,16 @@ class TacoTestHelper(Helper):
 		with tf.name_scope('TacoTestHelper'):
 			self._batch_size = batch_size
 			self._output_dim = output_dim
+			self._reduction_factor = r
 			self._end_token = tf.tile([0.0], [output_dim * r])
 
 	@property
 	def batch_size(self):
 		return self._batch_size
+
+	@property
+	def token_output_size(self):
+		return self._reduction_factor
 
 	@property
 	def sample_ids_shape(self):
@@ -50,6 +55,7 @@ class TacoTrainingHelper(Helper):
 		with tf.name_scope('TacoTrainingHelper'):
 			self._batch_size = tf.shape(inputs)[0]
 			self._output_dim = output_dim
+			self._reduction_factor = r
 
 			# Feed every r-th target frame as input
 			self._targets = targets[:, r-1::r, :]
@@ -65,6 +71,10 @@ class TacoTrainingHelper(Helper):
 	@property
 	def batch_size(self):
 		return self._batch_size
+
+	@property
+	def token_output_size(self):
+		return self._reduction_factor
 
 	@property
 	def sample_ids_shape(self):
