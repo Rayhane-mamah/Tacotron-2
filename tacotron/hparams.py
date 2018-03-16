@@ -69,7 +69,7 @@ hparams = tf.contrib.training.HParams(
 	zoneout_rate=0.1, #zoneout rate for all LSTM cells in the network
 	dropout_rate=0.5, #dropout rate for all convolutional layers + prenet
 
-	impute_finished=False, #Whether to cut off padded mel targets parts (under test)
+	impute_finished=True, #Whether to cut off padded mel targets parts (under test)
 
 	#Eval sentences
 	sentences = [
@@ -100,6 +100,7 @@ hparams = tf.contrib.training.HParams(
 	#From Training data:
 	'the rest being provided with barrack beds, and in dimensions varying from thirty feet by fifteen to fifteen feet by ten.',
 	'in giltspur street compter, where he was first lodged',
+	'a man named burnett came with his wife and took up his residence at whitchurch, hampshire, at no great distance from laverstock,',
 	]
 
 	)

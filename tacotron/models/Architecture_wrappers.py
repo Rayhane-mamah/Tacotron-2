@@ -158,9 +158,10 @@ class TacotronDecoderCell(RNNCell):
 		#first decoder hidden state as query vector and previous alignments
 		#to extract location features
 		first_rnn_state, last_rnn_state = state.cell_state
+		decoder_hidden_state = tf.concat([first_rnn_state.h, last_rnn_state.h], axis=-1)
 		previous_alignments = state.alignments
 		previous_alignment_history = state.alignment_history
-		context_vector, alignments = self._attention_mechanism(first_rnn_state.h, previous_alignments)
+		context_vector, alignments = self._attention_mechanism(decoder_hidden_state, previous_alignments)
 
 		#Concat context vector and prenet output to form LSTM cells input
 		LSTM_input = tf.concat([prenet_output, context_vector], axis=-1)

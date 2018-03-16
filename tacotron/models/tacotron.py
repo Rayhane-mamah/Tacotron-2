@@ -4,7 +4,7 @@ from utils.infolog import log
 from .helpers import TacoTrainingHelper, TacoTestHelper
 from .modules import *
 from models.zoneout_LSTM import ZoneoutLSTMCell
-from tensorflow.contrib.seq2seq import dynamic_decode
+from tensorflow.contrib.seq2seq import dynamic_decode, BahdanauAttention
 from .Architecture_wrappers import TacotronEncoderCell, TacotronDecoderCell
 from .attention import LocationSensitiveAttention
 from .custom_decoder import CustomDecoder
@@ -64,7 +64,7 @@ class Tacotron():
 			#Attention Decoder Prenet
 			prenet = Prenet(is_training, layer_sizes=hp.prenet_layers)
 			#Attention Mechanism
-			attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs)
+			attention_mechanism = BahdanauAttention(hp.attention_dim, encoder_outputs)
 			#Decoder LSTM Cells
 			decoder_lstm = DecoderRNN(is_training, layers=hp.decoder_layers,
 				size=hp.decoder_lstm_units, zoneout=hp.zoneout_rate)
