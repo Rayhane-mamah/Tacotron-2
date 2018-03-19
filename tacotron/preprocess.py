@@ -18,7 +18,8 @@ def write_metadata(metadata, out_dir):
 		for m in metadata:
 			f.write('|'.join([str(x) for x in m]) + '\n')
 	frames = sum([int(m[1]) for m in metadata])
-	hours = frames * hparams.frame_shift_ms / (3600 * 1000)
+	frame_shift_ms = hparams.hop_size / hparams.sample_rate
+	hours = frames * frame_shift_ms / 3600
 	print('Write {} utterances, {} frames, ({:.2f} hours)'.format(len(metadata), frames, hours))
 	print('Max input length: {}'.format(max(len(m[2]) for m in metadata)))
 	print('Max output length: {}'.format(max(int(m[1]) for m in metadata)))

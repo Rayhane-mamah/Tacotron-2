@@ -10,21 +10,27 @@ hparams = tf.contrib.training.HParams(
 
 	#Audio
 	num_mels=80, 
+	rescale = True, 
+	rescaling_max=0.999,
 
-	num_freq=1025,
+	#Mel spectrogram
+	fft_size = 1024,
+	hop_size=256,
 	sample_rate=22050, #22050 Hz (corresponding to ljspeech dataset)
 	frame_length_ms= 50,
 	frame_shift_ms= 12.5,
 
-	lfilter=False, #whether to use preemphasis
-	preemphasis=0.97,
+	#Mel spectrogram clipping
+	allow_clipping_in_normalization=True,
 
+	#Limits
 	min_level_db=-100,
 	ref_level_db=20,
 	fmin=125,
 	fmax=7600,
 
-	power=1.5,
+	#Griffin Lim
+	power=1.55,
 	griffin_lim_iters=60,
 
 	#Model

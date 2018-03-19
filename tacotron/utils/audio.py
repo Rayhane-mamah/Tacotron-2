@@ -19,19 +19,27 @@ def preemphasis(x):
 def inv_preemphasis(x):
 	return signal.lfilter([1], [1, -hparams.preemphasis], x)
 
-def melspectrogram(y):
-	if hparams.lfilter:
-		D = _stft(preemphasis(y))
-	else:
-		D = _stft(y)
+def get_hop_size():
+	hop_size = hparams.hop_size
+	if hop_size is None:
+		assert hparams.frame_shift_ms is not None
+		hop_size = int(hparams.frame_shift_ms / 1000 * hparams.sample_rate)
+	return hop_size
+
+def melspectrogram(wav):
+	if hparams.rescale:
+		wav = wav / np.abs(wav).max() * hparams.rescaling_max
+
+	D = _stft(wav)
 	S = _amp_to_db(_linear_to_mel(np.abs(D))) - hparams.ref_level_db
+	if not hparams.allow_clipping_in_normalization:
+		assert S.max() <= 0 and S.min() - hparams.min_level_db >= 0
 	return _normalize(S)
 
 def inv_mel_spectrogram(mel_spectrogram):
 	'''Converts mel spectrogram to waveform using librosa'''
 	S = _mel_to_linear(_db_to_amp(_denormalize(mel_spectrogram) + hparams.ref_level_db))  # Convert back to linear
-	if hparams.lfilter:
-		return inv_preemphasis(_griffin_lim(S ** hparams.power)) # Reconstruct phase
+
 	return _griffin_lim(S ** hparams.power)
 
 def _griffin_lim(S):
@@ -47,12 +55,10 @@ def _griffin_lim(S):
 	return y
 
 def _stft(y):
-	n_fft, hop_length, win_length = _stft_params()
-	return librosa.stft(y=y, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
+	return librosa.stft(y=y, n_fft=hparams.fft_size, hop_length=get_hop_size())
 
 def _istft(y):
-	_, hop_length, win_length = _stft_params()
-	return librosa.istft(y, hop_length=hop_length, win_length=win_length)
+	return librosa.istft(y, hop_length=get_hop_size())
 
 def _stft_params():
 	n_fft = (hparams.num_freq - 1) * 2
@@ -78,12 +84,13 @@ def _mel_to_linear(mel_spectrogram):
 	return np.maximum(1e-10, np.dot(_inv_mel_basis, mel_spectrogram))
 
 def _build_mel_basis():
-	n_fft = (hparams.num_freq - 1) * 2
-	return librosa.filters.mel(hparams.sample_rate, n_fft, n_mels=hparams.num_mels,
-							   fmin=hparams.fmin, fmax=hparams.fmax,)
+	assert hparams.fmax <= hparams.sample_rate // 2
+	return librosa.filters.mel(hparams.sample_rate, hparams.fft_size, n_mels=hparams.num_mels,
+							   fmin=hparams.fmin, fmax=hparams.fmax)
 
 def _amp_to_db(x):
-	return 20 * np.log10(np.maximum(1e-5, x))
+	min_level = np.exp(hparams.min_level_db / 20 * np.log(10))
+	return 20 * np.log10(np.maximum(min_level, x))
 
 def _db_to_amp(x):
 	return np.power(10.0, (x) * 0.05)
