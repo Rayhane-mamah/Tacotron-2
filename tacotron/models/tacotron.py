@@ -42,14 +42,14 @@ class Tacotron():
 			# Embeddings ==> [batch_size, sequence_length, embedding_dim]
 			embedding_table = tf.get_variable(
 				'inputs_embedding', [len(symbols), hp.embedding_dim], dtype=tf.float32,
-				initializer=tf.contrib.layers.xavier_initializer())
+				initializer=tf.contrib.layers.xavier_initializer(uniform=False))
 			embedded_inputs = tf.nn.embedding_lookup(embedding_table, inputs)
 
 
 			#Encoder Cell ==> [batch_size, encoder_steps, encoder_lstm_units]
 			encoder_cell = TacotronEncoderCell(
 				EncoderConvolutions(is_training, kernel_size=hp.enc_conv_kernel_size,
-					channels=hp.enc_conv_channels),
+					channels=hp.enc_conv_channels, scope='encoder_convolutions'),
 				EncoderRNN(is_training, size=hp.encoder_lstm_units,
 					zoneout=hp.zoneout_rate, scope='encoder_LSTM'))
 
@@ -61,16 +61,16 @@ class Tacotron():
 
 			#Decoder Parts
 			#Attention Decoder Prenet
-			prenet = Prenet(is_training, layer_sizes=hp.prenet_layers)
+			prenet = Prenet(is_training, layer_sizes=hp.prenet_layers, scope='decoder_prenet')
 			#Attention Mechanism
-			attention_mechanism = BahdanauAttention(hp.attention_dim, encoder_outputs)
+			attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs)
 			#Decoder LSTM Cells
 			decoder_lstm = DecoderRNN(is_training, layers=hp.decoder_layers,
-				size=hp.decoder_lstm_units, zoneout=hp.zoneout_rate)
+				size=hp.decoder_lstm_units, zoneout=hp.zoneout_rate, scope='decoder_lstm')
 			#Frames Projection layer
-			frame_projection = FrameProjection(hp.num_mels * hp.outputs_per_step)
+			frame_projection = FrameProjection(hp.num_mels * hp.outputs_per_step, scope='linear_transform')
 			#<stop_token> projection layer
-			stop_projection = StopProjection(is_training)
+			stop_projection = StopProjection(is_training, scope='stop_token_projection')
 
 
 			#Decoder Cell ==> [batch_size, decoder_steps, num_mels * r] (after decoding)
@@ -88,8 +88,6 @@ class Tacotron():
 			else:
 				self.helper = TacoTestHelper(batch_size, hp.num_mels, hp.outputs_per_step)
 
-			#We'll only limit decoder time steps during inference (consult hparams.py to modify the value)
-			max_iterations = None if is_training else hp.max_iters
 
 			#initial decoder state
 			decoder_init_state = decoder_cell.zero_state(batch_size=batch_size, dtype=tf.float32)
@@ -99,7 +97,7 @@ class Tacotron():
 			(frames_prediction, stop_token_prediction, _), final_decoder_state, _ = dynamic_decode(
 				CustomDecoder(decoder_cell, self.helper, decoder_init_state),
 				impute_finished=hp.impute_finished,
-				maximum_iterations=max_iterations)
+				maximum_iterations=hp.max_iters)
 
 
 			# Reshape outputs to be one output per entry 
@@ -110,14 +108,14 @@ class Tacotron():
 
 			#Postnet
 			postnet = Postnet(is_training, kernel_size=hp.postnet_kernel_size, 
-				channels=hp.postnet_channels)
+				channels=hp.postnet_channels, scope='postnet_convolutions')
 
 			#Compute residual using post-net ==> [batch_size, decoder_steps * r, postnet_channels]
 			residual = postnet(decoder_output)
 
 			#Project residual to same dimension as mel spectrogram 
 			#==> [batch_size, decoder_steps * r, num_mels]
-			residual_projection = FrameProjection(hp.num_mels)
+			residual_projection = FrameProjection(hp.num_mels, scope='postnet_projection')
 			projected_residual = residual_projection(residual)
 
 

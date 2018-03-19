@@ -150,14 +150,18 @@ class TacotronDecoderCell(RNNCell):
 				alignment_history=tensor_array_ops.TensorArray(dtype=dtype, size=0,
 				dynamic_size=True))
 
-	def call(self, inputs, state):
+	def __call__(self, inputs, state):
 		#Pass the previously predicted frame through the prenet
 		prenet_output = self._prenet(inputs)
 
 		#Compute the attention (context) vector and alignments using
-		#the concatenation of last decoder timestep output with previous context vector 
-		# as query vector and previous alignments to extract location features
-		attention_inputs = tf.concat([inputs, state.attention], axis=-1)
+		#the top layer hidden state as query vector 
+		#and previous alignments to extract location features
+		#Based on Luong et Al. (2015):
+		#https://arxiv.org/pdf/1508.04025.pdf
+		first_lstm_state, last_lstm_state = state.cell_state
+		attention_inputs = last_lstm_state.h
+
 		previous_alignments = state.alignments
 		previous_alignment_history = state.alignment_history
 		context_vector, alignments, _ = _compute_attention(self._attention_mechanism, 

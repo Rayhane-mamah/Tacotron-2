@@ -24,7 +24,7 @@ hparams = tf.contrib.training.HParams(
 	fmin=125,
 	fmax=7600,
 
-	power=1.3,
+	power=1.5,
 	griffin_lim_iters=60,
 
 	#Model
@@ -54,17 +54,17 @@ hparams = tf.contrib.training.HParams(
 
 	#Training
 	batch_size = 32, #number of training samples on each training steps
-	reg_weight = 10**(-6), #regularization weight (for l2 regularization)
+	reg_weight = 1e-6, #regularization weight (for l2 regularization)
 
 	decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	decay_steps = 50000, #starting point for learning rate decay (and determines the decay slope)
 	decay_rate = 0.4, #learning rate decay rate
-	initial_learning_rate = 10**(-3), #starting learning rate
-	final_learning_rate = 10**(-5), #minimal learning rate
+	initial_learning_rate = 1e-3, #starting learning rate
+	final_learning_rate = 1e-5, #minimal learning rate
 
 	adam_beta1 = 0.9, #AdamOptimizer beta1 parameter
 	adam_beta2 = 0.999, #AdamOptimizer beta2 parameter
-	adam_epsilon = 10**(-6), #AdamOptimizer beta3 parameter
+	adam_epsilon = 1e-6, #AdamOptimizer beta3 parameter
 
 	zoneout_rate=0.1, #zoneout rate for all LSTM cells in the network
 	dropout_rate=0.5, #dropout rate for all convolutional layers + prenet

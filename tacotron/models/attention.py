@@ -46,6 +46,12 @@ def _location_sensitive_score(W_query, W_fil, W_keys):
 class LocationSensitiveAttention(BahdanauAttention):
 	"""Impelements Bahdanau-style (cumulative) scoring function.
 	Usually referred to as "hybrid" attention (content-based + location-based)
+	Extends the additive attention described in:
+	"D. Bahdanau, K. Cho, and Y. Bengio, “Neural machine transla-
+  tion by jointly learning to align and translate,” in Proceedings
+  of ICLR, 2015."
+  	to use previous alignments as additional location features.
+  	
 	This attention is described in:
 	J. K. Chorowski, D. Bahdanau, D. Serdyuk, K. Cho, and Y. Ben-
   gio, “Attention-based models for speech recognition,” in Ad-
