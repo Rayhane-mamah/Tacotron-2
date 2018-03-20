@@ -89,7 +89,7 @@ def _build_mel_basis():
 							   fmin=hparams.fmin, fmax=hparams.fmax)
 
 def _amp_to_db(x):
-	min_level = np.exp(hparams.min_level_db / 20 * np.log(10))
+	min_level = _db_to_amp(hparams.min_level_db)
 	return 20 * np.log10(np.maximum(min_level, x))
 
 def _db_to_amp(x):
