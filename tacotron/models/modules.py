@@ -1,8 +1,7 @@
 import tensorflow as tf 
 from .zoneout_LSTM import ZoneoutLSTMCell
-from tensorflow.contrib.rnn import RNNCell, LSTMBlockCell
+from tensorflow.contrib.rnn import LSTMBlockCell
 from hparams import hparams
-from tensorflow.python.layers import base
 
 
 def conv1d(inputs, kernel_size, channels, activation, is_training, scope):
@@ -14,15 +13,14 @@ def conv1d(inputs, kernel_size, channels, activation, is_training, scope):
 			filters=channels,
 			kernel_size=kernel_size,
 			activation=None,
-			padding='same',
-			kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=False))
+			padding='same')
 		batched = tf.layers.batch_normalization(conv1d_output, training=is_training)
 		activated = activation(batched)
 		return tf.layers.dropout(activated, rate=drop_rate, training=is_training,
 								name='dropout_{}'.format(scope))
 
 
-class EncoderConvolutions(base.Layer):
+class EncoderConvolutions:
 	"""Encoder convolutional layers used to find local dependencies in inputs characters.
 	"""
 	def __init__(self, is_training, kernel_size=(5, ), channels=512, activation=tf.nn.relu, scope=None):
@@ -51,7 +49,7 @@ class EncoderConvolutions(base.Layer):
 		return x
 
 
-class EncoderRNN(RNNCell):
+class EncoderRNN:
 	"""Encoder bidirectional one layer LSTM
 	"""
 	def __init__(self, is_training, size=256, zoneout=0.1, scope=None):
@@ -70,10 +68,9 @@ class EncoderRNN(RNNCell):
 		self.scope = 'encoder_LSTM' if scope is None else scope
 
 		#Create LSTM Cell
-		# self._cell = ZoneoutLSTMCell(size, is_training,
-		# 	zoneout_factor_cell=zoneout,
-		# 	zoneout_factor_output=zoneout)
-		self._cell = LSTMBlockCell(size)
+		self._cell = ZoneoutLSTMCell(size, is_training,
+			zoneout_factor_cell=zoneout,
+			zoneout_factor_output=zoneout)
 
 	def __call__(self, inputs, input_lengths):
 		with tf.variable_scope(self.scope):
@@ -87,7 +84,7 @@ class EncoderRNN(RNNCell):
 			return tf.concat(outputs, axis=2) # Concat and return forward + backward outputs
 
 
-class Prenet(base.Layer):
+class Prenet:
 	"""Two fully connected layers used as an information bottleneck for the attention.
 	"""
 	def __init__(self, is_training, layer_sizes=[256, 256], activation=tf.nn.relu, scope=None):
@@ -114,7 +111,6 @@ class Prenet(base.Layer):
 		with tf.variable_scope(self.scope):
 			for i, size in enumerate(self.layer_sizes):
 				dense = tf.layers.dense(x, units=size, activation=self.activation,
-					kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=False),
 					name='dense_{}'.format(i + 1))
 				#The paper discussed introducing diversity in generation at inference time
 				#by using a dropout of 0.5 only in prenet layers.
@@ -123,7 +119,7 @@ class Prenet(base.Layer):
 		return x
 
 
-class DecoderRNN(RNNCell):
+class DecoderRNN:
 	"""Decoder two uni directional LSTM Cells
 	"""
 	def __init__(self, is_training, layers=2, size=1024, zoneout=0.1, scope=None):
@@ -143,10 +139,9 @@ class DecoderRNN(RNNCell):
 		self.scope = 'decoder_rnn' if scope is None else scope
 
 		#Create a set of LSTM layers
-		# self.rnn_layers = [ZoneoutLSTMCell(size, is_training, 
-		# 	zoneout_factor_cell=zoneout,
-		# 	zoneout_factor_output=zoneout) for i in range(layers)]
-		self.rnn_layers = [LSTMBlockCell(size) for i in range(layers)]
+		self.rnn_layers = [ZoneoutLSTMCell(size, is_training, 
+			zoneout_factor_cell=zoneout,
+			zoneout_factor_output=zoneout) for i in range(layers)]
 
 		self._cell = tf.contrib.rnn.MultiRNNCell(self.rnn_layers, state_is_tuple=True)
 
@@ -155,7 +150,7 @@ class DecoderRNN(RNNCell):
 			return self._cell(inputs, states)
 
 
-class FrameProjection(base.Layer):
+class FrameProjection:
 	"""Projection layer to r * num_mels dimensions or num_mels dimensions
 	"""
 	def __init__(self, shape=80, activation=None, scope=None):
@@ -177,13 +172,12 @@ class FrameProjection(base.Layer):
 			#If activation==None, this returns a simple Linear projection
 			#else the projection will be passed through an activation function
 			output = tf.layers.dense(inputs, units=self.shape, activation=self.activation,
-				kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=False),
 				name='projection_{}'.format(self.scope))
 
 			return output
 
 
-class StopProjection(base.Layer):
+class StopProjection:
 	"""Projection to a scalar and through a sigmoid activation
 	"""
 	def __init__(self, is_training, shape=hparams.outputs_per_step, activation=tf.nn.sigmoid, scope=None):
@@ -204,7 +198,7 @@ class StopProjection(base.Layer):
 
 	def __call__(self, inputs):
 		with tf.variable_scope(self.scope):
-			output = tf.layers.dense(inputs, units=self.shape, kernel_initializer=tf.contrib.layers.xavier_initializer(uniform=False),
+			output = tf.layers.dense(inputs, units=self.shape,
 				activation=None, name='projection_{}'.format(self.scope))
 
 			#During training, don't use activation as it is integrated inside the sigmoid_cross_entropy loss function
@@ -213,7 +207,7 @@ class StopProjection(base.Layer):
 			return self.activation(output)
 
 
-class Postnet(base.Layer):
+class Postnet:
 	"""Postnet that takes final decoder output and fine tunes it (using vision on past and future frames)
 	"""
 	def __init__(self, is_training, kernel_size=(5, ), channels=512, activation=tf.nn.tanh, scope=None):

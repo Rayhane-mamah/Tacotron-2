@@ -60,12 +60,6 @@ def _stft(y):
 def _istft(y):
 	return librosa.istft(y, hop_length=get_hop_size())
 
-def _stft_params():
-	n_fft = (hparams.num_freq - 1) * 2
-	hop_length = int(hparams.frame_shift_ms / 1000 * hparams.sample_rate)
-	win_length = int(hparams.frame_length_ms / 1000 * hparams.sample_rate)
-	return n_fft, hop_length, win_length
-
 
 # Conversions
 _mel_basis = None
@@ -89,7 +83,7 @@ def _build_mel_basis():
 							   fmin=hparams.fmin, fmax=hparams.fmax)
 
 def _amp_to_db(x):
-	min_level = _db_to_amp(hparams.min_level_db)
+	min_level = np.exp(hparams.min_level_db / 20 * np.log(10))
 	return 20 * np.log10(np.maximum(min_level, x))
 
 def _db_to_amp(x):

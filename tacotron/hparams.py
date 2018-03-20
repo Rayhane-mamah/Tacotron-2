@@ -44,6 +44,7 @@ hparams = tf.contrib.training.HParams(
 	enc_conv_channels=512, #number of encoder convolutions filters for each layer
 	encoder_lstm_units=256, #number of lstm units for each direction (forward and backward)
 
+	smoothing=False, #Whether to smooth the attention normalization function 
 	attention_dim = 128, #dimension of attention space
 	attention_filters = 32, #number of attention convolution filters
 	attention_kernel = (31, ), #kernel size of attention convolution

@@ -41,8 +41,7 @@ class Tacotron():
 
 			# Embeddings ==> [batch_size, sequence_length, embedding_dim]
 			embedding_table = tf.get_variable(
-				'inputs_embedding', [len(symbols), hp.embedding_dim], dtype=tf.float32,
-				initializer=tf.contrib.layers.xavier_initializer(uniform=False))
+				'inputs_embedding', [len(symbols), hp.embedding_dim], dtype=tf.float32)
 			embedded_inputs = tf.nn.embedding_lookup(embedding_table, inputs)
 
 
@@ -63,7 +62,8 @@ class Tacotron():
 			#Attention Decoder Prenet
 			prenet = Prenet(is_training, layer_sizes=hp.prenet_layers, scope='decoder_prenet')
 			#Attention Mechanism
-			attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs)
+			attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs,
+				memory_sequence_length=input_lengths, smoothing=hp.smoothing)
 			#Decoder LSTM Cells
 			decoder_lstm = DecoderRNN(is_training, layers=hp.decoder_layers,
 				size=hp.decoder_lstm_units, zoneout=hp.zoneout_rate, scope='decoder_lstm')

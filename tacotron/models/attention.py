@@ -37,10 +37,31 @@ def _location_sensitive_score(W_query, W_fil, W_keys):
 	num_units = W_query.shape[-1].value or array_ops.shape(W_query)[-1]
 
 	v_a = tf.get_variable(
-		'v_a', shape=[num_units], dtype=tf.float32,
-		initializer=tf.contrib.layers.xavier_initializer())
+		'v_a', shape=[num_units], dtype=tf.float32)
 
 	return tf.reduce_sum(v_a * tf.tanh(W_keys + W_query + W_fil), axis=2)
+
+def _smoothing_normalization(e):
+	"""Applies a smoothing normalization function instead of softmax
+	Introduced in:
+		J. K. Chorowski, D. Bahdanau, D. Serdyuk, K. Cho, and Y. Ben-
+	  gio, “Attention-based models for speech recognition,” in Ad-
+	  vances in Neural Information Processing Systems, 2015, pp.
+	  577–585.
+
+	#######################################################################
+    				   Smoothing normalization function
+    		  a_{i, j} = sigmoid(e_{i, j}) / sum_j(sigmoid(e_{i, j}))
+  	#######################################################################
+
+  	Args:
+  		e: matrix [batch_size, max_time(memory_time)]: expected to be energy (score)
+  			values of an attention mechanism
+  	Returns:
+  		matrix [batch_size, max_time]: [0, 1] normalized alignments with possible
+  			attendance to multiple memory time steps.
+  	"""
+	return tf.nn.sigmoid(e) / tf.reduce_sum(tf.nn.sigmoid(e), axis=-1, keepdims=True)
 
 
 class LocationSensitiveAttention(BahdanauAttention):
@@ -63,6 +84,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 				 num_units,
 				 memory,
 				 memory_sequence_length=None,
+				 smoothing=False,
 				 name='LocationSensitiveAttention'):
 		"""Construct the Attention mechanism.
 		Args:
@@ -72,12 +94,33 @@ class LocationSensitiveAttention(BahdanauAttention):
 			memory_sequence_length (optional): Sequence lengths for the batch entries
 				in memory.  If provided, the memory tensor rows are masked with zeros
 				for values past the respective sequence lengths.
+			smoothing (optional): Boolean. Determines which normalization function to use.
+				Default normalization function (probablity_fn) is softmax. If smoothing is 
+				enabled, we replace softmax with:
+						a_{i, j} = sigmoid(e_{i, j}) / sum_j(sigmoid(e_{i, j}))
+				Introduced in:
+					J. K. Chorowski, D. Bahdanau, D. Serdyuk, K. Cho, and Y. Ben-
+				  gio, “Attention-based models for speech recognition,” in Ad-
+				  vances in Neural Information Processing Systems, 2015, pp.
+				  577–585.
+				This is mainly used if the model wants to attend to multiple inputs parts 
+				at the same decoding step. We probably won't be using it since multiple sound
+				frames may depend from the same character, probably not the way around.
+				Note:
+					We still keep it implemented in case we want to test it. They used it in the
+					paper because they were doing speech recognitions, where one phoneme may depend from
+					multiple subsequent sound frames.
+
 			name: Name to use when creating ops.
 		"""
+		#Create normalization function
+		#Setting it to None defaults in using softmax
+		normalization_function = _smoothing_normalization if (smoothing == True) else None
 		super(LocationSensitiveAttention, self).__init__(
 				num_units=num_units,
 				memory=memory,
 				memory_sequence_length=memory_sequence_length,
+				probability_fn=normalization_function,
 				name=name)
 
 		self.location_convolution = tf.layers.Conv1D(filters=hparams.attention_filters,

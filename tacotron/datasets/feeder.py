@@ -28,7 +28,8 @@ class Feeder(threading.Thread):
 		self._datadir = os.path.dirname(metadata_filename)
 		with open(metadata_filename, encoding='utf-8') as f:
 			self._metadata = [line.strip().split('|') for line in f]
-			hours = sum([int(x[1]) for x in self._metadata]) * hparams.frame_shift_ms / (3600 * 1000)
+			frame_shift_ms = hparams.hop_size / hparams.sample_rate
+			hours = sum([int(x[1]) for x in self._metadata]) * frame_shift_ms / (3600)
 			log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(self._metadata), hours))
 
 		# Create placeholders for inputs and targets. Don't specify batch size because we want

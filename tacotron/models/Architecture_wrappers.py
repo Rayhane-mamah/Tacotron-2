@@ -157,15 +157,15 @@ class TacotronDecoderCell(RNNCell):
 		#Compute the attention (context) vector and alignments using
 		#the top layer hidden state as query vector 
 		#and previous alignments to extract location features
-		#Based on Luong et Al. (2015):
+		#Based on Luong et Al. (2015) for the top layer choice:
 		#https://arxiv.org/pdf/1508.04025.pdf
 		first_lstm_state, last_lstm_state = state.cell_state
-		attention_inputs = last_lstm_state.h
+		last_hidden_state = last_lstm_state.h
 
 		previous_alignments = state.alignments
 		previous_alignment_history = state.alignment_history
 		context_vector, alignments, _ = _compute_attention(self._attention_mechanism, 
-			attention_inputs,
+			last_hidden_state,
 			previous_alignments,
 			attention_layer=None)
 
