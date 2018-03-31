@@ -15,31 +15,35 @@ from hparams import hparams
 def _location_sensitive_score(W_query, W_fil, W_keys):
 	"""Impelements Bahdanau-style (cumulative) scoring function.
 	This attention is described in:
-	J. K. Chorowski, D. Bahdanau, D. Serdyuk, K. Cho, and Y. Ben-
-  gio, “Attention-based models for speech recognition,” in Ad-
-  vances in Neural Information Processing Systems, 2015, pp.
-  577–585.
+		J. K. Chorowski, D. Bahdanau, D. Serdyuk, K. Cho, and Y. Ben-
+	  gio, “Attention-based models for speech recognition,” in Ad-
+	  vances in Neural Information Processing Systems, 2015, pp.
+	  577–585.
 
-  #######################################################################
-            hybrid attention (content-based + location-based)
-        				     f = F * α_{i-1}
-     energy = dot(v_a, tanh(W_keys(h_enc) + W_query(h_dec) + W_fil(f)))
-  #######################################################################
+    #############################################################################
+              hybrid attention (content-based + location-based)
+        				       f = F * α_{i-1}
+       energy = dot(v_a, tanh(W_keys(h_enc) + W_query(h_dec) + W_fil(f) + b_a))
+    #############################################################################
 
-  Args:
-	W_query: Tensor, shape '[batch_size, 1, num_units]' to compare to location features.
-	W_location: processed previous alignments into location features, shape '[batch_size, max_time, attention_dim]'
-  Returns:
-	A '[batch_size, max_time]' attention score (energy)
+    Args:
+		W_query: Tensor, shape '[batch_size, 1, attention_dim]' to compare to location features.
+		W_location: processed previous alignments into location features, shape '[batch_size, max_time, attention_dim]'
+		W_keys: Tensor, shape '[batch_size, max_time, attention_dim]', typically the encoder outputs.
+    Returns:
+		A '[batch_size, max_time]' attention score (energy)
 	"""
+	# Get the number of hidden units from the trailing dimension of keys
 	dtype = W_query.dtype
-	# Get the number of hidden units from the trailing dimension of query
-	num_units = W_query.shape[-1].value or array_ops.shape(W_query)[-1]
+	num_units = W_keys.shape[-1].value or array_ops.shape(W_keys)[-1]
 
 	v_a = tf.get_variable(
-		'v_a', shape=[num_units], dtype=tf.float32)
+		'attention_variable', shape=[num_units], dtype=dtype)
+	b_a = tf.get_variable(
+		'attention_bias', shape=[num_units], dtype=dtype,
+		initializer=tf.zeros_initializer())
 
-	return tf.reduce_sum(v_a * tf.tanh(W_keys + W_query + W_fil), axis=2)
+	return tf.reduce_sum(v_a * tf.tanh(W_keys + W_query + W_fil + b_a), [2])
 
 def _smoothing_normalization(e):
 	"""Applies a smoothing normalization function instead of softmax
@@ -49,10 +53,10 @@ def _smoothing_normalization(e):
 	  vances in Neural Information Processing Systems, 2015, pp.
 	  577–585.
 
-	#######################################################################
-    				   Smoothing normalization function
-    		  a_{i, j} = sigmoid(e_{i, j}) / sum_j(sigmoid(e_{i, j}))
-  	#######################################################################
+	############################################################################
+    				   	Smoothing normalization function
+    		  	a_{i, j} = sigmoid(e_{i, j}) / sum_j(sigmoid(e_{i, j}))
+  	############################################################################
 
   	Args:
   		e: matrix [batch_size, max_time(memory_time)]: expected to be energy (score)
@@ -83,6 +87,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 	def __init__(self,
 				 num_units,
 				 memory,
+				 mask_encoder=True,
 				 memory_sequence_length=None,
 				 smoothing=False,
 				 name='LocationSensitiveAttention'):
@@ -91,9 +96,10 @@ class LocationSensitiveAttention(BahdanauAttention):
 			num_units: The depth of the query mechanism.
 			memory: The memory to query; usually the output of an RNN encoder.  This
 				tensor should be shaped `[batch_size, max_time, ...]`.
+			mask_encoder (optional): Boolean, whether to mask encoder paddings.
 			memory_sequence_length (optional): Sequence lengths for the batch entries
 				in memory.  If provided, the memory tensor rows are masked with zeros
-				for values past the respective sequence lengths.
+				for values past the respective sequence lengths. Only relevant if mask_encoder = True.
 			smoothing (optional): Boolean. Determines which normalization function to use.
 				Default normalization function (probablity_fn) is softmax. If smoothing is 
 				enabled, we replace softmax with:
@@ -108,18 +114,18 @@ class LocationSensitiveAttention(BahdanauAttention):
 				frames may depend from the same character, probably not the way around.
 				Note:
 					We still keep it implemented in case we want to test it. They used it in the
-					paper because they were doing speech recognitions, where one phoneme may depend from
+					paper in the context of speech recognition, where one phoneme may depend on
 					multiple subsequent sound frames.
-
 			name: Name to use when creating ops.
 		"""
 		#Create normalization function
 		#Setting it to None defaults in using softmax
 		normalization_function = _smoothing_normalization if (smoothing == True) else None
+		memory_length = memory_sequence_length if (mask_encoder==True) else None
 		super(LocationSensitiveAttention, self).__init__(
 				num_units=num_units,
 				memory=memory,
-				memory_sequence_length=memory_sequence_length,
+				memory_sequence_length=memory_length,
 				probability_fn=normalization_function,
 				name=name)
 
@@ -164,5 +170,6 @@ class LocationSensitiveAttention(BahdanauAttention):
 		# alignments shape = energy shape = [batch_size, max_time]
 		alignments = self._probability_fn(energy, previous_alignments)
 
-		next_state = alignments
+		# Cumulate alignments
+		next_state = alignments + previous_alignments
 		return alignments, next_state

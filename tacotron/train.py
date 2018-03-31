@@ -38,7 +38,11 @@ def train(log_dir, args):
 	checkpoint_path = os.path.join(save_dir, 'model.ckpt')
 	input_path = os.path.join(args.base_dir, args.input)
 	plot_dir = os.path.join(log_dir, 'plots')
+	wav_dir = os.path.join(log_dir, 'wavs')
+	mel_dir = os.path.join(log_dir, 'mel-spectrograms')
 	os.makedirs(plot_dir, exist_ok=True)
+	os.makedirs(wav_dir, exist_ok=True)
+	os.makedirs(mel_dir, exist_ok=True)
 	log('Checkpoint path: {}'.format(checkpoint_path))
 	log('Loading training data from: {}'.format(input_path))
 	log('Using model: {}'.format(args.model))
@@ -68,6 +72,7 @@ def train(log_dir, args):
 
 	#Book keeping
 	step = 0
+	save_step = 0
 	time_window = ValueWindow(100)
 	loss_window = ValueWindow(100)
 	saver = tf.train.Saver(max_to_keep=5)
@@ -126,9 +131,9 @@ def train(log_dir, args):
 						file.write(str(step))
 					log('Saving checkpoint to: {}-{}'.format(checkpoint_path, step))
 					saver.save(sess, checkpoint_path, global_step=step)
-					# Unlike the original tacotron, we won't save audio
-					# because we yet have to use wavenet as vocoder
-					log('Saving alignement and Mel-Spectrograms..')
+					save_step = step
+					
+					log('Saving alignment, Mel-Spectrograms and griffin-lim inverted waveform..')
 					input_seq, prediction, alignment, target = sess.run([model.inputs[0],
 							 model.mel_outputs[0],
 							 model.alignments[0],
@@ -136,7 +141,11 @@ def train(log_dir, args):
 							 ])
 					#save predicted spectrogram to disk (for plot and manual evaluation purposes)
 					mel_filename = 'ljspeech-mel-prediction-step-{}.npy'.format(step)
-					np.save(os.path.join(log_dir, mel_filename), prediction, allow_pickle=False)
+					np.save(os.path.join(mel_dir, mel_filename), prediction.T, allow_pickle=False)
+
+					#save griffin lim inverted wav for debug.
+					wav = audio.inv_mel_spectrogram(prediction.T)
+					audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-waveform.wav'.format(step)))
 
 					#save alignment plot to disk (control purposes)
 					plot.plot_alignment(alignment, os.path.join(plot_dir, 'step-{}-align.png'.format(step)),
@@ -156,7 +165,7 @@ def train(log_dir, args):
 
 def main():
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--base_dir', default=os.path.dirname(os.path.realpath(__file__)))
+	parser.add_argument('--base_dir', default='')
 	parser.add_argument('--input', default='training/train.txt')
 	parser.add_argument('--model', default='Tacotron')
 	parser.add_argument('--name', help='Name of the run, Used for logging, Defaults to model name')
@@ -173,7 +182,6 @@ def main():
 	log_dir = os.path.join(args.base_dir, 'logs-{}'.format(run_name))
 	os.makedirs(log_dir, exist_ok=True)
 	infolog.init(os.path.join(log_dir, 'Terminal_train_log'), run_name)
-	#hparams.parse(args.hparams)
 	args.hparams = hparams
 	train(log_dir, args)
 

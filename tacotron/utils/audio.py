@@ -32,13 +32,20 @@ def melspectrogram(wav):
 
 	D = _stft(wav)
 	S = _amp_to_db(_linear_to_mel(np.abs(D))) - hparams.ref_level_db
-	if not hparams.allow_clipping_in_normalization:
-		assert S.max() <= 0 and S.min() - hparams.min_level_db >= 0
-	return _normalize(S)
+
+	if hparams.mel_normalization:
+		return _normalize(S)
+	return S
+	
 
 def inv_mel_spectrogram(mel_spectrogram):
 	'''Converts mel spectrogram to waveform using librosa'''
-	S = _mel_to_linear(_db_to_amp(_denormalize(mel_spectrogram) + hparams.ref_level_db))  # Convert back to linear
+	if hparams.mel_normalization:
+		D = _denormalize(mel_spectrogram)
+	else:
+		D = mel_spectrogram
+
+	S = _mel_to_linear(_db_to_amp(D + hparams.ref_level_db))  # Convert back to linear
 
 	return _griffin_lim(S ** hparams.power)
 
@@ -90,7 +97,29 @@ def _db_to_amp(x):
 	return np.power(10.0, (x) * 0.05)
 
 def _normalize(S):
-	return np.clip((S - hparams.min_level_db) / (-hparams.min_level_db), 0, 1)
+	if hparams.allow_clipping_in_normalization:
+		if hparams.symmetric_mels:
+			return np.clip((2 * hparams.max_abs_value) * ((S - hparams.min_level_db) / (-hparams.min_level_db)) - hparams.max_abs_value,
+			 -hparams.max_abs_value, hparams.max_abs_value)
+		else:
+			return np.clip(hparams.max_abs_value * ((S - hparams.min_level_db) / (-hparams.min_level_db)), 0, hparams.max_abs_value)
+
+	assert S.max() <= 0 and S.min() - hparams.min_level_db >= 0
+	if hparams.symmetric_mels:
+		return (2 * hparams.max_abs_value) * ((S - hparams.min_level_db) / (-hparams.min_level_db)) - hparams.max_abs_value
+	else:
+		return hparams.max_abs_value * ((S - hparams.min_level_db) / (-hparams.min_level_db))
 
 def _denormalize(D):
-	return (np.clip(D, 0, 1) * -hparams.min_level_db) + hparams.min_level_db
+	if hparams.allow_clipping_in_normalization:
+		if hparams.symmetric_mels:
+			return (((np.clip(D, -hparams.max_abs_value,
+				hparams.max_abs_value) + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value)) 
+				+ hparams.min_level_db)
+		else:
+			return ((np.clip(D, 0, hparams.max_abs_value) * -hparams.min_level_db / hparams.max_abs_value) + hparams.min_level_db)
+
+	if hparams.symmetric_mels:
+		return (((D + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value)) + hparams.min_level_db)
+	else:
+		return ((D * -hparams.min_level_db / hparams.max_abs_value) + hparams.min_level_db)

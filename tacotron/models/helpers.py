@@ -9,7 +9,6 @@ class TacoTestHelper(Helper):
 			self._batch_size = batch_size
 			self._output_dim = output_dim
 			self._reduction_factor = r
-			self._end_token = tf.tile([0.0], [output_dim * r])
 
 	@property
 	def batch_size(self):
@@ -36,12 +35,22 @@ class TacoTestHelper(Helper):
 	def next_inputs(self, time, outputs, state, sample_ids, stop_token_prediction, name=None):
 		'''Stop on EOS. Otherwise, pass the last output as the next input and pass through state.'''
 		with tf.name_scope('TacoTestHelper'):
+			#A sequence is finished when the output probability is > 0.5
 			finished = tf.cast(tf.round(stop_token_prediction), tf.bool)
 
+			#Since we are predicting r frames at each step, two modes are 
+			#then possible:
+			#	Stop when the model outputs a p > 0.5 for any frame between r frames (Recommended)
+			#	Stop when the model outputs a p > 0.5 for all r frames (Safer)
+			#Note:
+			#	With enough training steps, the model should be able to predict when to stop correctly
+			#	and the use of stop_at_any = True would be recommended. If however the model didn't
+			#	learn to stop correctly yet, (stops too soon) one could choose to use the safer option 
+			#	to get a correct synthesis
 			if hparams.stop_at_any:
 				finished = tf.reduce_any(finished) #Recommended
 			else:
-				finished = tf.reduce_all(finished) #Safer bet
+				finished = tf.reduce_all(finished) #Safer option
 			
 			# Feed last output frame as next input. outputs is [N, output_dim * r]
 			next_inputs = outputs[:, -self._output_dim:]
@@ -50,23 +59,19 @@ class TacoTestHelper(Helper):
 
 
 class TacoTrainingHelper(Helper):
-	def __init__(self, inputs, targets, output_dim, r):
+	def __init__(self, batch_size, targets, stop_targets, output_dim, r, ratio):
 		# inputs is [N, T_in], targets is [N, T_out, D]
 		with tf.name_scope('TacoTrainingHelper'):
-			self._batch_size = tf.shape(inputs)[0]
+			self._batch_size = batch_size
 			self._output_dim = output_dim
 			self._reduction_factor = r
+			self._ratio = ratio
 
 			# Feed every r-th target frame as input
 			self._targets = targets[:, r-1::r, :]
 
-			#<stop_token> (same value as <pad_token>) to train dynamic stop
-			self._end_token = tf.tile([0.0], [output_dim * r])
-
-			# Use full length for every target because we don't want to mask the padding frames
-			num_steps = tf.shape(self._targets)[1]
-			self._lengths = tf.tile([num_steps], [self._batch_size])
-			self._num_steps = tf.cast(num_steps, tf.float32)
+			# Detect finished sequence using stop_targets
+			self._stop_targets = stop_targets[:, r-1::r]
 
 	@property
 	def batch_size(self):
@@ -92,11 +97,16 @@ class TacoTrainingHelper(Helper):
 
 	def next_inputs(self, time, outputs, state, sample_ids, stop_token_prediction, name=None):
 		with tf.name_scope(name or 'TacoTrainingHelper'):
-			finished = (time + 1 >= self._lengths)
+			#mark sequences where stop_target == 1 as finished (for case of imputation)
+			finished = tf.equal(self._stop_targets[:, time], [1.])
 
-			next_inputs = self._targets[:, time, :] #Teacher-forcing: return true frame
-			next_state = state #No change on the cell states
-			return (finished, next_inputs, next_state) #return true "finished" state
+			if np.random.random() <= self._ratio:
+				next_inputs = self._targets[:, time, :] #Teacher-forcing: return true frame
+			else:
+				next_inputs = outputs[:, -self._output_dim:]
+			#Update the finished state
+			next_state = state.replace(finished=tf.cast(tf.reshape(finished, [-1, 1]), tf.float32))
+			return (finished, next_inputs, next_state)
 
 
 def _go_frames(batch_size, output_dim):

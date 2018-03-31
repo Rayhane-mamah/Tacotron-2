@@ -11,6 +11,8 @@ from .custom_decoder import CustomDecoder
 
 
 class Tacotron():
+	"""Tacotron-2 Feature prediction Model.
+	"""
 	def __init__(self, hparams):
 		self._hparams = hparams
 
@@ -63,7 +65,7 @@ class Tacotron():
 			prenet = Prenet(is_training, layer_sizes=hp.prenet_layers, scope='decoder_prenet')
 			#Attention Mechanism
 			attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs,
-				memory_sequence_length=input_lengths, smoothing=hp.smoothing)
+				mask_encoder=hp.mask_encoder, memory_sequence_length=input_lengths, smoothing=hp.smoothing)
 			#Decoder LSTM Cells
 			decoder_lstm = DecoderRNN(is_training, layers=hp.decoder_layers,
 				size=hp.decoder_lstm_units, zoneout=hp.zoneout_rate, scope='decoder_lstm')
@@ -79,12 +81,14 @@ class Tacotron():
 				attention_mechanism,
 				decoder_lstm,
 				frame_projection,
-				stop_projection)
+				stop_projection,
+				mask_finished=hp.mask_finished)
 
 
 			#Define the helper for our decoder
 			if (is_training or gta) == True:
-				self.helper = TacoTrainingHelper(inputs, mel_targets, hp.num_mels, hp.outputs_per_step)
+				self.helper = TacoTrainingHelper(batch_size, mel_targets, stop_token_targets,
+					hp.num_mels, hp.outputs_per_step, hp.teacher_forcing_ratio)
 			else:
 				self.helper = TacoTestHelper(batch_size, hp.num_mels, hp.outputs_per_step)
 
@@ -92,12 +96,14 @@ class Tacotron():
 			#initial decoder state
 			decoder_init_state = decoder_cell.zero_state(batch_size=batch_size, dtype=tf.float32)
 
+			#Only use max iterations at synthesis time
+			max_iters = hp.max_iters if not is_training else None
 
 			#Decode
 			(frames_prediction, stop_token_prediction, _), final_decoder_state, _ = dynamic_decode(
 				CustomDecoder(decoder_cell, self.helper, decoder_init_state),
 				impute_finished=hp.impute_finished,
-				maximum_iterations=hp.max_iters)
+				maximum_iterations=max_iters)
 
 
 			# Reshape outputs to be one output per entry 
@@ -105,7 +111,7 @@ class Tacotron():
 			decoder_output = tf.reshape(frames_prediction, [batch_size, -1, hp.num_mels])
 			stop_token_prediction = tf.reshape(stop_token_prediction, [batch_size, -1])
 
-
+		
 			#Postnet
 			postnet = Postnet(is_training, kernel_size=hp.postnet_kernel_size, 
 				channels=hp.postnet_channels, scope='postnet_convolutions')
@@ -190,13 +196,11 @@ class Tacotron():
 			optimizer = tf.train.AdamOptimizer(self.learning_rate, hp.adam_beta1, hp.adam_beta2, hp.adam_epsilon)
 			gradients, variables = zip(*optimizer.compute_gradients(self.loss))
 			self.gradients = gradients
-			#Clip the gradients to avoid rnn gradient explosion
-			clipped_gradients, _ = tf.clip_by_global_norm(gradients, 1.0)
 
 			# Add dependency on UPDATE_OPS; otherwise batchnorm won't work correctly. See:
 			# https://github.com/tensorflow/tensorflow/issues/1122
 			with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-				self.optimize = optimizer.apply_gradients(zip(clipped_gradients, variables),
+				self.optimize = optimizer.apply_gradients(zip(gradients, variables),
 					global_step=global_step)
 
 	def _learning_rate_decay(self, init_lr, global_step):

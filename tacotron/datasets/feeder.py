@@ -6,10 +6,19 @@ import traceback
 from utils.text import text_to_sequence
 from utils.infolog import log
 import tensorflow as tf 
+from hparams import hparams
 
 
 _batches_per_group = 32
+#pad input sequences with the <pad_token> 0 ( _ )
 _pad = 0
+#explicitely setting the padding to a value that doesn't originally exist in the spectogram
+#to avoid any possible conflicts, without affecting the output range of the model too much
+if hparams.symmetric_mels:
+	_target_pad = -(hparams.max_abs_value + .1)
+else:
+	_target_pad = -0.1
+#Mark finished sequences with 1s
 _token_pad = 1.
 
 class Feeder(threading.Thread):
@@ -94,6 +103,7 @@ class Feeder(threading.Thread):
 
 		input_data = np.asarray(text_to_sequence(text, self._cleaner_names), dtype=np.int32)
 		mel_target = np.load(os.path.join(self._datadir, meta[0]))
+		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * len(mel_target))
 		return (input_data, mel_target, token_target, len(mel_target))
 
@@ -103,6 +113,7 @@ def _prepare_batch(batch, outputs_per_step):
 	inputs = _prepare_inputs([x[0] for x in batch])
 	input_lengths = np.asarray([len(x[0]) for x in batch], dtype=np.int32)
 	mel_targets = _prepare_targets([x[1] for x in batch], outputs_per_step)
+	#Pad sequences with 1 to infer that the sequence is done
 	token_targets = _prepare_token_targets([x[2] for x in batch], outputs_per_step)
 	return (inputs, input_lengths, mel_targets, token_targets)
 
@@ -122,7 +133,7 @@ def _pad_input(x, length):
 	return np.pad(x, (0, length - x.shape[0]), mode='constant', constant_values=_pad)
 
 def _pad_target(t, length):
-	return np.pad(t, [(0, length - t.shape[0]), (0, 0)], mode='constant', constant_values=_pad)
+	return np.pad(t, [(0, length - t.shape[0]), (0, 0)], mode='constant', constant_values=_target_pad)
 
 def _pad_token_target(t, length):
 	return np.pad(t, (0, length - t.shape[0]), mode='constant', constant_values=_token_pad)

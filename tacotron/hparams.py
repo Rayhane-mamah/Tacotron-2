@@ -9,54 +9,57 @@ hparams = tf.contrib.training.HParams(
 	cleaners='english_cleaners',
 
 	#Audio
-	num_mels=80, 
+	num_mels = 80, 
 	rescale = True, 
-	rescaling_max=0.999,
+	rescaling_max = 0.999,
 
 	#Mel spectrogram
 	fft_size = 1024,
-	hop_size=256,
-	sample_rate=22050, #22050 Hz (corresponding to ljspeech dataset)
-	frame_length_ms= 50,
-	frame_shift_ms= 12.5,
+	hop_size = 256,
+	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset)
+	frame_length_ms = 50,
+	frame_shift_ms = 12.5,
 
-	#Mel spectrogram clipping
-	allow_clipping_in_normalization=True,
+	#Mel spectrogram normalization/scaling and clipping
+	mel_normalization = True,
+	allow_clipping_in_normalization = True, #Only relevant if mel_normalization = True
+	symmetric_mels = True, #Whether to scale the data to be symmetric around 0
+	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max] 
 
 	#Limits
-	min_level_db=-100,
-	ref_level_db=20,
-	fmin=125,
-	fmax=7600,
+	min_level_db =- 100,
+	ref_level_db = 20,
+	fmin = 125,
+	fmax = 7600,
 
 	#Griffin Lim
-	power=1.55,
-	griffin_lim_iters=60,
+	power = 1.55,
+	griffin_lim_iters = 60,
 
 	#Model
 	outputs_per_step = 5, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
-	stop_at_any=True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them
+	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them
 
 	embedding_dim = 512, #dimension of embedding space
 
-	enc_conv_num_layers=3, #number of encoder convolutional layers
-	enc_conv_kernel_size=(5, ), #size of encoder convolution filters for each layer
-	enc_conv_channels=512, #number of encoder convolutions filters for each layer
-	encoder_lstm_units=256, #number of lstm units for each direction (forward and backward)
+	enc_conv_num_layers = 3, #number of encoder convolutional layers
+	enc_conv_kernel_size = (5, ), #size of encoder convolution filters for each layer
+	enc_conv_channels = 512, #number of encoder convolutions filters for each layer
+	encoder_lstm_units = 256, #number of lstm units for each direction (forward and backward)
 
-	smoothing=False, #Whether to smooth the attention normalization function 
+	smoothing = False, #Whether to smooth the attention normalization function 
 	attention_dim = 128, #dimension of attention space
 	attention_filters = 32, #number of attention convolution filters
 	attention_kernel = (31, ), #kernel size of attention convolution
 
-	prenet_layers=[256, 256], #number of layers and number of units of prenet
-	decoder_layers=2, #number of decoder lstm layers
-	decoder_lstm_units=1024, #number of decoder lstm units on each layer
-	max_iters=175, #Max decoder steps during inference (feel free to change it)
+	prenet_layers = [256, 256], #number of layers and number of units of prenet
+	decoder_layers = 2, #number of decoder lstm layers
+	decoder_lstm_units = 1024, #number of decoder lstm units on each layer
+	max_iters = 175, #Max decoder steps during inference (feel free to change it)
 
-	postnet_num_layers=5, #number of postnet convolutional layers
-	postnet_kernel_size=(5, ), #size of postnet convolution filters for each layer
-	postnet_channels=512, #number of postnet convolution filters for each layer
+	postnet_num_layers = 5, #number of postnet convolutional layers
+	postnet_kernel_size = (5, ), #size of postnet convolution filters for each layer
+	postnet_channels = 512, #number of postnet convolution filters for each layer
 
 
 	#Training
@@ -73,10 +76,14 @@ hparams = tf.contrib.training.HParams(
 	adam_beta2 = 0.999, #AdamOptimizer beta2 parameter
 	adam_epsilon = 1e-6, #AdamOptimizer beta3 parameter
 
-	zoneout_rate=0.1, #zoneout rate for all LSTM cells in the network
-	dropout_rate=0.5, #dropout rate for all convolutional layers + prenet
+	zoneout_rate = 0.1, #zoneout rate for all LSTM cells in the network
+	dropout_rate = 0.5, #dropout rate for all convolutional layers + prenet
 
-	impute_finished=True, #Whether to cut off padded mel targets parts (Recommended to set to True)
+	teacher_forcing_ratio = 1., #Value from [0., 1.], 0.=0%, 1.=100%, determines the % of times we force next decoder inputs
+	
+	mask_encoder = False, #whether to mask encoder padding while computing attention
+	impute_finished = False, #Whether to use loss mask for padded sequences
+	mask_finished = False, #Whether to mask alignments beyond the <stop_token> (False for debug, True for style)
 
 	#Eval sentences
 	sentences = [
@@ -106,8 +113,10 @@ hparams = tf.contrib.training.HParams(
 	'Talib Kweli confirmed to AllHipHop that he will be releasing an album in the next year.',
 	#From Training data:
 	'the rest being provided with barrack beds, and in dimensions varying from thirty feet by fifteen to fifteen feet by ten.',
-	'in giltspur street compter, where he was first lodged',
+	'in giltspur street compter, where he was first lodged.',
 	'a man named burnett came with his wife and took up his residence at whitchurch, hampshire, at no great distance from laverstock,',
+	'it appears that oswald had only one caller in response to all of his fpcc activities,'
+	'he relied on the absence of the strychnia.'
 	]
 
 	)
