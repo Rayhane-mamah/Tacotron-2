@@ -55,7 +55,7 @@ hparams = tf.contrib.training.HParams(
 	prenet_layers = [256, 256], #number of layers and number of units of prenet
 	decoder_layers = 2, #number of decoder lstm layers
 	decoder_lstm_units = 1024, #number of decoder lstm units on each layer
-	max_iters = 175, #Max decoder steps during inference (feel free to change it)
+	max_iters = 1000, #Max decoder steps during inference (Just for safety from infinite loop cases)
 
 	postnet_num_layers = 5, #number of postnet convolutional layers
 	postnet_kernel_size = (5, ), #size of postnet convolution filters for each layer
@@ -115,8 +115,15 @@ hparams = tf.contrib.training.HParams(
 	'the rest being provided with barrack beds, and in dimensions varying from thirty feet by fifteen to fifteen feet by ten.',
 	'in giltspur street compter, where he was first lodged.',
 	'a man named burnett came with his wife and took up his residence at whitchurch, hampshire, at no great distance from laverstock,',
-	'it appears that oswald had only one caller in response to all of his fpcc activities,'
-	'he relied on the absence of the strychnia.'
+	'it appears that oswald had only one caller in response to all of his fpcc activities,',
+	'he relied on the absence of the strychnia.',
+	'scoggins thought it was lighter.',
+	'''would, it is probable, have eventually overcome the reluctance of some of the prisoners at least, 
+	and would have possessed so much moral dignity''',
+	'''the only purpose of this whole sentence is to evaluate the scalability of the model for very long sentences. 
+	This is not even a long sentence anymore, it has become an entire paragraph. 
+	Should I stop now? Let\'s add this last sentence in which we talk about nothing special.''',
+	'Thank you so much for your support!!'
 	]
 
 	)

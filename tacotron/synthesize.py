@@ -13,15 +13,19 @@ def run_eval(args, checkpoint_path):
 	synth = Synthesizer()
 	synth.load(checkpoint_path)
 	eval_dir = os.path.join(args.output_dir, 'eval')
+	log_dir = os.path.join(args.output_dir, 'logs-eval')
 
 	#Create output path if it doesn't exist
 	os.makedirs(eval_dir, exist_ok=True)
+	os.makedirs(log_dir, exist_ok=True)
+	os.makedirs(os.path.join(log_dir, 'wavs'), exist_ok=True)
+	os.makedirs(os.path.join(log_dir, 'plots'), exist_ok=True)
 
 	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
 		file.write('"input"|"generated_mel"\n')
 		for i, text in enumerate(tqdm(hparams.sentences)):
 			start = time.time()
-			mel_filename = synth.synthesize(text, i+1, eval_dir, None)
+			mel_filename = synth.synthesize(text, i+1, eval_dir, log_dir, None)
 
 			file.write('"{}"|"{}"\n'.format(text, mel_filename))
 	print('synthesized mel spectrograms at {}'.format(eval_dir))
@@ -51,7 +55,7 @@ def run_synthesis(args, checkpoint_path):
 		for i, meta in enumerate(tqdm(metadata)):
 			text = meta[2]
 			mel_filename = os.path.join(args.input_dir, meta[0])
-			mel_output_filename = synth.synthesize(text, i+1, synth_dir, mel_filename)
+			mel_output_filename = synth.synthesize(text, i+1, synth_dir, None, mel_filename)
 
 			file.write('"{}"|"{}"|"{}"|"{}"\n'.format(text, meta[1], mel_filename, mel_output_filename))
 	print('synthesized mel spectrograms at {}'.format(synth_dir))
