@@ -7,11 +7,11 @@ import tensorflow as tf
 import traceback
 import argparse
 
-from datasets.feeder import Feeder
-from hparams import hparams, hparams_debug_string
-from models import create_model
-from utils.text import sequence_to_text
-from utils import audio, infolog, plot, ValueWindow
+from tacotron.datasets.feeder import Feeder
+from tacotron.hparams import hparams, hparams_debug_string
+from tacotron.models import create_model
+from tacotron.utils.text import sequence_to_text
+from tacotron.utils import audio, infolog, plot, ValueWindow
 log = infolog.log
 
 
@@ -163,27 +163,11 @@ def train(log_dir, args):
 			traceback.print_exc()
 			coord.request_stop(e)
 
-def main():
-	parser = argparse.ArgumentParser()
-	parser.add_argument('--base_dir', default='')
-	parser.add_argument('--input', default='training/train.txt')
-	parser.add_argument('--model', default='Tacotron')
-	parser.add_argument('--name', help='Name of the run, Used for logging, Defaults to model name')
-	parser.add_argument('--restore', type=bool, default=True, help='Set this to False to do a fresh training')
-	parser.add_argument('--summary_interval', type=int, default=10,
-		help='Steps between running summary ops')
-	parser.add_argument('--checkpoint_interval', type=int, default=100,
-		help='Steps between writing checkpoints')
-	parser.add_argument('--tf_log_level', type=int, default=1, help='Tensorflow C++ log level.')
-	args = parser.parse_args()
-
+def tacotron_train(args):
+	hparams.parse(args.hparams)
 	os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(args.tf_log_level)
-	run_name = args.name or args.model
+	run_name = args.model
 	log_dir = os.path.join(args.base_dir, 'logs-{}'.format(run_name))
 	os.makedirs(log_dir, exist_ok=True)
 	infolog.init(os.path.join(log_dir, 'Terminal_train_log'), run_name)
-	args.hparams = hparams
 	train(log_dir, args)
-
-if __name__ == '__main__':
-	main()

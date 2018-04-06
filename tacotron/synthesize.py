@@ -1,8 +1,8 @@
 import argparse
 import os
 import re
-from hparams import hparams, hparams_debug_string
-from synthesizer import Synthesizer
+from tacotron.hparams import hparams, hparams_debug_string
+from tacotron.synthesizer import Synthesizer
 import tensorflow as tf 
 import time
 from tqdm import tqdm
@@ -60,23 +60,9 @@ def run_synthesis(args, checkpoint_path):
 			file.write('"{}"|"{}"|"{}"|"{}"\n'.format(text, meta[1], mel_filename, mel_output_filename))
 	print('synthesized mel spectrograms at {}'.format(synth_dir))
 
-
-def main():
-	accepted_modes = ['eval', 'synthesis']
-	parser = argparse.ArgumentParser()
-	parser.add_argument('--checkpoint', default='logs-Tacotron/pretrained/', help='Path to model checkpoint')
-	parser.add_argument('--hparams', default='',
-		help='Hyperparameter overrides as a comma-separated list of name=value pairs')
-	parser.add_argument('--input_dir', default='training/', help='folder to contain inputs sentences/targets')
-	parser.add_argument('--output_dir', default='output/', help='folder to contain synthesized mel spectrograms')
-	parser.add_argument('--mode', default='synthesis', help='mode of run: can be one of {}'.format(accepted_modes))
-	parser.add_argument('--GTA', default=True, help='Ground truth aligned synthesis, defaults to True, only considered in synthesis mode')
-	args = parser.parse_args()
-	os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+def tacotron_synthesize(args):
 	hparams.parse(args.hparams)
-
-	if args.mode not in accepted_modes:
-		raise ValueError('accepted modes are: {}, found {}'.format(accepted_modes, args.mode))
+	os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 	try:
 		checkpoint_path = tf.train.get_checkpoint_state(args.checkpoint).model_checkpoint_path
@@ -88,7 +74,3 @@ def main():
 		run_eval(args, checkpoint_path)
 	else:
 		run_synthesis(args, checkpoint_path)
-
-
-if __name__ == '__main__':
-	main()

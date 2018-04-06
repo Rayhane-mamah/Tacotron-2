@@ -1,11 +1,11 @@
 import os
 import numpy as np
 import tensorflow as tf
-from hparams import hparams
+from tacotron.hparams import hparams
 from librosa import effects
-from models import create_model
-from utils.text import text_to_sequence
-from utils import audio, plot
+from tacotron.models import create_model
+from tacotron.utils.text import text_to_sequence
+from tacotron.utils import audio, plot
 from datetime import datetime
 
 
@@ -55,7 +55,7 @@ class Synthesizer:
 		if log_dir is not None:
 			#save wav
 			wav = audio.inv_mel_spectrogram(mels.T)
-			audio.save_wav(wav, os.path.join(log_dir, 'wavs/ljspeech-wav-{:05d}.npy'.format(index)))
+			audio.save_wav(wav, os.path.join(log_dir, 'wavs/ljspeech-wav-{:05d}.wav'.format(index)))
 
 			#save alignments
 			plot.plot_alignment(alignment, os.path.join(log_dir, 'plots/ljspeech-alignment-{:05d}.png'.format(index)),

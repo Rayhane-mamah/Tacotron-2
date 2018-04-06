@@ -3,10 +3,10 @@ import os
 import threading
 import time
 import traceback
-from utils.text import text_to_sequence
-from utils.infolog import log
+from tacotron.utils.text import text_to_sequence
+from tacotron.utils.infolog import log
 import tensorflow as tf 
-from hparams import hparams
+from tacotron.hparams import hparams
 
 
 _batches_per_group = 32
@@ -34,7 +34,7 @@ class Feeder(threading.Thread):
 		self._offset = 0
 
 		# Load metadata
-		self._datadir = os.path.dirname(metadata_filename)
+		self._datadir = os.path.join(os.path.dirname(metadata_filename), 'mels')
 		with open(metadata_filename, encoding='utf-8') as f:
 			self._metadata = [line.strip().split('|') for line in f]
 			frame_shift_ms = hparams.hop_size / hparams.sample_rate

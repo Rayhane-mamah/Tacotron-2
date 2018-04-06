@@ -1,7 +1,7 @@
 import tensorflow as tf 
-from .zoneout_LSTM import ZoneoutLSTMCell
+from tacotron.models.zoneout_LSTM import ZoneoutLSTMCell
 from tensorflow.contrib.rnn import LSTMBlockCell
-from hparams import hparams
+from tacotron.hparams import hparams
 
 
 def conv1d(inputs, kernel_size, channels, activation, is_training, scope):

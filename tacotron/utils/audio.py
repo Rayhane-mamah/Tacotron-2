@@ -2,7 +2,7 @@ import librosa
 import librosa.filters
 import numpy as np 
 from scipy import signal
-from hparams import hparams
+from tacotron.hparams import hparams
 import tensorflow as tf 
 
 
@@ -12,6 +12,13 @@ def load_wav(path):
 def save_wav(wav, path):
 	wav *= 32767 / max(0.01, np.max(np.abs(wav))) 
 	librosa.output.write_wav(path, wav.astype(np.int16), hparams.sample_rate)
+
+def trim_silence(wav):
+	'''Trim leading and trailing silence
+
+	Useful for M-AILABS dataset if we choose to trim the extra 0.5 silences.
+	'''
+	return librosa.effects.trim(wav)[0]
 
 def preemphasis(x):
 	return signal.lfilter([1, -hparams.preemphasis], [1], x)
@@ -27,9 +34,6 @@ def get_hop_size():
 	return hop_size
 
 def melspectrogram(wav):
-	if hparams.rescale:
-		wav = wav / np.abs(wav).max() * hparams.rescaling_max
-
 	D = _stft(wav)
 	S = _amp_to_db(_linear_to_mel(np.abs(D))) - hparams.ref_level_db
 

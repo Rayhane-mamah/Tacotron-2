@@ -1,6 +1,45 @@
-# Tacotron-2
+# Tacotron-2:
 Tensorflow implementation of Deep mind's Tacotron-2. A deep neural network architecture described in this paper: [Natural TTS synthesis by conditioning Wavenet on MEL spectogram predictions](https://arxiv.org/pdf/1712.05884.pdf)
 
+
+# Repository Structure:
+	Tacotron-2/
+	├── en_US			(0)
+	│   └── by_book
+	│       ├── female
+	│       └── male
+	├── LJSpeech-1.1	(0)
+	│   └── wavs
+	├── logs-Tacotron	(2)
+	│   ├── mel-spectrograms
+	│   ├── plots
+	│   ├── pretrained
+	│   └── wavs
+	├── papers
+	├── tacotron
+	│   ├── datasets
+	│   ├── models
+	│   └── utils
+	└── training_data	(1)
+		└── mels
+
+
+The previous tree shows what your cloned repository should look like (after **Preprocessing** **(1)** and **Tacotron training** **(2)**). **en_US** and **LJSppech-1.1** are not a must **(0)**, this depends on the dataset you will be using. 
+
+Note:
+- **Our preprocessing only supports Ljspeech and Ljspeech-like datasets (M-AILABS speech data)!** If running on datasets stored differently, you will probably need to make your own preprocessing script.
+- In the previous tree, files **were not represented** and **max depth was set to 3** for simplicity.
+
+# Model Architecture:
+<p align="center">
+  <img src="https://preview.ibb.co/bU8sLS/Tacotron_2_Architecture.png"/>
+</p>
+
+The model described by the authors can be divided in two parts:
+- Spectrogram prediction network
+- Wavenet vocoder
+
+To have an in-depth exploration of the model architecture, training procedure and preprocessing logic, refer to [our wiki](https://github.com/Rayhane-mamah/Tacotron-2/wiki)
 
 # Current state:
 
@@ -11,63 +50,108 @@ since the two parts of the global model are trained separately, we can start by 
 # How to start
 first, you need to have python 3 installed along with [Tensorflow v1.6](https://www.tensorflow.org/install/).
 
-next you can install the requirements using:
+next you can install the requirements. If you are an Anaconda user:
 
 > pip install -r requirements.txt
+
+else:
+
+> pip3 install -r requirements.txt
 
 # Dataset:
 We tested the code above on the [ljspeech dataset](https://keithito.com/LJ-Speech-Dataset/), which has almost 24 hours of labeled single actress voice recording. (further info on the dataset are available in the README file when you download it)
 
+We are also running current tests on the [new L-AILABS speech dataset](http://www.m-ailabs.bayern/en/the-mailabs-speech-dataset/) which contains more than 700h of speech (more than 80 Gb of data) for more than 10 languages.
+
 After **downloading** the dataset, **extract** the compressed file, and **place the folder inside the cloned repository.**
 
 # Preprocessing
+Before running the following steps, please make sure you are inside **Tacotron-2 folder**
 
-From this point and further, you'll have to be located inside the "tacotron" folder
-
-> cd tacotron
+> cd Tacotron-2
 
 Preprocessing can then be started using: 
 
 > python preprocess.py
+
+or 
+
+> python3 preprocess.py
 
 This should take **few minutes.**
 
 # Training:
 Feature prediction model can be **trained** using:
 
-> python train.py
+> python train.py --model='Tacotron'
 
-checkpoints will be made each **100 steps** and stored under **logs-<model_name> folder.**
+or 
+
+> python3 train.py --model='Tacotron'
+
+checkpoints will be made each **100 steps** and stored under **logs-Tacotron folder.**
+
+Naturally, **training the wavenet** is done by: (Not implemented yet)
+
+> python train.py --model='Wavenet'
+
+or 
+
+> python3 train.py --model='Wavenet'
+
+logs will be stored inside **logs-Wavenet**.
+
+**Note:**
+- If model argument is not provided, training will default to Tacotron model training.
 
 # Synthesis
-There are **three types** of mel spectrograms synthesis using this model:
+There are **three types** of mel spectrograms synthesis for the Spectrogram prediction network (Tacotron):
 
 - **Evaluation** (synthesis on custom sentences). This is what we'll usually use after having a full end to end model.
 
-> python synthesize.py --mode='eval'
+> python synthesize.py --model='Tacotron' --mode='eval'
+
+or
+
+> python3 synthesize.py --model='Tacotron' --mode='eval'
 
 - **Natural synthesis** (let the model make predictions alone by feeding last decoder output to the next time step).
 
-> python synthesize.py --GTA=False
+> python synthesize.py --model='Tacotron' --GTA=False
+
+or
+
+> python3 synthesize.py --model='Tacotron' --GTA=False
 
 - **Ground Truth Aligned synthesis** (DEFAULT: the model is assisted by true labels in a teacher forcing manner). This synthesis method is used when predicting mel spectrograms used to train the wavenet vocoder. (yields better results as stated in the paper)
 
-> python synthesize.py
+> python synthesize.py --model='Tacotron'
 
-## DISCLAIMER:
-Due to some constraints, we won't be able to provide a pretrained feature prediction model at the moment. Vocoder Wavenet model however is in development state. In the mean time, if someone can train a feature prediction model, we will gladly add it to the repository.
+or 
 
-## Note:
-Due to the large size of audio samples in the dataset, we advise you to drop the batch size to 32 or lower (depending on your gpu load). Please keep in mind that this will slow the training process.
+> python3 synthesize.py --model='Tacotron'
 
-# References:
+Synthesizing the waveforms conditionned on previously synthesized Mel-spectrograms can be done with:
+
+> python synthesize.py --model='Wavenet'
+
+or 
+
+> python3 synthesize.py --model='Wavenet'
+
+**Note:**
+- If model argument is not provided, synthesis will default to Tacotron model synthesis.
+- If mode argument is not provided, synthesis defaults to Ground Truth Aligned synthesis.
+
+# Pretrained model and Samples:
+Pre-trained models and audio samples will be added at a later date due to technical difficulties. You can however check some primary insights of the model performance (at early stages of training) [here](https://github.com/Rayhane-mamah/Tacotron-2/issues/4#issuecomment-378741465).
+
+
+# References and Resources:
 - [Tensorflow original tacotron implementation](https://github.com/keithito/tacotron)
 - [Original tacotron paper](https://arxiv.org/pdf/1703.10135.pdf)
 - [Attention-Based Models for Speech Recognition](https://arxiv.org/pdf/1506.07503.pdf)
 - [Natural TTS synthesis by conditioning Wavenet on MEL spectogram predictions](https://arxiv.org/pdf/1712.05884.pdf)
 - [r9y9/wavenet_vocoder](https://github.com/r9y9/wavenet_vocoder)
 
-
-** Work in progress, further info will be added **
-
-** This work is independant from deep mind **
+**Work in progress**

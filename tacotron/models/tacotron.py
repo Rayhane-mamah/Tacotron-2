@@ -1,13 +1,13 @@
 import tensorflow as tf 
-from utils.symbols import symbols
-from utils.infolog import log
-from .helpers import TacoTrainingHelper, TacoTestHelper
-from .modules import *
-from models.zoneout_LSTM import ZoneoutLSTMCell
+from tacotron.utils.symbols import symbols
+from tacotron.utils.infolog import log
+from tacotron.models.helpers import TacoTrainingHelper, TacoTestHelper
+from tacotron.models.modules import *
+from tacotron.models.zoneout_LSTM import ZoneoutLSTMCell
 from tensorflow.contrib.seq2seq import dynamic_decode
-from .Architecture_wrappers import TacotronEncoderCell, TacotronDecoderCell
-from .attention import LocationSensitiveAttention
-from .custom_decoder import CustomDecoder
+from tacotron.models.Architecture_wrappers import TacotronEncoderCell, TacotronDecoderCell
+from tacotron.models.attention import LocationSensitiveAttention
+from tacotron.models.custom_decoder import CustomDecoder
 
 
 class Tacotron():

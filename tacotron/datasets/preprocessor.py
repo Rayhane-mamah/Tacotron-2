@@ -1,11 +1,12 @@
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
-from utils import audio
+from tacotron.utils import audio
 import os
 import numpy as np 
+from tacotron.hparams import hparams
 
 
-def build_from_path(input_dir, out_dir, n_jobs=4, tqdm=lambda x: x):
+def build_from_path(input_dirs, out_dir, n_jobs=4, tqdm=lambda x: x):
 	"""
 	Preprocesses the Lj speech dataset from a gven input path to a given output directory
 
@@ -24,14 +25,16 @@ def build_from_path(input_dir, out_dir, n_jobs=4, tqdm=lambda x: x):
 	executor = ProcessPoolExecutor(max_workers=n_jobs)
 	futures = []
 	index = 1
-	with open(os.path.join(input_dir, 'metadata.csv'), encoding='utf-8') as f:
-		for line in f:
-			parts = line.strip().split('|')
-			wav_path = os.path.join(input_dir, 'wavs', '{}.wav'.format(parts[0]))
-			text = parts[2]
-			futures.append(executor.submit(partial(_process_utterance, out_dir, index, wav_path, text)))
-			index += 1
-	return [future.result() for future in tqdm(futures)]
+	for input_dir in input_dirs:
+		with open(os.path.join(input_dir, 'metadata.csv'), encoding='utf-8') as f:
+			for line in f:
+				parts = line.strip().split('|')
+				wav_path = os.path.join(input_dir, 'wavs', '{}.wav'.format(parts[0]))
+				text = parts[2]
+				futures.append(executor.submit(partial(_process_utterance, out_dir, index, wav_path, text)))
+				index += 1
+
+	return [future.result() for future in tqdm(futures) if future.result() is not None]
 
 
 def _process_utterance(out_dir, index, wav_path, text):
@@ -51,8 +54,20 @@ def _process_utterance(out_dir, index, wav_path, text):
 		- A tuple: (mel_filename, n_frames, text)
 	"""
 
-	# Load the audio as numpy array
-	wav = audio.load_wav(wav_path)
+	try:
+		# Load the audio as numpy array
+		wav = audio.load_wav(wav_path)
+	except FileNotFoundError:
+		print('file {} present in csv metadata is not present in wav folder. skipping!'.format(
+			wav_path))
+		return None
+
+	#rescale wav
+	if hparams.rescale:
+		wav = wav / np.abs(wav).max() * hparams.rescaling_max
+
+	if hparams.trim_silence:
+		wav = audio.trim_silence(wav)
 
 	# Compute the mel scale spectrogram from the wav
 	mel_spectrogram = audio.melspectrogram(wav).astype(np.float32)

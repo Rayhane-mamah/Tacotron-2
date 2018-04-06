@@ -12,6 +12,7 @@ hparams = tf.contrib.training.HParams(
 	num_mels = 80, 
 	rescale = True, 
 	rescaling_max = 0.999,
+	trim_silence = True,
 
 	#Mel spectrogram
 	fft_size = 1024,
