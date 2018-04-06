@@ -78,7 +78,13 @@ or
 
 > python3 preprocess.py
 
-This should take **few minutes.**
+dataset can be chosen using the **--dataset** argument. If using M-AILABS dataset, you need to provide the **language, voice, reader, merge_books and book arguments** for your custom need. Default is **Ljspeech**.
+
+Example M-AILABS:
+
+> python preprocess.py --dataset='M-AILABS' --language='en_US' --voice='female' --reader='mary_ann' --merge_books=False --book='northandsouth'
+
+This should take no longer than a **few minutes.**
 
 # Training:
 Feature prediction model can be **trained** using:
