@@ -4,7 +4,7 @@ Tensorflow implementation of Deep mind's Tacotron-2. A deep neural network archi
 
 # Repository Structure:
 	Tacotron-2/
-	├── en_US			(0)
+	├── en_US		(0)
 	│   └── by_book
 	│       ├── female
 	│       └── male
