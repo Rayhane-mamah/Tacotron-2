@@ -7,11 +7,12 @@ import tensorflow as tf
 import traceback
 import argparse
 
-from tacotron.datasets.feeder import Feeder
-from tacotron.hparams import hparams, hparams_debug_string
+from tacotron.feeder import Feeder
+from hparams import hparams, hparams_debug_string
 from tacotron.models import create_model
 from tacotron.utils.text import sequence_to_text
-from tacotron.utils import audio, infolog, plot, ValueWindow
+from tacotron.utils import infolog, plot, ValueWindow
+from datasets import audio
 log = infolog.log
 
 

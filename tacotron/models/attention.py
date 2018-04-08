@@ -7,7 +7,7 @@ from tensorflow.python.layers import core as layers_core
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.ops import math_ops
-from tacotron.hparams import hparams
+from hparams import hparams
 
 
 

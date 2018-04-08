@@ -3,7 +3,11 @@ Tensorflow implementation of Deep mind's Tacotron-2. A deep neural network archi
 
 
 # Repository Structure:
-	Tacotron-2/
+	Tacotron-2
+	├── datasets
+	├── en_UK		(0)
+	│   └── by_book
+	│       └── female
 	├── en_US		(0)
 	│   └── by_book
 	│       ├── female
@@ -17,14 +21,17 @@ Tensorflow implementation of Deep mind's Tacotron-2. A deep neural network archi
 	│   └── wavs
 	├── papers
 	├── tacotron
-	│   ├── datasets
 	│   ├── models
 	│   └── utils
-	└── training_data	(1)
-		└── mels
+	├── training_data	(1)
+	│   ├── audio
+	│   └── mels
+	└── wavenet_vocoder
+		└── models
 
 
-The previous tree shows what your cloned repository should look like (after **Preprocessing** **(1)** and **Tacotron training** **(2)**). **en_US** and **LJSppech-1.1** are not a must **(0)**, this depends on the dataset you will be using. 
+
+The previous tree shows what the current state of the repository should look like (after **Preprocessing** **(1)** and **Tacotron training** **(2)**). **en_US**, **en_UK** and **LJSppech-1.1** are optional **(0)**, these depend on the dataset you will be using. 
 
 Note:
 - **Our preprocessing only supports Ljspeech and Ljspeech-like datasets (M-AILABS speech data)!** If running on datasets stored differently, you will probably need to make your own preprocessing script.

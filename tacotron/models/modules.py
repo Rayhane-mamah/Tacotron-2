@@ -1,11 +1,11 @@
 import tensorflow as tf 
 from tacotron.models.zoneout_LSTM import ZoneoutLSTMCell
 from tensorflow.contrib.rnn import LSTMBlockCell
-from tacotron.hparams import hparams
+from hparams import hparams
 
 
 def conv1d(inputs, kernel_size, channels, activation, is_training, scope):
-	drop_rate = hparams.dropout_rate
+	drop_rate = hparams.tacotron_dropout_rate
 
 	with tf.variable_scope(scope):
 		conv1d_output = tf.layers.conv1d(
@@ -97,7 +97,7 @@ class Prenet:
 			scope: Prenet scope.
 		"""
 		super(Prenet, self).__init__()
-		self.drop_rate = hparams.dropout_rate
+		self.drop_rate = hparams.tacotron_dropout_rate
 
 		self.layer_sizes = layer_sizes
 		self.is_training = is_training

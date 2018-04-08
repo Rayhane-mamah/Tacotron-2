@@ -1,7 +1,7 @@
 import argparse
 import os
 import re
-from tacotron.hparams import hparams, hparams_debug_string
+from hparams import hparams, hparams_debug_string
 from tacotron.synthesizer import Synthesizer
 import tensorflow as tf 
 import time

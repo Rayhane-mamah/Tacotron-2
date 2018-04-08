@@ -52,7 +52,7 @@ class Tacotron():
 				EncoderConvolutions(is_training, kernel_size=hp.enc_conv_kernel_size,
 					channels=hp.enc_conv_channels, scope='encoder_convolutions'),
 				EncoderRNN(is_training, size=hp.encoder_lstm_units,
-					zoneout=hp.zoneout_rate, scope='encoder_LSTM'))
+					zoneout=hp.tacotron_zoneout_rate, scope='encoder_LSTM'))
 
 			encoder_outputs = encoder_cell(embedded_inputs, input_lengths)
 
@@ -68,7 +68,7 @@ class Tacotron():
 				mask_encoder=hp.mask_encoder, memory_sequence_length=input_lengths, smoothing=hp.smoothing)
 			#Decoder LSTM Cells
 			decoder_lstm = DecoderRNN(is_training, layers=hp.decoder_layers,
-				size=hp.decoder_lstm_units, zoneout=hp.zoneout_rate, scope='decoder_lstm')
+				size=hp.decoder_lstm_units, zoneout=hp.tacotron_zoneout_rate, scope='decoder_lstm')
 			#Frames Projection layer
 			frame_projection = FrameProjection(hp.num_mels * hp.outputs_per_step, scope='linear_transform')
 			#<stop_token> projection layer
@@ -88,7 +88,7 @@ class Tacotron():
 			#Define the helper for our decoder
 			if (is_training or gta) == True:
 				self.helper = TacoTrainingHelper(batch_size, mel_targets, stop_token_targets,
-					hp.num_mels, hp.outputs_per_step, hp.teacher_forcing_ratio)
+					hp.num_mels, hp.outputs_per_step, hp.tacotron_teacher_forcing_ratio)
 			else:
 				self.helper = TacoTestHelper(batch_size, hp.num_mels, hp.outputs_per_step)
 
@@ -168,7 +168,7 @@ class Tacotron():
 			all_vars = tf.trainable_variables()
 			# Compute the regularization term
 			regularization = tf.add_n([tf.nn.l2_loss(v) for v in all_vars
-				if not('bias' in v.name or 'Bias' in v.name)]) * hp.reg_weight
+				if not('bias' in v.name or 'Bias' in v.name)]) * hp.tacotron_reg_weight
 
 			# Compute final loss term
 			self.before_loss = before
@@ -186,14 +186,15 @@ class Tacotron():
 		'''
 		with tf.variable_scope('optimizer') as scope:
 			hp = self._hparams
-			if hp.decay_learning_rate:
-				self.decay_steps = hp.decay_steps
-				self.decay_rate = hp.decay_rate
-				self.learning_rate = self._learning_rate_decay(hp.initial_learning_rate, global_step)
+			if hp.tacotron_decay_learning_rate:
+				self.decay_steps = hp.tacotron_decay_steps
+				self.decay_rate = hp.tacotron_decay_rate
+				self.learning_rate = self._learning_rate_decay(hp.tacotron_initial_learning_rate, global_step)
 			else:
-				self.learning_rate = tf.convert_to_tensor(hp.initial_learning_rate)
+				self.learning_rate = tf.convert_to_tensor(hp.tacotron_initial_learning_rate)
 
-			optimizer = tf.train.AdamOptimizer(self.learning_rate, hp.adam_beta1, hp.adam_beta2, hp.adam_epsilon)
+			optimizer = tf.train.AdamOptimizer(self.learning_rate, hp.tacotron_adam_beta1,
+				hp.tacotron_adam_beta2, hp.tacotron_adam_epsilon)
 			gradients, variables = zip(*optimizer.compute_gradients(self.loss))
 			self.gradients = gradients
 
@@ -213,4 +214,4 @@ class Tacotron():
 			self.decay_steps, 
 			self.decay_rate,
 			name='exponential_decay')
-		return tf.maximum(hp.final_learning_rate, lr)
+		return tf.maximum(hp.tacotron_final_learning_rate, lr)

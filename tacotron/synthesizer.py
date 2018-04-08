@@ -1,11 +1,12 @@
 import os
 import numpy as np
 import tensorflow as tf
-from tacotron.hparams import hparams
+from hparams import hparams
 from librosa import effects
 from tacotron.models import create_model
 from tacotron.utils.text import text_to_sequence
-from tacotron.utils import audio, plot
+from tacotron.utils import plot
+from datasets import audio
 from datetime import datetime
 
 
