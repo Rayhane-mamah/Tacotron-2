@@ -60,19 +60,24 @@ class TacoTestHelper(Helper):
 
 
 class TacoTrainingHelper(Helper):
-	def __init__(self, batch_size, targets, stop_targets, output_dim, r, ratio):
+	def __init__(self, batch_size, targets, stop_targets, output_dim, r, ratio, gta):
 		# inputs is [N, T_in], targets is [N, T_out, D]
 		with tf.name_scope('TacoTrainingHelper'):
 			self._batch_size = batch_size
 			self._output_dim = output_dim
 			self._reduction_factor = r
 			self._ratio = ratio
+			self.gta = gta
 
 			# Feed every r-th target frame as input
 			self._targets = targets[:, r-1::r, :]
 
-			# Detect finished sequence using stop_targets
-			self._stop_targets = stop_targets[:, r-1::r]
+			if not gta:
+				# Detect finished sequence using stop_targets
+				self._stop_targets = stop_targets[:, r-1::r]
+			else:
+				# GTA synthesis
+				self._lengths = tf.tile([tf.shape(self._targets)[1]], [self._batch_size])
 
 	@property
 	def batch_size(self):
@@ -98,8 +103,12 @@ class TacoTrainingHelper(Helper):
 
 	def next_inputs(self, time, outputs, state, sample_ids, stop_token_prediction, name=None):
 		with tf.name_scope(name or 'TacoTrainingHelper'):
-			#mark sequences where stop_target == 1 as finished (for case of imputation)
-			finished = tf.equal(self._stop_targets[:, time], [1.])
+			if not self.gta:
+				#mark sequences where stop_target == 1 as finished (for case of imputation)
+				finished = tf.equal(self._stop_targets[:, time], [1.])
+			else:
+				#GTA synthesis stop
+				finished = (time + 1 >= self._lengths)
 
 			if np.random.random() <= self._ratio:
 				next_inputs = self._targets[:, time, :] #Teacher-forcing: return true frame

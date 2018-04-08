@@ -33,7 +33,7 @@ class Tacotron():
 		"""
 		if mel_targets is None and stop_token_targets is not None:
 			raise ValueError('no mel targets were provided but token_targets were given')
-		if mel_targets is not None and stop_token_targets is None:
+		if mel_targets is not None and stop_token_targets is None and not gta:
 			raise ValueError('Mel targets are provided without corresponding token_targets')
 
 		with tf.variable_scope('inference') as scope:
@@ -88,7 +88,7 @@ class Tacotron():
 			#Define the helper for our decoder
 			if (is_training or gta) == True:
 				self.helper = TacoTrainingHelper(batch_size, mel_targets, stop_token_targets,
-					hp.num_mels, hp.outputs_per_step, hp.tacotron_teacher_forcing_ratio)
+					hp.num_mels, hp.outputs_per_step, hp.tacotron_teacher_forcing_ratio, gta)
 			else:
 				self.helper = TacoTestHelper(batch_size, hp.num_mels, hp.outputs_per_step)
 

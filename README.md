@@ -23,6 +23,13 @@ Tensorflow implementation of Deep mind's Tacotron-2. A deep neural network archi
 	├── tacotron
 	│   ├── models
 	│   └── utils
+	├── tacotron_output	(3)
+	│   ├── eval
+	│   ├── gta
+	│   ├── logs-eval
+	│   │   ├── plots
+	│   │   └── wavs
+	│   └── natural
 	├── training_data	(1)
 	│   ├── audio
 	│   └── mels
@@ -31,7 +38,14 @@ Tensorflow implementation of Deep mind's Tacotron-2. A deep neural network archi
 
 
 
-The previous tree shows what the current state of the repository should look like (after **Preprocessing** **(1)** and **Tacotron training** **(2)**). **en_US**, **en_UK** and **LJSppech-1.1** are optional **(0)**, these depend on the dataset you will be using. 
+
+The previous tree shows what the current state of the repository.
+
+- Step **(0)**: Get your dataset, here I have set the examples of **Ljspeech**, **en_US** and **en_UK** (from **M-AILABS**).
+- Step **(1)**: Preprocess your data. This will give you the **trainin_data** folder.
+- Step **(2)**: Train your Tacotron model. Yields the **logs-Tacotron** folder.
+- Step **(3)**: Synthesize/Evaluate the Tacotron model. Gives the **tacotron_output** folder.
+
 
 Note:
 - **Our preprocessing only supports Ljspeech and Ljspeech-like datasets (M-AILABS speech data)!** If running on datasets stored differently, you will probably need to make your own preprocessing script.

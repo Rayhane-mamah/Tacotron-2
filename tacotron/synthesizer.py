@@ -19,7 +19,7 @@ class Synthesizer:
 		with tf.variable_scope('model') as scope:
 			self.model = create_model(model_name, hparams)
 			if gta:
-				self.model.initialize(inputs, input_lengths, targets, gta)
+				self.model.initialize(inputs, input_lengths, targets, gta=gta)
 			else:		
 				self.model.initialize(inputs, input_lengths)
 			self.mel_outputs = self.model.mel_outputs
