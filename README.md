@@ -42,7 +42,7 @@ Tensorflow implementation of Deep mind's Tacotron-2. A deep neural network archi
 The previous tree shows what the current state of the repository.
 
 - Step **(0)**: Get your dataset, here I have set the examples of **Ljspeech**, **en_US** and **en_UK** (from **M-AILABS**).
-- Step **(1)**: Preprocess your data. This will give you the **trainin_data** folder.
+- Step **(1)**: Preprocess your data. This will give you the **training_data** folder.
 - Step **(2)**: Train your Tacotron model. Yields the **logs-Tacotron** folder.
 - Step **(3)**: Synthesize/Evaluate the Tacotron model. Gives the **tacotron_output** folder.
 
@@ -82,7 +82,7 @@ else:
 # Dataset:
 We tested the code above on the [ljspeech dataset](https://keithito.com/LJ-Speech-Dataset/), which has almost 24 hours of labeled single actress voice recording. (further info on the dataset are available in the README file when you download it)
 
-We are also running current tests on the [new L-AILABS speech dataset](http://www.m-ailabs.bayern/en/the-mailabs-speech-dataset/) which contains more than 700h of speech (more than 80 Gb of data) for more than 10 languages.
+We are also running current tests on the [new M-AILABS speech dataset](http://www.m-ailabs.bayern/en/the-mailabs-speech-dataset/) which contains more than 700h of speech (more than 80 Gb of data) for more than 10 languages.
 
 After **downloading** the dataset, **extract** the compressed file, and **place the folder inside the cloned repository.**
 

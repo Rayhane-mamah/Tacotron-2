@@ -40,8 +40,8 @@ def norm_data(args):
 
 	
 	if args.dataset == 'M-AILABS':
-		supported_languages = ['en_US', 'en_UK', 'fr_FR', 'it_IT', 'de_DE', 'es-ES', 'ru-RU', 
-			'uk-UK', 'pl-PL', 'nl-NL', 'pt-PT', 'sv-FI', 'sv-SE', 'tr-TR', 'ar-SA']
+		supported_languages = ['en_US', 'en_UK', 'fr_FR', 'it_IT', 'de_DE', 'es_ES', 'ru_RU', 
+			'uk_UK', 'pl_PL', 'nl_NL', 'pt_PT', 'sv_FI', 'sv_SE', 'tr_TR', 'ar_SA']
 		if args.language not in supported_languages:
 			raise ValueError('Please enter a supported language to use from M-AILABS dataset! \n{}'.format(
 				supported_languages))
