@@ -91,7 +91,7 @@ hparams = tf.contrib.training.HParams(
 
 
 	#Tacotron Training
-	tacotron_batch_size = 32, #number of training samples on each training steps
+	tacotron_batch_size = 64, #number of training samples on each training steps
 	tacotron_reg_weight = 1e-6, #regularization weight (for l2 regularization)
 
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
@@ -160,4 +160,4 @@ hparams = tf.contrib.training.HParams(
 def hparams_debug_string():
   values = hparams.values()
   hp = ['  %s: %s' % (name, values[name]) for name in sorted(values) if name != 'sentences']
-  return 'Hyperparameters:\n' + '\n'.join(hp)
+return 'Hyperparameters:\n' + '\n'.join(hp)

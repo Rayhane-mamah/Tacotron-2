@@ -6,8 +6,15 @@ from tacotron.models.modules import *
 from tacotron.models.zoneout_LSTM import ZoneoutLSTMCell
 from tensorflow.contrib.seq2seq import dynamic_decode
 from tacotron.models.Architecture_wrappers import TacotronEncoderCell, TacotronDecoderCell
-from tacotron.models.attention import LocationSensitiveAttention
 from tacotron.models.custom_decoder import CustomDecoder
+
+if int(tf.__version__.replace('.', '')) < 160:
+	log('using old attention Tensorflow structure (1.5.0 and earlier)')
+	from tacotron.models.attention_old import LocationSensitiveAttention
+else:
+	log('using new attention Tensorflow structure (1.6.0 and later)')
+	from tacotron.models.attention import LocationSensitiveAttention
+
 
 
 class Tacotron():

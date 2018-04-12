@@ -41,7 +41,7 @@ def norm_data(args):
 	
 	if args.dataset == 'M-AILABS':
 		supported_languages = ['en_US', 'en_UK', 'fr_FR', 'it_IT', 'de_DE', 'es_ES', 'ru_RU', 
-			'uk_UK', 'pl_PL', 'nl_NL', 'pt_PT', 'sv_FI', 'sv_SE', 'tr_TR', 'ar_SA']
+			'uk_UK', 'pl_PL', 'nl_NL', 'pt_PT', 'fi_FI', 'se_SE', 'tr_TR', 'ar_SA']
 		if args.language not in supported_languages:
 			raise ValueError('Please enter a supported language to use from M-AILABS dataset! \n{}'.format(
 				supported_languages))
@@ -52,7 +52,7 @@ def norm_data(args):
 				supported_voices))
 
 		path = os.path.join(args.base_dir, args.language, 'by_book', args.voice)
-		supported_readers = [e for e in os.listdir(path) if e != '.DS_Store']
+		supported_readers = [e for e in os.listdir(path) if 'DS_Store' not in e]
 		if args.reader not in supported_readers:
 			raise ValueError('Please enter a valid reader for your language and voice settings! \n{}'.format(
 				supported_readers))
