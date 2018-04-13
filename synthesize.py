@@ -11,7 +11,7 @@ def main():
 	parser.add_argument('--model', default='Tacotron')
 	parser.add_argument('--input_dir', default='training_data/', help='folder to contain inputs sentences/targets')
 	parser.add_argument('--output_dir', default='output/', help='folder to contain synthesized mel spectrograms')
-	parser.add_argument('--mode', default='synthesis', help='mode of run: can be one of {}'.format(accepted_modes))
+	parser.add_argument('--mode', default='eval', help='mode of run: can be one of {}'.format(accepted_modes))
 	parser.add_argument('--GTA', default=True, help='Ground truth aligned synthesis, defaults to True, only considered in synthesis mode')
 	args = parser.parse_args()
 	

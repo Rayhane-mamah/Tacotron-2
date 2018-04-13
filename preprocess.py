@@ -30,10 +30,14 @@ def write_metadata(metadata, out_dir):
 
 def norm_data(args):
 	print('Selecting data folders..')
-	supported_datasets = ['LJSpeech-1.1', 'M-AILABS']
+	supported_datasets = ['LJSpeech-1.1', 'M-AILABS', 'thchs30']
 	if args.dataset not in supported_datasets:
 		raise ValueError('dataset value entered {} does not belong to supported datasets: {}'.format(
 			args.dataset, supported_datasets))
+
+	if args.dataset == 'thchs30':
+		return [os.path.join(args.base_dir, 'data_thchs30')]
+
 
 	if args.dataset == 'LJSpeech-1.1':
 		return [os.path.join(args.base_dir, args.dataset)]
@@ -82,7 +86,7 @@ def main():
 	print('initializing preprocessing..')
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--base_dir', default='')
-	parser.add_argument('--dataset', default='LJSpeech-1.1')
+	parser.add_argument('--dataset', default='thchs30')
 	parser.add_argument('--language', default='en_US')
 	parser.add_argument('--voice', default='female')
 	parser.add_argument('--reader', default='mary_ann')
