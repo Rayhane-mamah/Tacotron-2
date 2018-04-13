@@ -52,13 +52,13 @@ def norm_data(args):
 				supported_voices))
 
 		path = os.path.join(args.base_dir, args.language, 'by_book', args.voice)
-		supported_readers = [e for e in os.listdir(path) if 'DS_Store' not in e]
+		supported_readers = [e for e in os.listdir(path) if os.path.isdir(os.path.join(path, e))]
 		if args.reader not in supported_readers:
 			raise ValueError('Please enter a valid reader for your language and voice settings! \n{}'.format(
 				supported_readers))
 
 		path = os.path.join(path, args.reader)
-		supported_books = [e for e in os.listdir(path) if e != '.DS_Store']
+		supported_books = [e for e in os.listdir(path) if os.path.isdir(os.path.join(path, e))]
 
 		if args.merge_books:
 			return [os.path.join(path, book) for book in supported_books]
