@@ -51,19 +51,19 @@ class Synthesizer:
 		# Write the spectrogram to disk
 		# Note: outputs mel-spectrogram files and target ones have same names, just different folders
 		mel_filename = os.path.join(out_dir, 'ljspeech-mel-{:05d}.npy'.format(index))
-		np.save(mel_filename, mels, allow_pickle=False)
+		# np.save(mel_filename, mels, allow_pickle=False)
 
-		if log_dir is not None:
-			#save wav
-			wav = audio.inv_mel_spectrogram(mels.T)
-			audio.save_wav(wav, os.path.join(log_dir, 'wavs/ljspeech-wav-{:05d}.wav'.format(index)))
+		# if log_dir is not None:
+		#save wav
+		wav = audio.inv_mel_spectrogram(mels.T)
+		audio.save_wav(wav, os.path.join(log_dir, 'wavs/ljspeech-wav-{:05d}.wav'.format(index)))
 
-			#save alignments
-			plot.plot_alignment(alignment, os.path.join(log_dir, 'plots/ljspeech-alignment-{:05d}.png'.format(index)),
-				info='{}'.format(text), split_title=True)
+		# 	#save alignments
+		# 	plot.plot_alignment(alignment, os.path.join(log_dir, 'plots/ljspeech-alignment-{:05d}.png'.format(index)),
+		# 		info='{}'.format(text), split_title=True)
 
-			#save mel spectrogram plot
-			plot.plot_spectrogram(mels, os.path.join(log_dir, 'plots/ljspeech-mel-{:05d}.png'.format(index)),
-				info='{}'.format(text), split_title=True)
+		# 	#save mel spectrogram plot
+		# 	plot.plot_spectrogram(mels, os.path.join(log_dir, 'plots/ljspeech-mel-{:05d}.png'.format(index)),
+		# 		info='{}'.format(text), split_title=True)
 
 		return mel_filename

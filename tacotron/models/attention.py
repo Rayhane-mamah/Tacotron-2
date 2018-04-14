@@ -10,6 +10,33 @@ from tensorflow.python.ops import math_ops
 from hparams import hparams
 
 
+#From https://github.com/tensorflow/tensorflow/blob/r1.7/tensorflow/contrib/seq2seq/python/ops/attention_wrapper.py
+def _compute_attention(attention_mechanism, cell_output, attention_state,
+					   attention_layer):
+	"""Computes the attention and alignments for a given attention_mechanism."""
+	alignments, next_attention_state = attention_mechanism(
+		cell_output, state=attention_state)
+
+	# Reshape from [batch_size, memory_time] to [batch_size, 1, memory_time]
+	expanded_alignments = array_ops.expand_dims(alignments, 1)
+	# Context is the inner product of alignments and values along the
+	# memory time dimension.
+	# alignments shape is
+	#   [batch_size, 1, memory_time]
+	# attention_mechanism.values shape is
+	#   [batch_size, memory_time, memory_size]
+	# the batched matmul is over memory_time, so the output shape is
+	#   [batch_size, 1, memory_size].
+	# we then squeeze out the singleton dim.
+	context = math_ops.matmul(expanded_alignments, attention_mechanism.values)
+	context = array_ops.squeeze(context, [1])
+
+	if attention_layer is not None:
+		attention = attention_layer(array_ops.concat([cell_output, context], 1))
+	else:
+		attention = context
+
+	return attention, alignments, next_attention_state
 
 
 def _location_sensitive_score(W_query, W_fil, W_keys):
@@ -20,17 +47,17 @@ def _location_sensitive_score(W_query, W_fil, W_keys):
 	  vances in Neural Information Processing Systems, 2015, pp.
 	  577–585.
 
-    #############################################################################
-              hybrid attention (content-based + location-based)
-        				       f = F * α_{i-1}
-       energy = dot(v_a, tanh(W_keys(h_enc) + W_query(h_dec) + W_fil(f) + b_a))
-    #############################################################################
+	#############################################################################
+			  hybrid attention (content-based + location-based)
+							   f = F * α_{i-1}
+	   energy = dot(v_a, tanh(W_keys(h_enc) + W_query(h_dec) + W_fil(f) + b_a))
+	#############################################################################
 
-    Args:
+	Args:
 		W_query: Tensor, shape '[batch_size, 1, attention_dim]' to compare to location features.
 		W_location: processed previous alignments into location features, shape '[batch_size, max_time, attention_dim]'
 		W_keys: Tensor, shape '[batch_size, max_time, attention_dim]', typically the encoder outputs.
-    Returns:
+	Returns:
 		A '[batch_size, max_time]' attention score (energy)
 	"""
 	# Get the number of hidden units from the trailing dimension of keys
@@ -38,7 +65,8 @@ def _location_sensitive_score(W_query, W_fil, W_keys):
 	num_units = W_keys.shape[-1].value or array_ops.shape(W_keys)[-1]
 
 	v_a = tf.get_variable(
-		'attention_variable', shape=[num_units], dtype=dtype)
+		'attention_variable', shape=[num_units], dtype=dtype,
+		initializer=tf.contrib.layers.xavier_initializer())
 	b_a = tf.get_variable(
 		'attention_bias', shape=[num_units], dtype=dtype,
 		initializer=tf.zeros_initializer())
@@ -54,17 +82,17 @@ def _smoothing_normalization(e):
 	  577–585.
 
 	############################################################################
-    				   	Smoothing normalization function
-    		  	a_{i, j} = sigmoid(e_{i, j}) / sum_j(sigmoid(e_{i, j}))
-  	############################################################################
+						Smoothing normalization function
+				a_{i, j} = sigmoid(e_{i, j}) / sum_j(sigmoid(e_{i, j}))
+	############################################################################
 
-  	Args:
-  		e: matrix [batch_size, max_time(memory_time)]: expected to be energy (score)
-  			values of an attention mechanism
-  	Returns:
-  		matrix [batch_size, max_time]: [0, 1] normalized alignments with possible
-  			attendance to multiple memory time steps.
-  	"""
+	Args:
+		e: matrix [batch_size, max_time(memory_time)]: expected to be energy (score)
+			values of an attention mechanism
+	Returns:
+		matrix [batch_size, max_time]: [0, 1] normalized alignments with possible
+			attendance to multiple memory time steps.
+	"""
 	return tf.nn.sigmoid(e) / tf.reduce_sum(tf.nn.sigmoid(e), axis=-1, keepdims=True)
 
 
@@ -75,8 +103,8 @@ class LocationSensitiveAttention(BahdanauAttention):
 	"D. Bahdanau, K. Cho, and Y. Bengio, “Neural machine transla-
   tion by jointly learning to align and translate,” in Proceedings
   of ICLR, 2015."
-  	to use previous alignments as additional location features.
-  	
+	to use previous alignments as additional location features.
+	
 	This attention is described in:
 	J. K. Chorowski, D. Bahdanau, D. Serdyuk, K. Cho, and Y. Ben-
   gio, “Attention-based models for speech recognition,” in Ad-

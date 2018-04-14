@@ -7,13 +7,7 @@ from tacotron.models.zoneout_LSTM import ZoneoutLSTMCell
 from tensorflow.contrib.seq2seq import dynamic_decode
 from tacotron.models.Architecture_wrappers import TacotronEncoderCell, TacotronDecoderCell
 from tacotron.models.custom_decoder import CustomDecoder
-
-if int(tf.__version__.replace('.', '')) < 160:
-	log('using old attention Tensorflow structure (1.5.0 and earlier)')
-	from tacotron.models.attention_old import LocationSensitiveAttention
-else:
-	log('using new attention Tensorflow structure (1.6.0 and later)')
-	from tacotron.models.attention import LocationSensitiveAttention
+from tacotron.models.attention import LocationSensitiveAttention
 
 
 
@@ -174,8 +168,10 @@ class Tacotron():
 			# Get all trainable variables
 			all_vars = tf.trainable_variables()
 			# Compute the regularization term
+			reg_weight_scaler = 1. / (2 * hp.max_abs_value) if hp.symmetric_mels else 1. / (hp.max_abs_value)
+			reg_weight = hp.tacotron_reg_weight * reg_weight_scaler
 			regularization = tf.add_n([tf.nn.l2_loss(v) for v in all_vars
-				if not('bias' in v.name or 'Bias' in v.name)]) * hp.tacotron_reg_weight
+				if not('bias' in v.name or 'Bias' in v.name)]) * reg_weight
 
 			# Compute final loss term
 			self.before_loss = before
@@ -204,11 +200,14 @@ class Tacotron():
 				hp.tacotron_adam_beta2, hp.tacotron_adam_epsilon)
 			gradients, variables = zip(*optimizer.compute_gradients(self.loss))
 			self.gradients = gradients
+			#Just for causion
+			#https://github.com/Rayhane-mamah/Tacotron-2/issues/11
+			clipped_gradients, _ = tf.clip_by_global_norm(gradients, 0.5)
 
 			# Add dependency on UPDATE_OPS; otherwise batchnorm won't work correctly. See:
 			# https://github.com/tensorflow/tensorflow/issues/1122
 			with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-				self.optimize = optimizer.apply_gradients(zip(gradients, variables),
+				self.optimize = optimizer.apply_gradients(zip(clipped_gradients, variables),
 					global_step=global_step)
 
 	def _learning_rate_decay(self, init_lr, global_step):

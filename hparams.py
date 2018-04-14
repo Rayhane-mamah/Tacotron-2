@@ -70,24 +70,24 @@ hparams = tf.contrib.training.HParams(
 
 	#Wavenet
 	# Input type:
-    # 1. raw [-1, 1]
-    # 2. mulaw [-1, 1]
-    # 3. mulaw-quantize [0, mu]
-    # If input_type is raw or mulaw, network assumes scalar input and
-    # discretized mixture of logistic distributions output, otherwise one-hot
-    # input and softmax output are assumed.
-    # **NOTE**: if you change the one of the two parameters below, you need to
-    # re-run preprocessing before training.
-    # **NOTE**: scaler input (raw or mulaw) is experimental. Use it your own risk.
-    input_type="mulaw-quantize",
-    quantize_channels=256,  # 65536 or 256
+	# 1. raw [-1, 1]
+	# 2. mulaw [-1, 1]
+	# 3. mulaw-quantize [0, mu]
+	# If input_type is raw or mulaw, network assumes scalar input and
+	# discretized mixture of logistic distributions output, otherwise one-hot
+	# input and softmax output are assumed.
+	# **NOTE**: if you change the one of the two parameters below, you need to
+	# re-run preprocessing before training.
+	# **NOTE**: scaler input (raw or mulaw) is experimental. Use it your own risk.
+	input_type="mulaw-quantize",
+	quantize_channels=256,  # 65536 or 256
 
-    silence_threshold=2,
+	silence_threshold=2,
 
-    # Mixture of logistic distributions:
-    log_scale_min=float(np.log(1e-14)),
+	# Mixture of logistic distributions:
+	log_scale_min=float(np.log(1e-14)),
 
-    #TODO model params
+	#TODO model params
 
 
 	#Tacotron Training
@@ -158,6 +158,6 @@ hparams = tf.contrib.training.HParams(
 	)
 
 def hparams_debug_string():
-  values = hparams.values()
-  hp = ['  %s: %s' % (name, values[name]) for name in sorted(values) if name != 'sentences']
-return 'Hyperparameters:\n' + '\n'.join(hp)
+	values = hparams.values()
+	hp = ['  %s: %s' % (name, values[name]) for name in sorted(values) if name != 'sentences']
+	return 'Hyperparameters:\n' + '\n'.join(hp)

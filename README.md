@@ -105,6 +105,10 @@ Example M-AILABS:
 
 > python preprocess.py --dataset='M-AILABS' --language='en_US' --voice='female' --reader='mary_ann' --merge_books=False --book='northandsouth'
 
+or if you want to use all books for a single speaker:
+
+> python preprocess.py --dataset='M-AILABS' --language='en_US' --voice='female' --reader='mary_ann' --merge_books=True
+
 This should take no longer than a **few minutes.**
 
 # Training:
