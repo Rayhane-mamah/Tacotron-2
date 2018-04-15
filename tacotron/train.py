@@ -22,6 +22,8 @@ def add_stats(model):
 		tf.summary.histogram('mel_targets', model.mel_targets)
 		tf.summary.scalar('before_loss', model.before_loss)
 		tf.summary.scalar('after_loss', model.after_loss)
+		if hparams.predict_linear:
+			tf.summary.scalar('linear loss', model.linear_loss)
 		tf.summary.scalar('regularization_loss', model.regularization_loss)
 		tf.summary.scalar('stop_token_loss', model.stop_token_loss)
 		tf.summary.scalar('loss', model.loss)
@@ -44,6 +46,11 @@ def train(log_dir, args):
 	os.makedirs(plot_dir, exist_ok=True)
 	os.makedirs(wav_dir, exist_ok=True)
 	os.makedirs(mel_dir, exist_ok=True)
+
+	if hparams.predict_linear:
+		linear_dir = os.path.join(log_dir, 'linear-spectrograms')
+		os.makedirs(linear_dir, exist_ok=True)
+
 	log('Checkpoint path: {}'.format(checkpoint_path))
 	log('Loading training data from: {}'.format(input_path))
 	log('Using model: {}'.format(args.model))
@@ -66,7 +73,10 @@ def train(log_dir, args):
 	global_step = tf.Variable(step_count, name='global_step', trainable=False)
 	with tf.variable_scope('model') as scope:
 		model = create_model(args.model, hparams)
-		model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets)
+		if hparams.predict_linear:
+			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets, feeder.linear_targets)
+		else:
+			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets)
 		model.add_loss()
 		model.add_optimizer(global_step)
 		stats = add_stats(model)
@@ -135,18 +145,37 @@ def train(log_dir, args):
 					save_step = step
 					
 					log('Saving alignment, Mel-Spectrograms and griffin-lim inverted waveform..')
-					input_seq, prediction, alignment, target = sess.run([model.inputs[0],
-							 model.mel_outputs[0],
-							 model.alignments[0],
-							 model.mel_targets[0],
-							 ])
-					#save predicted spectrogram to disk (for plot and manual evaluation purposes)
-					mel_filename = 'ljspeech-mel-prediction-step-{}.npy'.format(step)
-					np.save(os.path.join(mel_dir, mel_filename), prediction.T, allow_pickle=False)
+					if hparams.predict_linear:
+						input_seq, mel_prediction, linear_prediction, alignment, target = sess.run([
+							model.inputs[0],
+							model.mel_outputs[0],
+							model.linear_outputs[0],
+							model.alignments[0],
+							model.mel_targets[0],
+							])
 
-					#save griffin lim inverted wav for debug.
-					wav = audio.inv_mel_spectrogram(prediction.T)
-					audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-waveform.wav'.format(step)))
+						#save predicted linear spectrogram to disk (debug)
+						linear_filename = 'linear-prediction-step-{}.npy'.format(step)
+						np.save(os.path.join(linear_dir, linear_filename), linear_prediction.T, allow_pickle=False)
+
+						#save griffin lim inverted wav for debug (linear -> wav)
+						wav = audio.inv_linear_spectrogram(linear_prediction.T)
+						audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-waveform-linear.wav'.format(step)))
+
+					else:
+						input_seq, mel_prediction, alignment, target = sess.run([model.inputs[0],
+							model.mel_outputs[0],
+							model.alignments[0],
+							model.mel_targets[0],
+							])
+
+					#save predicted mel spectrogram to disk (debug)
+					mel_filename = 'mel-prediction-step-{}.npy'.format(step)
+					np.save(os.path.join(mel_dir, mel_filename), mel_prediction.T, allow_pickle=False)
+
+					#save griffin lim inverted wav for debug (mel -> wav)
+					wav = audio.inv_mel_spectrogram(mel_prediction.T)
+					audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-waveform-mel.wav'.format(step)))
 
 					#save alignment plot to disk (control purposes)
 					plot.plot_alignment(alignment, os.path.join(plot_dir, 'step-{}-align.png'.format(step)),
@@ -155,7 +184,7 @@ def train(log_dir, args):
 					plot.plot_spectrogram(target, os.path.join(plot_dir, 'step-{}-real-mel-spectrogram.png'.format(step)),
 						info='{}, {}, step={}, Real'.format(args.model, time_string(), step, loss))
 					#save predicted mel-spectrogram plot to disk (control purposes)
-					plot.plot_spectrogram(prediction, os.path.join(plot_dir, 'step-{}-pred-mel-spectrogram.png'.format(step)),
+					plot.plot_spectrogram(mel_prediction, os.path.join(plot_dir, 'step-{}-pred-mel-spectrogram.png'.format(step)),
 						info='{}, {}, step={}, loss={:.5}'.format(args.model, time_string(), step, loss))
 					log('Input at step {}: {}'.format(step, sequence_to_text(input_seq)))
 

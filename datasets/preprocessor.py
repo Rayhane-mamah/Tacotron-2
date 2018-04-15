@@ -7,13 +7,14 @@ from hparams import hparams
 from wavenet_vocoder.util import mulaw_quantize, mulaw, is_mulaw, is_mulaw_quantize
 
 
-def build_from_path(input_dirs, mel_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
+def build_from_path(input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
 	"""
-	Preprocesses the Lj speech dataset from a gven input path to a given output directory
+	Preprocesses the speech dataset from a gven input path to given output directories
 
 	Args:
 		- input_dir: input directory that contains the files to prerocess
 		- mel_dir: output directory of the preprocessed speech mel-spectrogram dataset
+		- linear_dir: output directory of the preprocessed speech linear-spectrogram dataset
 		- wav_dir: output directory of the preprocessed speech audio dataset
 		- n_jobs: Optional, number of worker process to parallelize across
 		- tqdm: Optional, provides a nice progress bar
@@ -33,13 +34,13 @@ def build_from_path(input_dirs, mel_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
 				parts = line.strip().split('|')
 				wav_path = os.path.join(input_dir, 'wavs', '{}.wav'.format(parts[0]))
 				text = parts[2]
-				futures.append(executor.submit(partial(_process_utterance, mel_dir, wav_dir, index, wav_path, text)))
+				futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, index, wav_path, text)))
 				index += 1
 
 	return [future.result() for future in tqdm(futures) if future.result() is not None]
 
 
-def _process_utterance(mel_dir, wav_dir, index, wav_path, text):
+def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text):
 	"""
 	Preprocesses a single utterance wav/text pair
 
@@ -48,13 +49,14 @@ def _process_utterance(mel_dir, wav_dir, index, wav_path, text):
 
 	Args:
 		- mel_dir: the directory to write the mel spectograms into
+		- linear_dir: the directory to write the linear spectrograms into
 		- wav_dir: the directory to write the preprocessed wav into
 		- index: the numeric index to use in the spectogram filename
 		- wav_path: path to the audio file containing the speech input
 		- text: text spoken in the input audio file
 
 	Returns:
-		- A tuple: (mel_filename, n_frames, text)
+		- A tuple: (audio_filename, mel_filename, linear_filename, time_steps, mel_frames, linear_frames, text)
 	"""
 
 	try:
@@ -100,26 +102,36 @@ def _process_utterance(mel_dir, wav_dir, index, wav_path, text):
 
 	# Compute the mel scale spectrogram from the wav
 	mel_spectrogram = audio.melspectrogram(wav).astype(np.float32)
-	n_frames = mel_spectrogram.shape[1]
+	mel_frames = mel_spectrogram.shape[1]
+
+	#Compute the linear scale spectrogram from the wav
+	linear_spectrogram = audio.linearspectrogram(wav).astype(np.float32)
+	linear_frames = linear_spectrogram.shape[1] 
+
+	#sanity check
+	assert linear_frames == mel_frames
+
 	#Ensure time resolution adjustement between audio and mel-spectrogram
 	l, r = audio.pad_lr(wav, hparams.fft_size, audio.get_hop_size())
 
 	#Zero pad for quantized signal
 	out = np.pad(out, (l, r), mode='constant', constant_values=constant_values)
 	time_steps = len(out)
-	assert time_steps >= n_frames * audio.get_hop_size()
+	assert time_steps >= mel_frames * audio.get_hop_size()
 
 	#time resolution adjustement
 	#ensure length of raw audio is multiple of hop size so that we can use
 	#transposed convolution to upsample
-	out = out[:n_frames * audio.get_hop_size()]
+	out = out[:mel_frames * audio.get_hop_size()]
 	assert time_steps % audio.get_hop_size() == 0
 
 	# Write the spectrogram and audio to disk
 	audio_filename = 'speech-audio-{:05d}.npy'.format(index)
 	mel_filename = 'speech-mel-{:05d}.npy'.format(index)
+	linear_filename = 'speech-linear-{:05d}.npy'.format(index)
 	np.save(os.path.join(wav_dir, audio_filename), out.astype(out_dtype), allow_pickle=False)
 	np.save(os.path.join(mel_dir, mel_filename), mel_spectrogram.T, allow_pickle=False)
+	np.save(os.path.join(linear_dir, linear_filename), linear_spectrogram.T, allow_pickle=False)
 
 	# Return a tuple describing this training example
-	return (audio_filename, mel_filename, time_steps, n_frames, text)
+	return (audio_filename, mel_filename, linear_filename, time_steps, mel_frames, text)

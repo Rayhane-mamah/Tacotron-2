@@ -17,7 +17,7 @@ class Tacotron():
 	def __init__(self, hparams):
 		self._hparams = hparams
 
-	def initialize(self, inputs, input_lengths, mel_targets=None, stop_token_targets=None, gta=False):
+	def initialize(self, inputs, input_lengths, mel_targets=None, stop_token_targets=None, linear_targets=None, gta=False):
 		"""
 		Initializes the model for inference
 
@@ -36,11 +36,17 @@ class Tacotron():
 			raise ValueError('no mel targets were provided but token_targets were given')
 		if mel_targets is not None and stop_token_targets is None and not gta:
 			raise ValueError('Mel targets are provided without corresponding token_targets')
+		if gta==False and self._hparams.predict_linear==True and linear_targets is None:
+			raise ValueError('Model is set to use post processing to predict linear spectrograms in training but no linear targets given!')
+		if gta and linear_targets is not None:
+			raise ValueError('Linear spectrogram prediction is not supported in GTA mode!')
 
 		with tf.variable_scope('inference') as scope:
 			is_training = mel_targets is not None and not gta
 			batch_size = tf.shape(inputs)[0]
 			hp = self._hparams
+			#GTA is only used for predicting mels to train Wavenet vocoder, so we ommit post processing when doing GTA synthesis
+			post_condition = hp.predict_linear and not gta
 
 			# Embeddings ==> [batch_size, sequence_length, embedding_dim]
 			embedding_table = tf.get_variable(
@@ -129,6 +135,19 @@ class Tacotron():
 			#Compute the mel spectrogram
 			mel_outputs = decoder_output + projected_residual
 
+
+			if post_condition:
+				#Based on https://github.com/keithito/tacotron/blob/tacotron2-work-in-progress/models/tacotron.py
+				#Post-processing Network to map mels to linear spectrograms using same architecture as the encoder
+				post_processing_cell = TacotronEncoderCell(
+				EncoderConvolutions(is_training, kernel_size=hp.enc_conv_kernel_size,
+					channels=hp.enc_conv_channels, scope='post_processing_convolutions'),
+				EncoderRNN(is_training, size=hp.encoder_lstm_units,
+					zoneout=hp.tacotron_zoneout_rate, scope='post_processing_LSTM'))
+
+				expand_outputs = post_processing_cell(mel_outputs)
+				linear_outputs = FrameProjection(hp.num_freq, scope='post_processing_projection')(expand_outputs)
+
 			#Grab alignments from the final decoder state
 			alignments = tf.transpose(final_decoder_state.alignment_history.stack(), [1, 2, 0])
 
@@ -139,8 +158,11 @@ class Tacotron():
 			self.stop_token_prediction = stop_token_prediction
 			self.stop_token_targets = stop_token_targets
 			self.mel_outputs = mel_outputs
+			if post_condition:
+				self.linear_outputs = linear_outputs
+				self.linear_targets = linear_targets
 			self.mel_targets = mel_targets
-			log('Initialized Tacotron model. Dimensions: ')
+			log('Initialized Tacotron model. Dimensions (? = dynamic shape): ')
 			log('  embedding:                {}'.format(embedded_inputs.shape))
 			log('  enc conv out:             {}'.format(enc_conv_output_shape))
 			log('  encoder out:              {}'.format(encoder_outputs.shape))
@@ -148,6 +170,8 @@ class Tacotron():
 			log('  residual out:             {}'.format(residual.shape))
 			log('  projected residual out:   {}'.format(projected_residual.shape))
 			log('  mel out:                  {}'.format(mel_outputs.shape))
+			if post_condition:
+				log('  linear out:               {}'.format(linear_outputs.shape))
 			log('  <stop_token> out:         {}'.format(stop_token_prediction.shape))
 
 
@@ -165,11 +189,25 @@ class Tacotron():
 				labels=self.stop_token_targets,
 				logits=self.stop_token_prediction))
 
+			if hp.predict_linear:
+				#Compute linear loss
+				#From https://github.com/keithito/tacotron/blob/tacotron2-work-in-progress/models/tacotron.py
+				# Prioritize loss for frequencies under 2000 Hz.
+				l1 = tf.abs(self.linear_targets - self.linear_outputs)
+				n_priority_freq = int(2000 / (hp.sample_rate * 0.5) * hp.num_mels)
+				linear_loss = 0.5 * tf.reduce_mean(l1) + 0.5 * tf.reduce_mean(l1[:,:,0:n_priority_freq])
+			else:
+				linear_loss = 0.
+
+			# Compute the regularization weight
+			if hp.tacotron_scale_regularization:
+				reg_weight_scaler = 1. / (2 * hp.max_abs_value) if hp.symmetric_mels else 1. / (hp.max_abs_value)
+				reg_weight = hp.tacotron_reg_weight * reg_weight_scaler
+			else:
+				reg_weight = hp.tacotron_reg_weight
+
 			# Get all trainable variables
 			all_vars = tf.trainable_variables()
-			# Compute the regularization term
-			reg_weight_scaler = 1. / (2 * hp.max_abs_value) if hp.symmetric_mels else 1. / (hp.max_abs_value)
-			reg_weight = hp.tacotron_reg_weight * reg_weight_scaler
 			regularization = tf.add_n([tf.nn.l2_loss(v) for v in all_vars
 				if not('bias' in v.name or 'Bias' in v.name)]) * reg_weight
 
@@ -178,8 +216,9 @@ class Tacotron():
 			self.after_loss = after
 			self.stop_token_loss = stop_token_loss
 			self.regularization_loss = regularization
+			self.linear_loss = linear_loss
 
-			self.loss = self.before_loss + self.after_loss + self.stop_token_loss + self.regularization_loss 
+			self.loss = self.before_loss + self.after_loss + self.stop_token_loss + self.regularization_loss + self.linear_loss
 
 	def add_optimizer(self, global_step):
 		'''Adds optimizer. Sets "gradients" and "optimize" fields. add_loss must have been called.
@@ -211,13 +250,27 @@ class Tacotron():
 					global_step=global_step)
 
 	def _learning_rate_decay(self, init_lr, global_step):
-		# Exponential decay
-		# We won't drop learning rate below 10e-5
+		#################################################################
+		# Narrow Exponential Decay:
+
+		# Phase 1: lr = 1e-3
+		# We only start learning rate decay after 50k steps
+
+		# Phase 2: lr in ]1e-3, 1e-5[
+		# decay reach minimal value at step 150k
+
+		# Phase 3: lr = 1e-5
+		# clip by minimal learning rate value (step > 150k)
+		#################################################################
 		hp = self._hparams
 		step = tf.cast(global_step + 1, dtype=tf.float32)
+
+		#Compute natural exponential decay
 		lr = tf.train.exponential_decay(init_lr, 
-			global_step - self.decay_steps + 1, 
+			global_step - hp.tacotron_start_decay, #lr = 1e-3 at step 50k
 			self.decay_steps, 
-			self.decay_rate,
+			self.decay_rate, #lr = 1e-5 around step 150k
 			name='exponential_decay')
-		return tf.maximum(hp.tacotron_final_learning_rate, lr)
+
+		#clip learning rate by max and min values (initial and final values)
+		return tf.minimum(tf.maximum(lr, hp.tacotron_final_learning_rate), init_lr)

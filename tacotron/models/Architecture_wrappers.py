@@ -36,7 +36,7 @@ class TacotronEncoderCell(RNNCell):
 		self._convolutions = convolutional_layers
 		self._cell = lstm_layer
 
-	def __call__(self, inputs, input_lengths):
+	def __call__(self, inputs, input_lengths=None):
 		#Pass input sequence through a stack of convolutional layers
 		conv_output = self._convolutions(inputs)
 

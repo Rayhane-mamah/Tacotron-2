@@ -5,12 +5,13 @@ import numpy as np
 # Default hyperparameters
 hparams = tf.contrib.training.HParams(
 	# Comma-separated list of cleaners to run on text prior to training and eval. For non-English
-	# text, you may want to use "basic_cleaners" or "transliteration_cleaners" See TRAINING_DATA.md.
+	# text, you may want to use "basic_cleaners" or "transliteration_cleaners".
 	cleaners='english_cleaners',
 
 
 	#Audio
 	num_mels = 80, 
+	num_freq = 513, #only used when adding linear spectrograms post processing network
 	rescale = True, 
 	rescaling_max = 0.999,
 	trim_silence = True,
@@ -21,8 +22,8 @@ hparams = tf.contrib.training.HParams(
 	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset)
 	frame_shift_ms = None,
 
-	#Mel spectrogram normalization/scaling and clipping
-	mel_normalization = True,
+	#Mel and Linear spectrograms normalization/scaling and clipping
+	signal_normalization = True,
 	allow_clipping_in_normalization = True, #Only relevant if mel_normalization = True
 	symmetric_mels = True, #Whether to scale the data to be symmetric around 0
 	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max] 
@@ -67,6 +68,8 @@ hparams = tf.contrib.training.HParams(
 	impute_finished = False, #Whether to use loss mask for padded sequences
 	mask_finished = False, #Whether to mask alignments beyond the <stop_token> (False for debug, True for style)
 
+	predict_linear = False, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
+
 
 	#Wavenet
 	# Input type:
@@ -93,10 +96,12 @@ hparams = tf.contrib.training.HParams(
 	#Tacotron Training
 	tacotron_batch_size = 64, #number of training samples on each training steps
 	tacotron_reg_weight = 1e-6, #regularization weight (for l2 regularization)
+	tacotron_scale_regularization = False,
 
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
-	tacotron_decay_steps = 50000, #starting point for learning rate decay (and determines the decay slope)
-	tacotron_decay_rate = 0.4, #learning rate decay rate
+	tacotron_start_decay = 50000, #Step at which learning decay starts
+	tacotron_decay_steps = 25000, #starting point for learning rate decay (and determines the decay slope) (UNDER TEST)
+	tacotron_decay_rate = 0.33, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
 	tacotron_final_learning_rate = 1e-5, #minimal learning rate
 
