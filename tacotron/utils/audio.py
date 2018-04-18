@@ -90,8 +90,8 @@ def _mel_to_linear(mel_spectrogram):
 
 def _build_mel_basis():
 	assert hparams.fmax <= hparams.sample_rate // 2
-	return librosa.filters.mel(hparams.sample_rate, hparams.fft_size, n_mels=hparams.num_mels)
-							   #fmin=hparams.fmin, fmax=hparams.fmax)
+	return librosa.filters.mel(hparams.sample_rate, hparams.fft_size, n_mels=hparams.num_mels,
+							   fmin=hparams.fmin, fmax=hparams.fmax)
 
 def _amp_to_db(x):
 	min_level = np.exp(hparams.min_level_db / 20 * np.log(10))

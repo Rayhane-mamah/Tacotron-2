@@ -5,12 +5,13 @@ import numpy as np
 # Default hyperparameters
 hparams = tf.contrib.training.HParams(
 	# Comma-separated list of cleaners to run on text prior to training and eval. For non-English
-	# text, you may want to use "basic_cleaners" or "transliteration_cleaners" See TRAINING_DATA.md.
+	# text, you may want to use "basic_cleaners" or "transliteration_cleaners".
 	cleaners='basic_cleaners',
 
 
 	#Audio
 	num_mels = 80, 
+	num_freq = 513, #only used when adding linear spectrograms post processing network
 	rescale = True, 
 	rescaling_max = 0.999,
 	trim_silence = True,
@@ -21,8 +22,8 @@ hparams = tf.contrib.training.HParams(
 	sample_rate = 16000, #22050 Hz (corresponding to ljspeech dataset)
 	frame_shift_ms = None,
 
-	#Mel spectrogram normalization/scaling and clipping
-	mel_normalization = True,
+	#Mel and Linear spectrograms normalization/scaling and clipping
+	signal_normalization = True,
 	allow_clipping_in_normalization = True, #Only relevant if mel_normalization = True
 	symmetric_mels = True, #Whether to scale the data to be symmetric around 0
 	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max] 
@@ -67,36 +68,40 @@ hparams = tf.contrib.training.HParams(
 	impute_finished = False, #Whether to use loss mask for padded sequences
 	mask_finished = False, #Whether to mask alignments beyond the <stop_token> (False for debug, True for style)
 
+	predict_linear = False, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
+
 
 	#Wavenet
 	# Input type:
-    # 1. raw [-1, 1]
-    # 2. mulaw [-1, 1]
-    # 3. mulaw-quantize [0, mu]
-    # If input_type is raw or mulaw, network assumes scalar input and
-    # discretized mixture of logistic distributions output, otherwise one-hot
-    # input and softmax output are assumed.
-    # **NOTE**: if you change the one of the two parameters below, you need to
-    # re-run preprocessing before training.
-    # **NOTE**: scaler input (raw or mulaw) is experimental. Use it your own risk.
-    input_type="mulaw-quantize",
-    quantize_channels=256,  # 65536 or 256
+	# 1. raw [-1, 1]
+	# 2. mulaw [-1, 1]
+	# 3. mulaw-quantize [0, mu]
+	# If input_type is raw or mulaw, network assumes scalar input and
+	# discretized mixture of logistic distributions output, otherwise one-hot
+	# input and softmax output are assumed.
+	# **NOTE**: if you change the one of the two parameters below, you need to
+	# re-run preprocessing before training.
+	# **NOTE**: scaler input (raw or mulaw) is experimental. Use it your own risk.
+	input_type="mulaw-quantize",
+	quantize_channels=256,  # 65536 or 256
 
-    silence_threshold=2,
+	silence_threshold=2,
 
-    # Mixture of logistic distributions:
-    log_scale_min=float(np.log(1e-14)),
+	# Mixture of logistic distributions:
+	log_scale_min=float(np.log(1e-14)),
 
-    #TODO model params
+	#TODO model params
 
 
 	#Tacotron Training
 	tacotron_batch_size = 64, #number of training samples on each training steps
 	tacotron_reg_weight = 1e-6, #regularization weight (for l2 regularization)
+	tacotron_scale_regularization = False,
 
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
-	tacotron_decay_steps = 50000, #starting point for learning rate decay (and determines the decay slope)
-	tacotron_decay_rate = 0.4, #learning rate decay rate
+	tacotron_start_decay = 50000, #Step at which learning decay starts
+	tacotron_decay_steps = 25000, #starting point for learning rate decay (and determines the decay slope) (UNDER TEST)
+	tacotron_decay_rate = 0.33, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
 	tacotron_final_learning_rate = 1e-5, #minimal learning rate
 
@@ -116,12 +121,12 @@ hparams = tf.contrib.training.HParams(
 
 	#Eval sentences
 	sentences = [
-	# From July 8, 2017 New York Times:
+	# # From July 8, 2017 New York Times:
 	# 'Scientists at the CERN laboratory say they have discovered a new particle.',
-	# 'There’s a way to measure the acute emotional intelligence that has never gone out of style.',
+	# 'There\'s a way to measure the acute emotional intelligence that has never gone out of style.',
 	# 'President Trump met with other leaders at the Group of 20 conference.',
 	# 'The Senate\'s bill to repeal and replace the Affordable Care Act is now imperiled.',
-	# From Google's Tacotron example page:
+	# # From Google's Tacotron example page:
 	# 'Generative adversarial network or variational auto-encoder.',
 	# 'Basilar membrane and otolaryngology are not auto-correlations.',
 	# 'He has read the whole thing.',
@@ -140,7 +145,7 @@ hparams = tf.contrib.training.HParams(
 	# "The blue lagoon is a nineteen eighty American romance adventure film.",
 	# "Tajima Airport serves Toyooka.",
 	# 'Talib Kweli confirmed to AllHipHop that he will be releasing an album in the next year.',
-	#From Training data:
+	# #From Training data:
 	# 'the rest being provided with barrack beds, and in dimensions varying from thirty feet by fifteen to fifteen feet by ten.',
 	# 'in giltspur street compter, where he was first lodged.',
 	# 'a man named burnett came with his wife and took up his residence at whitchurch, hampshire, at no great distance from laverstock,',
@@ -154,6 +159,8 @@ hparams = tf.contrib.training.HParams(
 	# Should I stop now? Let\'s add this last sentence in which we talk about nothing special.''',
 	# 'Thank you so much for your support!!'
 	"yu2 jian4 jun1 : wei4 mei3 ge4 you3 cai2 neng2 de ren2 ti2 gong1 ping2 tai2 .",
+	"ta1 shi4 yin1 pin2 ling3 yu4 de tao2 bao3 tian1 mao1 , zai4 zhe4 ge4 ping2 tai2 shang4, ",
+	"mei3 ge4 nei4 rong2 sheng1 chan3 zhe3 dou1 ke3 yi3 hen3 fang1 bian4 de shi1 xian4 zi4 wo3 jia4 zhi2 , geng4 duo1 de ren2 yong1 you3 wei1 chuang4 ye4 de ji1 hui4 .",
 	"zui4 jin4 xi3 ma3 la1 ya3 de bao4 guang1 lv4 you3 dian3 gao1 , ren4 xing4 shai4 chu1 yi1 dian3 qi1 yi4 yuan2 de zhang4 hu4 yu2 e2 de jie2 tu2 ,",
 	"rang4 ye4 nei4 ye4 wai4 dou1 hen3 jing1 tan4 : yi2 ge4 zuo4 yin1 pin2 de , ju1 ran2 you3 zhe4 me duo1 qian2 ?",
 	"ji4 zhe3 cha2 dao4 , wang3 shang4 dui4 xi3 ma3 la1 ya3 de jie4 shao4 shi4 ,",
@@ -163,13 +170,11 @@ hparams = tf.contrib.training.HParams(
 	"ji4 zhe3 liao3 jie3 dao4 , xi3 ma3 la1 ya3 cai3 qu3 bu4 duo1 jian4 de lian2 xi2 mo2 shi4 , ling4 yi1 wei4 jiu4 shi4 chen2 xiao3 yu3 ,",
 	"liang3 ren2 qi4 zhi4 hun4 da1 , you3 dian3 nan2 zhu3 wai4 nv3 zhu3 nei4 de yi4 si1 ,",
 	"bu4 guo4 ta1 men zhi3 shi4 da1 dang4 , bu2 shi4 chang2 jian4 de fu1 qi1 dang4 mo2 shi4 . yong4 yu2 jian4 jun1 de hua4 lai2 shuo1 , zhe4 ge4 mo2 shi4 ye3 bu4 chang2 jian4 .",
-	"ta1 shi4 yin1 pin2 ling3 yu4 de tao2 bao3 tian1 mao1 , zai4 zhe4 ge4 ping2 tai2 shang4, ",
-	"mei3 ge4 nei4 rong2 sheng1 chan3 zhe3 dou1 ke3 yi3 hen3 fang1 bian4 de shi1 xian4 zi4 wo3 jia4 zhi2 , geng4 duo1 de ren2 yong1 you3 wei1 chuang4 ye4 de ji1 hui4 .",
 	]
 
 	)
 
 def hparams_debug_string():
-  values = hparams.values()
-  hp = ['  %s: %s' % (name, values[name]) for name in sorted(values) if name != 'sentences']
-  return 'Hyperparameters:\n' + '\n'.join(hp)
+	values = hparams.values()
+	hp = ['  %s: %s' % (name, values[name]) for name in sorted(values) if name != 'sentences']
+	return 'Hyperparameters:\n' + '\n'.join(hp)

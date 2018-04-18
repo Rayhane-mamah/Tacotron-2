@@ -52,6 +52,8 @@ def expand_numbers(text):
 
 
 def lowercase(text):
+  '''lowercase input tokens.
+  '''
   return text.lower()
 
 
@@ -65,7 +67,6 @@ def convert_to_ascii(text):
 
 def basic_cleaners(text):
   '''Basic pipeline that lowercases and collapses whitespace without transliteration.'''
-  text = lowercase(text)
   text = collapse_whitespace(text)
   return text
 
@@ -73,7 +74,6 @@ def basic_cleaners(text):
 def transliteration_cleaners(text):
   '''Pipeline for non-English text that transliterates to ASCII.'''
   text = convert_to_ascii(text)
-  text = lowercase(text)
   text = collapse_whitespace(text)
   return text
 
@@ -81,7 +81,6 @@ def transliteration_cleaners(text):
 def english_cleaners(text):
   '''Pipeline for English text, including number and abbreviation expansion.'''
   text = convert_to_ascii(text)
-  text = lowercase(text)
   text = expand_numbers(text)
   text = expand_abbreviations(text)
   text = collapse_whitespace(text)

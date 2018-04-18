@@ -35,10 +35,11 @@ class Feeder(threading.Thread):
 
 		# Load metadata
 		self._mel_dir = os.path.join(os.path.dirname(metadata_filename), 'mels')
+		self._linear_dir = os.path.join(os.path.dirname(metadata_filename), 'linear')
 		with open(metadata_filename, encoding='utf-8') as f:
 			self._metadata = [line.strip().split('|') for line in f]
 			frame_shift_ms = hparams.hop_size / hparams.sample_rate
-			hours = sum([int(x[3]) for x in self._metadata]) * frame_shift_ms / (3600)
+			hours = sum([int(x[4]) for x in self._metadata]) * frame_shift_ms / (3600)
 			log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(self._metadata), hours))
 
 		# Create placeholders for inputs and targets. Don't specify batch size because we want
@@ -48,16 +49,18 @@ class Feeder(threading.Thread):
 		tf.placeholder(tf.int32, shape=(None, ), name='input_lengths'),
 		tf.placeholder(tf.float32, shape=(None, None, hparams.num_mels), name='mel_targets'),
 		tf.placeholder(tf.float32, shape=(None, None), name='token_targets'),
+		tf.placeholder(tf.float32, shape=(None, None, hparams.num_freq), name='linear_targets'),
 		]
 
 		# Create queue for buffering data
-		queue = tf.FIFOQueue(8, [tf.int32, tf.int32, tf.float32, tf.float32], name='input_queue')
+		queue = tf.FIFOQueue(8, [tf.int32, tf.int32, tf.float32, tf.float32, tf.float32], name='input_queue')
 		self._enqueue_op = queue.enqueue(self._placeholders)
-		self.inputs, self.input_lengths, self.mel_targets, self.token_targets = queue.dequeue()
+		self.inputs, self.input_lengths, self.mel_targets, self.token_targets, self.linear_targets = queue.dequeue()
 		self.inputs.set_shape(self._placeholders[0].shape)
 		self.input_lengths.set_shape(self._placeholders[1].shape)
 		self.mel_targets.set_shape(self._placeholders[2].shape)
 		self.token_targets.set_shape(self._placeholders[3].shape)
+		self.linear_targets.set_shape(self._placeholders[4].shape)
 
 	def start_in_session(self, session):
 		self._session = session
@@ -99,13 +102,14 @@ class Feeder(threading.Thread):
 		meta = self._metadata[self._offset]
 		self._offset += 1
 
-		text = meta[4]
+		text = meta[5]
 
 		input_data = np.asarray(text_to_sequence(text, self._cleaner_names), dtype=np.int32)
 		mel_target = np.load(os.path.join(self._mel_dir, meta[1]))
 		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * len(mel_target))
-		return (input_data, mel_target, token_target, len(mel_target))
+		linear_target = np.load(os.path.join(self._linear_dir, meta[2]))
+		return (input_data, mel_target, token_target, linear_target, len(mel_target))
 
 
 def _prepare_batch(batch, outputs_per_step):
@@ -115,7 +119,8 @@ def _prepare_batch(batch, outputs_per_step):
 	mel_targets = _prepare_targets([x[1] for x in batch], outputs_per_step)
 	#Pad sequences with 1 to infer that the sequence is done
 	token_targets = _prepare_token_targets([x[2] for x in batch], outputs_per_step)
-	return (inputs, input_lengths, mel_targets, token_targets)
+	linear_targets = _prepare_targets([x[3] for x in batch], outputs_per_step)
+	return (inputs, input_lengths, mel_targets, token_targets, linear_targets)
 
 def _prepare_inputs(inputs):
 	max_len = max([len(x) for x in inputs])

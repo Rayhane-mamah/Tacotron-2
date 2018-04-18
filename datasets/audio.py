@@ -48,18 +48,37 @@ def get_hop_size():
 		hop_size = int(hparams.frame_shift_ms / 1000 * hparams.sample_rate)
 	return hop_size
 
+def linearspectrogram(wav):
+	D = _stft(wav)
+	S = _amp_to_db(np.abs(D)) - hparams.ref_level_db
+
+	if hparams.signal_normalization:
+		return _normalize(S)
+	return S
+
 def melspectrogram(wav):
 	D = _stft(wav)
 	S = _amp_to_db(_linear_to_mel(np.abs(D))) - hparams.ref_level_db
 
-	if hparams.mel_normalization:
+	if hparams.signal_normalization:
 		return _normalize(S)
 	return S
+
+def inv_linear_spectrogram(linear_spectrogram):
+	'''Converts linear spectrogram to waveform using librosa'''
+	if hparams.signal_normalization:
+		D = _denormalize(linear_spectrogram)
+	else:
+		D = linear_spectrogram
+
+	S = _db_to_amp(D + hparams.ref_level_db) #Convert back to linear
+
+	return _griffin_lim(S ** hparams.power)
 	
 
 def inv_mel_spectrogram(mel_spectrogram):
 	'''Converts mel spectrogram to waveform using librosa'''
-	if hparams.mel_normalization:
+	if hparams.signal_normalization:
 		D = _denormalize(mel_spectrogram)
 	else:
 		D = mel_spectrogram
@@ -125,8 +144,8 @@ def _mel_to_linear(mel_spectrogram):
 
 def _build_mel_basis():
 	assert hparams.fmax <= hparams.sample_rate // 2
-	return librosa.filters.mel(hparams.sample_rate, hparams.fft_size, n_mels=hparams.num_mels)
-							   #fmin=hparams.fmin, fmax=hparams.fmax)
+	return librosa.filters.mel(hparams.sample_rate, hparams.fft_size, n_mels=hparams.num_mels,
+							   fmin=hparams.fmin, fmax=hparams.fmax)
 
 def _amp_to_db(x):
 	min_level = np.exp(hparams.min_level_db / 20 * np.log(10))
