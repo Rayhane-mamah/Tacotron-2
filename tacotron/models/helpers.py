@@ -110,10 +110,11 @@ class TacoTrainingHelper(Helper):
 				#GTA synthesis stop
 				finished = (time + 1 >= self._lengths)
 
-			if np.random.random() <= self._ratio:
-				next_inputs = self._targets[:, time, :] #Teacher-forcing: return true frame
-			else:
-				next_inputs = outputs[:, -self._output_dim:]
+			next_inputs = tf.cond(
+				tf.equal(tf.mod(time, int(1./self._ratio)), 0), 
+				lambda: self._targets[:, time, :], 
+				lambda: outputs[:,-self._output_dim:])
+                
 			#Update the finished state
 			next_state = state.replace(finished=tf.cast(tf.reshape(finished, [-1, 1]), tf.float32))
 			return (finished, next_inputs, next_state)
