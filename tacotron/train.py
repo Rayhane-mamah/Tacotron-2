@@ -196,7 +196,7 @@ def train(log_dir, args):
 def tacotron_train(args):
 	hparams.parse(args.hparams)
 	os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(args.tf_log_level)
-	run_name = args.model
+	run_name = args.name or args.model
 	log_dir = os.path.join(args.base_dir, 'logs-{}'.format(run_name))
 	os.makedirs(log_dir, exist_ok=True)
 	infolog.init(os.path.join(log_dir, 'Terminal_train_log'), run_name)

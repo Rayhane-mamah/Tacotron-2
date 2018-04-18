@@ -15,6 +15,7 @@ def main():
 	parser.add_argument('--checkpoint_interval', type=int, default=500,
 		help='Steps between writing checkpoints')
 	parser.add_argument('--tf_log_level', type=int, default=1, help='Tensorflow C++ log level.')
+	parser.add_argument('--name', help='Name of logging directory.')
 	args = parser.parse_args()
 
 	accepted_models = ['Tacotron', 'Wavenet']
