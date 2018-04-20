@@ -83,7 +83,6 @@ def train(log_dir, args):
 
 	#Book keeping
 	step = 0
-	save_step = 0
 	time_window = ValueWindow(100)
 	loss_window = ValueWindow(100)
 	saver = tf.train.Saver(max_to_keep=5)
@@ -116,7 +115,7 @@ def train(log_dir, args):
 				else:
 					log('No model to load at {}'.format(save_dir))
 
-			#initiating feeder
+			#initializing feeder
 			feeder.start_in_session(sess)
 
 			#Training loop
@@ -142,7 +141,6 @@ def train(log_dir, args):
 						file.write(str(step))
 					log('Saving checkpoint to: {}-{}'.format(checkpoint_path, step))
 					saver.save(sess, checkpoint_path, global_step=step)
-					save_step = step
 					
 					log('Saving alignment, Mel-Spectrograms and griffin-lim inverted waveform..')
 					if hparams.predict_linear:

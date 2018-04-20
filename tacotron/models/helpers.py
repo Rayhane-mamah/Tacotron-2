@@ -66,7 +66,7 @@ class TacoTrainingHelper(Helper):
 			self._batch_size = batch_size
 			self._output_dim = output_dim
 			self._reduction_factor = r
-			self._ratio = ratio
+			self._ratio = tf.convert_to_tensor(ratio)
 			self.gta = gta
 
 			# Feed every r-th target frame as input
@@ -111,10 +111,10 @@ class TacoTrainingHelper(Helper):
 				finished = (time + 1 >= self._lengths)
 
 			next_inputs = tf.cond(
-				tf.equal(tf.mod(time, int(1./self._ratio)), 0), 
-				lambda: self._targets[:, time, :], 
+				tf.less(tf.random_uniform([], minval=0, maxval=1, dtype=tf.float32), self._ratio),
+				lambda: self._targets[:, time, :], #Teacher-forcing: return true frame
 				lambda: outputs[:,-self._output_dim:])
-                
+
 			#Update the finished state
 			next_state = state.replace(finished=tf.cast(tf.reshape(finished, [-1, 1]), tf.float32))
 			return (finished, next_inputs, next_state)

@@ -50,13 +50,15 @@ def run_synthesis(args, checkpoint_path, output_dir):
 
 	print('starting synthesis')
 	mel_dir = os.path.join(args.input_dir, 'mels')
+	wav_dir = os.path.join(args.input_dir, 'audio')
 	with open(os.path.join(synth_dir, 'map.txt'), 'w') as file:
 		for i, meta in enumerate(tqdm(metadata)):
-			text = meta[4]
+			text = meta[5]
 			mel_filename = os.path.join(mel_dir, meta[1])
+			wav_filename = os.path.join(wav_dir, meta[0])
 			mel_output_filename = synth.synthesize(text, i+1, synth_dir, None, mel_filename)
 
-			file.write('{}|{}|{}\n'.format(text, mel_filename, mel_output_filename))
+			file.write('{}|{}|{}|{}\n'.format(text, mel_filename, mel_output_filename, wav_filename))
 	print('synthesized mel spectrograms at {}'.format(synth_dir))
 
 def tacotron_synthesize(args):

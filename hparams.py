@@ -40,7 +40,7 @@ hparams = tf.contrib.training.HParams(
 
 
 	#Tacotron
-	outputs_per_step = 5, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
+	outputs_per_step = 1, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them
 
 	embedding_dim = 512, #dimension of embedding space
@@ -54,11 +54,12 @@ hparams = tf.contrib.training.HParams(
 	attention_dim = 128, #dimension of attention space
 	attention_filters = 32, #number of attention convolution filters
 	attention_kernel = (31, ), #kernel size of attention convolution
+	cumulative_weights = True, #Whether to cumulate (sum) all previous attention weights or simply feed previous weights (Recommended: True)
 
 	prenet_layers = [256, 256], #number of layers and number of units of prenet
 	decoder_layers = 2, #number of decoder lstm layers
 	decoder_lstm_units = 1024, #number of decoder lstm units on each layer
-	max_iters = 1000, #Max decoder steps during inference (Just for safety from infinite loop cases)
+	max_iters = 2500, #Max decoder steps during inference (Just for safety from infinite loop cases)
 
 	postnet_num_layers = 5, #number of postnet convolutional layers
 	postnet_kernel_size = (5, ), #size of postnet convolution filters for each layer
@@ -94,14 +95,14 @@ hparams = tf.contrib.training.HParams(
 
 
 	#Tacotron Training
-	tacotron_batch_size = 64, #number of training samples on each training steps
+	tacotron_batch_size = 32, #number of training samples on each training steps
 	tacotron_reg_weight = 1e-6, #regularization weight (for l2 regularization)
-	tacotron_scale_regularization = False,
+	tacotron_scale_regularization = True, #Whether to rescale regularization weight to adapt for outputs range (used when reg_weight is high and biasing the model)
 
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	tacotron_start_decay = 50000, #Step at which learning decay starts
-	tacotron_decay_steps = 25000, #starting point for learning rate decay (and determines the decay slope) (UNDER TEST)
-	tacotron_decay_rate = 0.33, #learning rate decay rate (UNDER TEST)
+	tacotron_decay_steps = 50000, #starting point for learning rate decay (and determines the decay slope) (UNDER TEST)
+	tacotron_decay_rate = 0.4, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
 	tacotron_final_learning_rate = 1e-5, #minimal learning rate
 

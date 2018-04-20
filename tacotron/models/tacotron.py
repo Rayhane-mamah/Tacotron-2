@@ -72,7 +72,8 @@ class Tacotron():
 			prenet = Prenet(is_training, layer_sizes=hp.prenet_layers, scope='decoder_prenet')
 			#Attention Mechanism
 			attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs,
-				mask_encoder=hp.mask_encoder, memory_sequence_length=input_lengths, smoothing=hp.smoothing)
+				mask_encoder=hp.mask_encoder, memory_sequence_length=input_lengths, smoothing=hp.smoothing, 
+				cumulate_weights=hp.cumulative_weights)
 			#Decoder LSTM Cells
 			decoder_lstm = DecoderRNN(is_training, layers=hp.decoder_layers,
 				size=hp.decoder_lstm_units, zoneout=hp.tacotron_zoneout_rate, scope='decoder_lstm')
@@ -192,7 +193,7 @@ class Tacotron():
 			if hp.predict_linear:
 				#Compute linear loss
 				#From https://github.com/keithito/tacotron/blob/tacotron2-work-in-progress/models/tacotron.py
-				# Prioritize loss for frequencies under 2000 Hz.
+				#Prioritize loss for frequencies under 2000 Hz.
 				l1 = tf.abs(self.linear_targets - self.linear_outputs)
 				n_priority_freq = int(2000 / (hp.sample_rate * 0.5) * hp.num_mels)
 				linear_loss = 0.5 * tf.reduce_mean(l1) + 0.5 * tf.reduce_mean(l1[:,:,0:n_priority_freq])
@@ -257,20 +258,20 @@ class Tacotron():
 		# We only start learning rate decay after 50k steps
 
 		# Phase 2: lr in ]1e-3, 1e-5[
-		# decay reach minimal value at step 150k
+		# decay reach minimal value at step 300k
 
 		# Phase 3: lr = 1e-5
-		# clip by minimal learning rate value (step > 150k)
+		# clip by minimal learning rate value (step > 300k)
 		#################################################################
 		hp = self._hparams
-		step = tf.cast(global_step + 1, dtype=tf.float32)
 
 		#Compute natural exponential decay
 		lr = tf.train.exponential_decay(init_lr, 
 			global_step - hp.tacotron_start_decay, #lr = 1e-3 at step 50k
 			self.decay_steps, 
-			self.decay_rate, #lr = 1e-5 around step 150k
+			self.decay_rate, #lr = 1e-5 around step 300k
 			name='exponential_decay')
+
 
 		#clip learning rate by max and min values (initial and final values)
 		return tf.minimum(tf.maximum(lr, hp.tacotron_final_learning_rate), init_lr)
