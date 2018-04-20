@@ -31,7 +31,7 @@ hparams = tf.contrib.training.HParams(
 	#Limits
 	min_level_db =- 100,
 	ref_level_db = 20,
-	fmin = 125,
+	fmin = 50,
 	fmax = 7600,
 
 	#Griffin Lim
@@ -40,7 +40,7 @@ hparams = tf.contrib.training.HParams(
 
 
 	#Tacotron
-	outputs_per_step = 5, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
+	outputs_per_step = 2, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them
 
 	embedding_dim = 512, #dimension of embedding space
@@ -94,7 +94,7 @@ hparams = tf.contrib.training.HParams(
 
 
 	#Tacotron Training
-	tacotron_batch_size = 64, #number of training samples on each training steps
+	tacotron_batch_size = 32, #number of training samples on each training steps
 	tacotron_reg_weight = 1e-6, #regularization weight (for l2 regularization)
 	tacotron_scale_regularization = False,
 

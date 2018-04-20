@@ -262,13 +262,14 @@ class Tacotron():
 		# Phase 3: lr = 1e-5
 		# clip by minimal learning rate value (step > 150k)
 		#################################################################
+
 		hp = self._hparams
 		step = tf.cast(global_step + 1, dtype=tf.float32)
 
 		#Compute natural exponential decay
-		lr = tf.train.exponential_decay(init_lr, 
+		lr = tf.train.exponential_decay(init_lr,
 			global_step - hp.tacotron_start_decay, #lr = 1e-3 at step 50k
-			self.decay_steps, 
+			self.decay_steps,
 			self.decay_rate, #lr = 1e-5 around step 150k
 			name='exponential_decay')
 
