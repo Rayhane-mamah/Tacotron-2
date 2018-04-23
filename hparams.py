@@ -69,7 +69,7 @@ hparams = tf.contrib.training.HParams(
 	impute_finished = False, #Whether to use loss mask for padded sequences
 	mask_finished = False, #Whether to mask alignments beyond the <stop_token> (False for debug, True for style)
 
-	predict_linear = False, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
+	predict_linear = True, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
 
 
 	#Wavenet
