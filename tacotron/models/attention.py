@@ -118,6 +118,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 				 mask_encoder=True,
 				 memory_sequence_length=None,
 				 smoothing=False,
+				 cumulate_weights=True,
 				 name='LocationSensitiveAttention'):
 		"""Construct the Attention mechanism.
 		Args:
@@ -162,6 +163,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 			name='location_features_convolution')
 		self.location_layer = tf.layers.Dense(units=num_units, use_bias=False, 
 			dtype=tf.float32, name='location_features_layer')
+		self._cumulate = cumulate_weights
 
 	def __call__(self, query, state):
 		"""Score the query based on the keys and values.
@@ -199,5 +201,9 @@ class LocationSensitiveAttention(BahdanauAttention):
 		alignments = self._probability_fn(energy, previous_alignments)
 
 		# Cumulate alignments
-		next_state = alignments + previous_alignments
+		if self._cumulate:
+			next_state = alignments + previous_alignments
+		else:
+			next_state = alignments
+			
 		return alignments, next_state

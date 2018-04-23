@@ -54,11 +54,12 @@ hparams = tf.contrib.training.HParams(
 	attention_dim = 128, #dimension of attention space
 	attention_filters = 32, #number of attention convolution filters
 	attention_kernel = (31, ), #kernel size of attention convolution
+	cumulative_weights = True, #Whether to cumulate (sum) all previous attention weights or simply feed previous weights (Recommended: True)
 
 	prenet_layers = [256, 256], #number of layers and number of units of prenet
 	decoder_layers = 2, #number of decoder lstm layers
 	decoder_lstm_units = 1024, #number of decoder lstm units on each layer
-	max_iters = 1000, #Max decoder steps during inference (Just for safety from infinite loop cases)
+	max_iters = 2500, #Max decoder steps during inference (Just for safety from infinite loop cases)
 
 	postnet_num_layers = 5, #number of postnet convolutional layers
 	postnet_kernel_size = (5, ), #size of postnet convolution filters for each layer
@@ -96,12 +97,12 @@ hparams = tf.contrib.training.HParams(
 	#Tacotron Training
 	tacotron_batch_size = 32, #number of training samples on each training steps
 	tacotron_reg_weight = 1e-6, #regularization weight (for l2 regularization)
-	tacotron_scale_regularization = False,
+	tacotron_scale_regularization = True, #Whether to rescale regularization weight to adapt for outputs range (used when reg_weight is high and biasing the model)
 
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
-	tacotron_start_decay = 50000, #Step at which learning decay starts
-	tacotron_decay_steps = 25000, #starting point for learning rate decay (and determines the decay slope) (UNDER TEST)
-	tacotron_decay_rate = 0.33, #learning rate decay rate (UNDER TEST)
+	tacotron_start_decay = 40000, #Step at which learning decay starts
+	tacotron_decay_steps = 40000, #starting point for learning rate decay (and determines the decay slope) (UNDER TEST)
+	tacotron_decay_rate = 0.4, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
 	tacotron_final_learning_rate = 1e-5, #minimal learning rate
 
@@ -121,12 +122,12 @@ hparams = tf.contrib.training.HParams(
 
 	#Eval sentences
 	sentences = [
-	# # From July 8, 2017 New York Times:
+	# From July 8, 2017 New York Times:
 	# 'Scientists at the CERN laboratory say they have discovered a new particle.',
 	# 'There\'s a way to measure the acute emotional intelligence that has never gone out of style.',
 	# 'President Trump met with other leaders at the Group of 20 conference.',
 	# 'The Senate\'s bill to repeal and replace the Affordable Care Act is now imperiled.',
-	# # From Google's Tacotron example page:
+	# From Google's Tacotron example page:
 	# 'Generative adversarial network or variational auto-encoder.',
 	# 'Basilar membrane and otolaryngology are not auto-correlations.',
 	# 'He has read the whole thing.',
@@ -145,17 +146,17 @@ hparams = tf.contrib.training.HParams(
 	# "The blue lagoon is a nineteen eighty American romance adventure film.",
 	# "Tajima Airport serves Toyooka.",
 	# 'Talib Kweli confirmed to AllHipHop that he will be releasing an album in the next year.',
-	# #From Training data:
+	#From Training data:
 	# 'the rest being provided with barrack beds, and in dimensions varying from thirty feet by fifteen to fifteen feet by ten.',
 	# 'in giltspur street compter, where he was first lodged.',
 	# 'a man named burnett came with his wife and took up his residence at whitchurch, hampshire, at no great distance from laverstock,',
 	# 'it appears that oswald had only one caller in response to all of his fpcc activities,',
 	# 'he relied on the absence of the strychnia.',
 	# 'scoggins thought it was lighter.',
-	# '''would, it is probable, have eventually overcome the reluctance of some of the prisoners at least,
+	# '''would, it is probable, have eventually overcome the reluctance of some of the prisoners at least, 
 	# and would have possessed so much moral dignity''',
-	# '''the only purpose of this whole sentence is to evaluate the scalability of the model for very long sentences.
-	# This is not even a long sentence anymore, it has become an entire paragraph.
+	# '''the only purpose of this whole sentence is to evaluate the scalability of the model for very long sentences. 
+	# This is not even a long sentence anymore, it has become an entire paragraph. 
 	# Should I stop now? Let\'s add this last sentence in which we talk about nothing special.''',
 	# 'Thank you so much for your support!!'
 	"yu2 jian4 jun1 : wei4 mei3 ge4 you3 cai2 neng2 de ren2 ti2 gong1 ping2 tai2 .",

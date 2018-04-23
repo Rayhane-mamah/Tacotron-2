@@ -113,8 +113,8 @@ class Prenet:
 				dense = tf.layers.dense(x, units=size, activation=self.activation,
 					name='dense_{}'.format(i + 1))
 				#The paper discussed introducing diversity in generation at inference time
-				#by using a dropout of 0.5 only in prenet layers.
-				x = tf.layers.dropout(dense, rate=self.drop_rate, training=self.is_training,
+				#by using a dropout of 0.5 only in prenet layers (in both training and inference).
+				x = tf.layers.dropout(dense, rate=self.drop_rate, training=True,
 					name='dropout_{}'.format(i + 1) + self.scope)
 		return x
 

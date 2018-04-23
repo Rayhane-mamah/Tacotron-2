@@ -94,7 +94,7 @@ class Feeder(threading.Thread):
 
 	def _get_next_example(self):
 		"""
-		Gets a single example (input, mel_target, token_target) from disk
+		Gets a single example (input, mel_target, token_target, linear_target, mel_length) from_ disk
 		"""
 		if self._offset >= len(self._metadata):
 			self._offset = 0
