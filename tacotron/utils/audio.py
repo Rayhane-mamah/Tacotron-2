@@ -37,14 +37,14 @@ def melspectrogram(wav):
 	D = _stft(wav)
 	S = _amp_to_db(_linear_to_mel(np.abs(D))) - hparams.ref_level_db
 
-	if hparams.mel_normalization:
+	if hparams.signal_normalization:
 		return _normalize(S)
 	return S
 	
 
 def inv_mel_spectrogram(mel_spectrogram):
 	'''Converts mel spectrogram to waveform using librosa'''
-	if hparams.mel_normalization:
+	if hparams.signal_normalization:
 		D = _denormalize(mel_spectrogram)
 	else:
 		D = mel_spectrogram
