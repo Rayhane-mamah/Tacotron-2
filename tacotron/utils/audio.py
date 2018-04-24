@@ -127,3 +127,4 @@ def _denormalize(D):
 		return (((D + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value)) + hparams.min_level_db)
 	else:
 		return ((D * -hparams.min_level_db / hparams.max_abs_value) + hparams.min_level_db)
+	
