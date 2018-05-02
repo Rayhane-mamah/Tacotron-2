@@ -36,8 +36,6 @@ class Tacotron():
 			raise ValueError('no mel targets were provided but token_targets were given')
 		if mel_targets is not None and stop_token_targets is None and not gta:
 			raise ValueError('Mel targets are provided without corresponding token_targets')
-		if gta==False and self._hparams.predict_linear==True and linear_targets is None:
-			raise ValueError('Model is set to use post processing to predict linear spectrograms in training but no linear targets given!')
 		if gta and linear_targets is not None:
 			raise ValueError('Linear spectrogram prediction is not supported in GTA mode!')
 

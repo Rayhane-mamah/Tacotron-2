@@ -45,7 +45,7 @@ hparams = tf.contrib.training.HParams(
 
 	embedding_dim = 512, #dimension of embedding space
 
-	enc_conv_num_layers = 3, #number of encoder convolutional layers
+	enc_conv_num_layers = 5, #number of encoder convolutional layers
 	enc_conv_kernel_size = (5, ), #size of encoder convolution filters for each layer
 	enc_conv_channels = 512, #number of encoder convolutions filters for each layer
 	encoder_lstm_units = 256, #number of lstm units for each direction (forward and backward)
@@ -101,7 +101,7 @@ hparams = tf.contrib.training.HParams(
 
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	tacotron_start_decay = 40000, #Step at which learning decay starts
-	tacotron_decay_steps = 40000, #starting point for learning rate decay (and determines the decay slope) (UNDER TEST)
+	tacotron_decay_steps = 25000, #starting point for learning rate decay (and determines the decay slope) (UNDER TEST)
 	tacotron_decay_rate = 0.4, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
 	tacotron_final_learning_rate = 1e-5, #minimal learning rate
