@@ -13,8 +13,9 @@ def main():
 	parser.add_argument('--output_dir', default='output/', help='folder to contain synthesized mel spectrograms')
 	parser.add_argument('--mode', default='synthesis', help='mode of run: can be one of {}'.format(accepted_modes))
 	parser.add_argument('--GTA', default=True, help='Ground truth aligned synthesis, defaults to True, only considered in synthesis mode')
+	parser.add_argument('--text_list', default='', help='Text file contains list of texts to be synthesized. Valid if mode=eval')
 	args = parser.parse_args()
-	
+
 	accepted_models = ['Tacotron', 'Wavenet']
 
 	if args.model not in accepted_models:
