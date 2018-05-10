@@ -16,7 +16,7 @@ hparams = tf.contrib.training.HParams(
 	rescaling_max = 0.999,
 	trim_silence = True,
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
-	# Preffered to set True to use with https://github.com/r9y9/wavenet_vocoder
+	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
 	use_lws=False,
 
 	#Mel spectrogram
