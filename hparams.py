@@ -1,5 +1,5 @@
-import tensorflow as tf 
-import numpy as np 
+import tensorflow as tf
+import numpy as np
 
 
 # Default hyperparameters
@@ -10,11 +10,14 @@ hparams = tf.contrib.training.HParams(
 
 
 	#Audio
-	num_mels = 80, 
+	num_mels = 80,
 	num_freq = 513, #only used when adding linear spectrograms post processing network
-	rescale = True, 
+	rescale = True,
 	rescaling_max = 0.999,
 	trim_silence = True,
+	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
+	# Preffered to set True to use with https://github.com/r9y9/wavenet_vocoder
+	use_lws=False,
 
 	#Mel spectrogram
 	fft_size = 1024,
@@ -26,7 +29,7 @@ hparams = tf.contrib.training.HParams(
 	signal_normalization = True,
 	allow_clipping_in_normalization = True, #Only relevant if mel_normalization = True
 	symmetric_mels = True, #Whether to scale the data to be symmetric around 0
-	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max] 
+	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max]
 
 	#Limits
 	min_level_db =- 100,
@@ -50,7 +53,7 @@ hparams = tf.contrib.training.HParams(
 	enc_conv_channels = 512, #number of encoder convolutions filters for each layer
 	encoder_lstm_units = 256, #number of lstm units for each direction (forward and backward)
 
-	smoothing = False, #Whether to smooth the attention normalization function 
+	smoothing = False, #Whether to smooth the attention normalization function
 	attention_dim = 128, #dimension of attention space
 	attention_filters = 32, #number of attention convolution filters
 	attention_kernel = (31, ), #kernel size of attention convolution
@@ -114,7 +117,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_dropout_rate = 0.5, #dropout rate for all convolutional layers + prenet
 
 	tacotron_teacher_forcing_ratio = 1., #Value from [0., 1.], 0.=0%, 1.=100%, determines the % of times we force next decoder inputs
-	
+
 
 	#Wavenet Training TODO
 
@@ -153,10 +156,10 @@ hparams = tf.contrib.training.HParams(
 	'it appears that oswald had only one caller in response to all of his fpcc activities,',
 	'he relied on the absence of the strychnia.',
 	'scoggins thought it was lighter.',
-	'''would, it is probable, have eventually overcome the reluctance of some of the prisoners at least, 
+	'''would, it is probable, have eventually overcome the reluctance of some of the prisoners at least,
 	and would have possessed so much moral dignity''',
-	'''the only purpose of this whole sentence is to evaluate the scalability of the model for very long sentences. 
-	This is not even a long sentence anymore, it has become an entire paragraph. 
+	'''the only purpose of this whole sentence is to evaluate the scalability of the model for very long sentences.
+	This is not even a long sentence anymore, it has become an entire paragraph.
 	Should I stop now? Let\'s add this last sentence in which we talk about nothing special.''',
 	'Thank you so much for your support!!'
 	]
