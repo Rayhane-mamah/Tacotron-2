@@ -67,13 +67,13 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text):
 			wav_path))
 		return None
 
-	#rescale wav
-	if hparams.rescale:
-		wav = wav / np.abs(wav).max() * hparams.rescaling_max
-
 	#M-AILABS extra silence specific
 	if hparams.trim_silence:
 		wav = audio.trim_silence(wav)
+
+	#rescale wav
+	if hparams.rescale:
+		wav = wav / np.abs(wav).max() * hparams.rescaling_max
 
 	#Mu-law quantize
 	if is_mulaw_quantize(hparams.input_type):
