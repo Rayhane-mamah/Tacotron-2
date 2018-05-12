@@ -18,7 +18,8 @@ def trim_silence(wav):
 
 	Useful for M-AILABS dataset if we choose to trim the extra 0.5 silences.
 	'''
-	return librosa.effects.trim(wav)[0]
+	return librosa.effects.trim(wav, frame_length=hparams.fft_size,
+                hop_length=get_hop_size())[0]
 
 def preemphasis(x):
 	return signal.lfilter([1, -hparams.preemphasis], [1], x)
