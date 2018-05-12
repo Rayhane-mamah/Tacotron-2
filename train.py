@@ -8,6 +8,7 @@ def main():
 	parser.add_argument('--hparams', default='',
 		help='Hyperparameter overrides as a comma-separated list of name=value pairs')
 	parser.add_argument('--input', default='training_data/train.txt')
+	parser.add_argument('--name', help='Name of logging directory.')
 	parser.add_argument('--model', default='Tacotron')
 	parser.add_argument('--restore', type=bool, default=True, help='Set this to False to do a fresh training')
 	parser.add_argument('--summary_interval', type=int, default=100,

@@ -9,38 +9,40 @@ from hparams import hparams
 def preprocess(args, input_folders, out_dir):
 	mel_dir = os.path.join(out_dir, 'mels')
 	wav_dir = os.path.join(out_dir, 'audio')
+	linear_dir = os.path.join(out_dir, 'linear')
 	os.makedirs(mel_dir, exist_ok=True)
 	os.makedirs(wav_dir, exist_ok=True)
-	metadata = preprocessor.build_from_path(input_folders, mel_dir, wav_dir, args.n_jobs, tqdm=tqdm)
+	os.makedirs(linear_dir, exist_ok=True)
+	metadata = preprocessor.build_from_path(input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
 	write_metadata(metadata, out_dir)
 
 def write_metadata(metadata, out_dir):
 	with open(os.path.join(out_dir, 'train.txt'), 'w', encoding='utf-8') as f:
 		for m in metadata:
 			f.write('|'.join([str(x) for x in m]) + '\n')
-	frames = sum([int(m[3]) for m in metadata])
-	timesteps = sum([int(m[2]) for m in metadata])
+	mel_frames = sum([int(m[4]) for m in metadata])
+	timesteps = sum([int(m[3]) for m in metadata])
 	sr = hparams.sample_rate
 	hours = timesteps / sr / 3600
 	print('Write {} utterances, {} mel frames, {} audio timesteps, ({:.2f} hours)'.format(
-		len(metadata), frames, timesteps, hours))
-	print('Max input length (text chars): {}'.format(max(len(m[4]) for m in metadata)))
-	print('Max mel frames length: {}'.format(max(int(m[3]) for m in metadata)))
-	print('Max audio timesteps length: {}'.format(max(m[2] for m in metadata)))
+		len(metadata), mel_frames, timesteps, hours))
+	print('Max input length (text chars): {}'.format(max(len(m[5]) for m in metadata)))
+	print('Max mel frames length: {}'.format(max(int(m[4]) for m in metadata)))
+	print('Max audio timesteps length: {}'.format(max(m[3] for m in metadata)))
 
 def norm_data(args):
 	print('Selecting data folders..')
-	supported_datasets = ['LJSpeech-1.1', 'M-AILABS']
+	supported_datasets = ['LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS']
 	if args.dataset not in supported_datasets:
 		raise ValueError('dataset value entered {} does not belong to supported datasets: {}'.format(
 			args.dataset, supported_datasets))
 
-	if args.dataset == 'LJSpeech-1.1':
+	if args.dataset.startswith('LJSpeech'):
 		return [os.path.join(args.base_dir, args.dataset)]
 
-	
+
 	if args.dataset == 'M-AILABS':
-		supported_languages = ['en_US', 'en_UK', 'fr_FR', 'it_IT', 'de_DE', 'es_ES', 'ru_RU', 
+		supported_languages = ['en_US', 'en_UK', 'fr_FR', 'it_IT', 'de_DE', 'es_ES', 'ru_RU',
 			'uk_UK', 'pl_PL', 'nl_NL', 'pt_PT', 'fi_FI', 'se_SE', 'tr_TR', 'ar_SA']
 		if args.language not in supported_languages:
 			raise ValueError('Please enter a supported language to use from M-AILABS dataset! \n{}'.format(
