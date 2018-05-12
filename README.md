@@ -84,18 +84,18 @@ We tested the code above on the [ljspeech dataset](https://keithito.com/LJ-Speec
 
 We are also running current tests on the [new M-AILABS speech dataset](http://www.m-ailabs.bayern/en/the-mailabs-speech-dataset/) which contains more than 700h of speech (more than 80 Gb of data) for more than 10 languages.
 
-After **downloading** the dataset, **extract** the compressed file, and **place the folder inside the cloned repository.**
+After **downloading** the dataset, **extract** the compressed file, and **place the folder inside the speech_datasets folder inside the cloned repository.**
 
 # Preprocessing
 Before running the following steps, please make sure you are inside **Tacotron-2 folder**
 
 > cd Tacotron-2
 
-Preprocessing can then be started using: 
+Preprocessing can then be started using:
 
 > python preprocess.py
 
-or 
+or
 
 > python3 preprocess.py
 
@@ -116,7 +116,7 @@ Feature prediction model can be **trained** using:
 
 > python train.py --model='Tacotron'
 
-or 
+or
 
 > python3 train.py --model='Tacotron'
 
@@ -126,7 +126,7 @@ Naturally, **training the wavenet** is done by: (Not implemented yet)
 
 > python train.py --model='Wavenet'
 
-or 
+or
 
 > python3 train.py --model='Wavenet'
 
@@ -158,7 +158,7 @@ or
 
 > python synthesize.py --model='Tacotron'
 
-or 
+or
 
 > python3 synthesize.py --model='Tacotron'
 
@@ -166,7 +166,7 @@ Synthesizing the waveforms conditionned on previously synthesized Mel-spectrogra
 
 > python synthesize.py --model='Wavenet'
 
-or 
+or
 
 > python3 synthesize.py --model='Wavenet'
 
