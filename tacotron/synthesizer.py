@@ -44,26 +44,36 @@ class Synthesizer:
 		if self.gta:
 			feed_dict[self.model.mel_targets] = np.load(mel_filename).reshape(1, -1, 80)
 
-		mels, alignment = self.session.run([self.mel_outputs, self.alignment], feed_dict=feed_dict)
+		if self.gta or not hparams.predict_linear:
+			mels, alignment = self.session.run([self.mel_outputs, self.alignment], feed_dict=feed_dict)
 
-		mels = mels.reshape(-1, 80) #Thanks to @imdatsolak for pointing this out
+		else:
+			linear, mels, alignment = self.session.run([self.linear_outputs, self.mel_outputs, self.alignment], feed_dict=feed_dict)
+			linear = linear.reshape(-1, hparams.num_freq)
+
+		mels = mels.reshape(-1, hparams.num_mels) #Thanks to @imdatsolak for pointing this out
 
 		# Write the spectrogram to disk
 		# Note: outputs mel-spectrogram files and target ones have same names, just different folders
-		mel_filename = os.path.join(out_dir, 'ljspeech-mel-{:05d}.npy'.format(index))
+		mel_filename = os.path.join(out_dir, 'speech-mel-{:05d}.npy'.format(index))
 		np.save(mel_filename, mels, allow_pickle=False)
 
 		if log_dir is not None:
-			#save wav
+			#save wav (mel -> wav)
 			wav = audio.inv_mel_spectrogram(mels.T)
-			audio.save_wav(wav, os.path.join(log_dir, 'wavs/ljspeech-wav-{:05d}.wav'.format(index)))
+			audio.save_wav(wav, os.path.join(log_dir, 'wavs/speech-wav-{:05d}-mel.wav'.format(index)))
+
+			if hparams.predict_linear:
+				#save wav (linear -> wav)
+				wav = audio.inv_linear_spectrogram(linear.T)
+				audio.save_wav(wav, os.path.join(log_dir, 'wavs/speech-wav-{:05d}-linear.wav'.format(index)))
 
 			#save alignments
-			plot.plot_alignment(alignment, os.path.join(log_dir, 'plots/ljspeech-alignment-{:05d}.png'.format(index)),
+			plot.plot_alignment(alignment, os.path.join(log_dir, 'plots/speech-alignment-{:05d}.png'.format(index)),
 				info='{}'.format(text), split_title=True)
 
 			#save mel spectrogram plot
-			plot.plot_spectrogram(mels, os.path.join(log_dir, 'plots/ljspeech-mel-{:05d}.png'.format(index)),
+			plot.plot_spectrogram(mels, os.path.join(log_dir, 'plots/speech-mel-{:05d}.png'.format(index)),
 				info='{}'.format(text), split_title=True)
 
 		return mel_filename

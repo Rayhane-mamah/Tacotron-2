@@ -1,16 +1,16 @@
 import librosa
 import librosa.filters
-import numpy as np 
+import numpy as np
 from scipy import signal
 from tacotron.hparams import hparams
-import tensorflow as tf 
+import tensorflow as tf
 
 
 def load_wav(path):
 	return librosa.core.load(path, sr=hparams.sample_rate)[0]
 
 def save_wav(wav, path):
-	wav *= 32767 / max(0.01, np.max(np.abs(wav))) 
+	wav *= 32767 / max(0.01, np.max(np.abs(wav)))
 	librosa.output.write_wav(path, wav.astype(np.int16), hparams.sample_rate)
 
 def trim_silence(wav):
@@ -40,7 +40,7 @@ def melspectrogram(wav):
 	if hparams.mel_normalization:
 		return _normalize(S)
 	return S
-	
+
 
 def inv_mel_spectrogram(mel_spectrogram):
 	'''Converts mel spectrogram to waveform using librosa'''
@@ -51,7 +51,13 @@ def inv_mel_spectrogram(mel_spectrogram):
 
 	S = _mel_to_linear(_db_to_amp(D + hparams.ref_level_db))  # Convert back to linear
 
-	return _griffin_lim(S ** hparams.power)
+	if hparams.use_lws:
+		processor = _lws_processor()
+		D = processor.run_lws(S.astype(np.float64).T ** hparams.power)
+		y = processor.istft(D).astype(np.float32)
+		return y
+	else:
+		return _griffin_lim(S ** hparams.power)
 
 def _griffin_lim(S):
 	'''librosa implementation of Griffin-Lim
@@ -65,8 +71,15 @@ def _griffin_lim(S):
 		y = _istft(S_complex * angles)
 	return y
 
+def _lws_processor():
+	import lws
+	return lws.lws(hparams.fft_size, get_hop_size(), mode="speech")
+
 def _stft(y):
-	return librosa.stft(y=y, n_fft=hparams.fft_size, hop_length=get_hop_size())
+	if hparams.use_lws:
+		return _lws_processor().stft(y).T
+	else:
+		return librosa.stft(y=y, n_fft=hparams.fft_size, hop_length=get_hop_size())
 
 def _istft(y):
 	return librosa.istft(y, hop_length=get_hop_size())
@@ -118,7 +131,7 @@ def _denormalize(D):
 	if hparams.allow_clipping_in_normalization:
 		if hparams.symmetric_mels:
 			return (((np.clip(D, -hparams.max_abs_value,
-				hparams.max_abs_value) + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value)) 
+				hparams.max_abs_value) + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value))
 				+ hparams.min_level_db)
 		else:
 			return ((np.clip(D, 0, hparams.max_abs_value) * -hparams.min_level_db / hparams.max_abs_value) + hparams.min_level_db)
