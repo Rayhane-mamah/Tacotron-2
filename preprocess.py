@@ -60,8 +60,7 @@ def norm_data(args):
 				supported_readers))
 
 		path = os.path.join(path, args.reader)
-		supported_books = [e for e in os.listdir(path) if e != '.DS_Store']
-
+		supported_books = [e for e in os.listdir(path) if os.path.isdir(os.path.join(path,e))]
 		if args.merge_books:
 			return [os.path.join(path, book) for book in supported_books]
 
@@ -75,7 +74,7 @@ def norm_data(args):
 
 def run_preprocess(args):
 	input_folders = norm_data(args)
-	output_folder = os.path.join(args.base_dir, args.output)
+	output_folder = os.path.join(os.getcwd(), args.output)
 
 	preprocess(args, input_folders, output_folder)
 
@@ -83,7 +82,7 @@ def run_preprocess(args):
 def main():
 	print('initializing preprocessing..')
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--base_dir', default='')
+	parser.add_argument('--base_dir', default='speech_datasets')
 	parser.add_argument('--dataset', default='LJSpeech-1.1')
 	parser.add_argument('--language', default='en_US')
 	parser.add_argument('--voice', default='female')

@@ -107,3 +107,6 @@ venv.bak/
 logs-*/
 training_data/
 
+# Datasets
+speech_datasets/*
+!speech_datasets/.gitkeep
