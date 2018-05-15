@@ -170,19 +170,16 @@ class ZoneoutLSTMCell(RNNCell):
                                w_f_diag * c_prev) + \
                     tf.sigmoid(i + w_i_diag * c_prev) * \
                     self.activation(j)
-                if self.is_training and self.zoneout_factor_cell > 0.0:
-                    c = binary_mask_cell * c_prev + \
-                        binary_mask_cell_complement * c_temp
-                else:
-                    c = c_temp
             else:
                 c_temp = c_prev * tf.sigmoid(f + self.forget_bias) + \
                     tf.sigmoid(i) * self.activation(j)
-                if self.is_training and self.zoneout_factor_cell > 0.0:
-                    c = binary_mask_cell * c_prev + \
-                        binary_mask_cell_complement * c_temp
-                else:
-                    c = c_temp
+
+            if self.is_training and self.zoneout_factor_cell > 0.0:
+                c = binary_mask_cell * c_prev + \
+                    binary_mask_cell_complement * c_temp
+            else:
+                c = (1.0 - self.zoneout_factor_cell) * c_temp + \
+                    self.zoneout_factor_cell * c_prev
 
             if self.cell_clip is not None:
                 c = tf.clip_by_value(c, -self.cell_clip, self.cell_clip)
@@ -190,18 +187,15 @@ class ZoneoutLSTMCell(RNNCell):
             # apply zoneout for output
             if self.use_peepholes:
                 h_temp = tf.sigmoid(o + w_o_diag * c) * self.activation(c)
-                if self.is_training and self.zoneout_factor_output > 0.0:
-                    h = binary_mask_output * h_prev + \
-                        binary_mask_output_complement * h_temp
-                else:
-                    h = h_temp
             else:
                 h_temp = tf.sigmoid(o) * self.activation(c)
-                if self.is_training and self.zoneout_factor_output > 0.0:
-                    h = binary_mask_output * h_prev + \
-                        binary_mask_output_complement * h_temp
-                else:
-                    h = h_temp
+
+            if self.is_training and self.zoneout_factor_output > 0.0:
+                h = binary_mask_output * h_prev + \
+                    binary_mask_output_complement * h_temp
+            else:
+                h = (1.0 - self.zoneout_factor_output) * h_temp + \
+                    self.zoneout_factor_output * h_prev
 
             # apply prejection
             if self.num_proj is not None:
