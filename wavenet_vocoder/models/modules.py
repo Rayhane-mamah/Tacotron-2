@@ -1,6 +1,7 @@
 import numpy as np 
 import tensorflow as tf 
-
+from wavenet_vocoder.util import sequence_mask
+from .mixture import discretized_mix_logistic_loss
 
 class Embedding:
 	"""Embedding class for global conditions.
@@ -28,70 +29,181 @@ class ReluActivation:
 class Conv1d1x1(tf.layers.Conv1D):
 	"""Extend tf.layers.Conv1D for dilated layers convolutions.
 	"""
-	def __init__(in_channels, filters, kernel_size=1, padding='same', dilation_rate=1, use_bias=True, **kwargs):
-		super(Conv1d1x1, self).__init__(
-			filters=filters,
-			kernel_size=kernel_size,
-			padding=padding,
-			dilation_rate=dilation_rate,
-			use_bias=use_bias,
-			**kwargs)
-		self.in_channels = in_channels
-		self.input_buffer = None
-		self._linearizer_weight = None
-		tf.add_to_collections(tf.GraphKeys.UPDATE_OPS, self._clear_linearized_weight)
+	def __init__(self, in_channels, filters, kernel_size=1, padding=None, dilation=1, use_bias=True, name='Conv1d1x1'):
+		with tf.variable_scope(name) as scope:
+			#Create variables
+			kernel_shape = (kernel_size, in_channels, filters)
+			self.kernel = tf.get_variable(
+				name='kernel_{}'.format(name),
+				shape=kernel_shape,
+				dtype=tf.float32
+				)
+
+			if use_bias:
+				self.bias = tf.get_variable(
+					name='bias_{}'.format(name),
+					shape=(filters, ),
+					initializer=tf.zeros_initializer(),
+					dtype=tf.float32)
+
+			self.filters = filters
+			self.in_channels = in_channels
+			self.dilation_rate = dilation
+			self.convolution_queue = None
+			self._linearized_weight = None
+			self.paddings = None
+			self.use_bias = use_bias
+			self.paddings = padding
+
+	def set_mode(self, is_training):
+		self.training = is_training
+
+	def _to_dilation(self, inputs):
+		'''Pad and reshape inputs by dilation rate.
+
+		Used to perfrom 1D dilation convolution.
+		'''
+		if self.paddings is not None: #dilated conv
+			assert isinstance(self.paddings, int)
+
+			inputs_padded = tf.pad(inputs, [[0, 0], [0, 0], [self.paddings, 0]], "CONSTANT")
+
+			#inputs are channels first
+			inputs_shape = tf.shape(inputs_padded)
+			channels = inputs_shape[1]
+			width_pad = inputs_shape[-1]
+
+			dilation_shape = (width_pad // self.dilation_rate, -1, channels) #-1 refers to batch_size * dilation_rate
+			#[width_pad, batch_size, channels]
+			inputs_transposed = tf.transpose(inputs_padded, [2, 0, 1])
+			#[width_pad / dilation_rate, batch_size * dilation_rate, channels]
+			inputs_reshaped = tf.reshape(inputs_transposed, dilation_shape)
+			#[batch_size * dilation_rate, width_pad / dilation_rate, channels]
+			outputs = tf.transpose(inputs_reshaped, [1, 0, 2])
+
+		else: #Simple channels first convolution
+			outputs = tf.transpose(inputs, [0, 2, 1])
+
+		return outputs
+
+	def _from_dilation(self, inputs, crop):
+		'''Remove paddings and reshape to 1d signal.
+
+		Used after 1D dilation convolution.
+		'''
+		if self.paddings is not None: #dilated conv
+			assert isinstance(self.paddings, int)
+			#inputs: [batch_size * dilation_rate, width_pad / dilation_rate, channels]
+			inputs_shape = tf.shape(inputs)
+			batch_size = inputs_shape[0] / self.dilation_rate
+			width_pad = inputs_shape[1] * self.dilation_rate
+			channels = inputs_shape[-1]
+			new_shape = (width_pad, -1, channels) #-1 refers to batch_size
+
+			#[width_pad / dilation_rate, batch_size * dilation_rate, channels]
+			inputs_transposed = tf.transpose(inputs, [1, 0, 2])
+			#[width_pad, batch_size, channels]
+			inputs_reshaped = tf.reshape(inputs_transposed, new_shape)
+			#[batch_size, channels, width_pad]
+			outputs = tf.transpose(inputs_reshaped, [1, 2, 0])
+			#[batch_size, channels, width]
+			cropped = tf.slice(outputs, [0, 0, crop], [-1, -1, -1])
+
+		else: #Simple channels first convolution
+			cropped = tf.transpose(inputs, [0, 2, 1])
+
+		return cropped
+		
+
+	def __call__(self, inputs):
+		'''During this call, we change to channel last scheme for a better generalization and easier bias computation
+		'''
+		#Reshape to dilated conv mode (if this instance is of a dilated convolution)
+		inputs_ = self._to_dilation(inputs)
+
+		outputs_ = tf.nn.conv1d(inputs_, self.kernel,
+			stride=1, padding='VALID', data_format='NWC')
+
+		if self.use_bias:
+			outputs_ = tf.nn.bias_add(outputs_, self.bias)
+
+		#Reshape back ((if this instance is of a dilated convolution))
+		diff = tf.shape(outputs_)[1] * self.dilation_rate - tf.shape(inputs)[-1]
+		outputs = self._from_dilation(outputs_, crop=diff)
+
+		#Make sure that outputs have same time steps as inputs
+		#[batch_size, channels(filters), width]
+		with tf.control_dependencies([tf.assert_equal(tf.shape(outputs)[-1], tf.shape(inputs)[-1])]):
+			outputs = tf.identity(outputs, name='output_equal_input_time_assert')
+
+		return outputs
 
 	def incremental_step(self, inputs):
+		'''At sequential inference times:
+		we adopt fast wavenet convolution queues by saving precomputed states for faster generation
+
+		inputs: [batch_size, time_length, channels] ('NWC')! Channels last!
+		'''
 		#input: [batch_size, time_length, channels]
 		if self.training: 
 			raise RuntimeError('incremental_step only supports eval mode')
 
-
 		#reshape weight
-		weight = self._get_linearized_weight()
-		kw = self.kernel_size[0]
-		dilation = self.dilation_rate[0]
+		weight = self._get_linearized_weight(inputs)
+		kw = self.kernel.shape[0]
+		dilation = self.dilation_rate
 
 		batch_size = tf.shape(inputs)[0]
+		#Fast dilation
+		#Similar to using tf FIFOQueue to schedule states of dilated convolutions
 		if kw > 1:
-			if self.input_buffer is None:
-				self.input_buffer = tf.zeros((batch_size, kw + (kw - 1) * (dilation - 1), tf.shape(inputs)[2]))
+			if self.convolution_queue is None:
+				self.convolution_queue = tf.zeros((batch_size, (kw - 1) + (kw - 1) * (dilation - 1), tf.shape(inputs)[2]))
 			else:
-				#shift buffer
-				self.input_buffer[:, :-1, :] = self.input_buffer[:, 1:, :]
+				#shift queue
+				self.convolution_queue = self.convolution_queue[:, 1:, :]
+
 			#append next input
-			self.input_buffer[:, -1, :] = inputs[:, -1, :]
-			inputs = self.input_buffer
+			self.convolution_queue = tf.concat([self.convolution_queue, tf.expand_dims(inputs[:, -1, :], axis=1)], axis=1)
+			#self.convolution_queue[:, -1, :] = inputs[:, -1, :]
+			inputs = self.convolution_queue
 			if dilation > 1:
 				inputs = inputs[:, 0::dilation, :]
-		output = tf.add(tf.matmul(inputs, weight), self.bias)
-		return tf.reshape(output, [batch_size, 1, -1])
 
-	def _get_linearized_weight(self):
-		if self._linearizer_weight is None:
+		#Compute step prediction
+		output = tf.matmul(tf.reshape(inputs, [batch_size, -1]), weight)
+		if self.use_bias:
+			output = tf.nn.bias_add(output, self.bias)
+
+		#[batch_size, 1(time_step), channels(filters)]
+		return tf.reshape(output, [batch_size, 1, self.filters])
+
+	def _get_linearized_weight(self, inputs):
+		if self._linearized_weight is None:
 			kw = self.kernel.shape[0]
 			#layers.Conv1D
 			if tf.shape(self.kernel) == (self.filters, self.in_channels, kw):
-				weight = tf.transpose(self.kernel, [0, 2, 1])
+				#[filters, in, kw]
+				weight = tf.transpose(self.kernel, [2, 1, 0])
 			else:
-				weight = tf.transpose(self.kernel, [2, 0, 1])
-			assert tf.shape(weight) == (self.filters, kw, self.in_channels)
-			self._linearizer_weight = tf.reshape(self.filters, -1)
-		return self._linearizer_weight
+				#[kw, in, filters]
+				weight = self.kernel
 
-	def _clear_linearized_weight(self):
-		self._linearizer_weight = None
+			#[kw, in, filters]
+			assert weight.shape == (kw, self.in_channels, self.filters)
+			self._linearized_weight = tf.cast(tf.reshape(weight, [-1, self.filters]), dtype=inputs.dtype)
+		return self._linearized_weight
 
-	def clear_buffer(self):
-		self.input_buffer = None
+	def clear_queue(self):
+		self.convolution_queue = None
 
 def _conv1x1_forward(conv, x, is_incremental):
 	"""conv1x1 step
 	"""
 	if is_incremental:
-		x = conv.incremental_step(x)
+		return conv.incremental_step(x)
 	else:
-		x = conv(x)
+		return conv(x)
 
 class ResidualConv1dGLU():
 	'''Residual dilated conv1d + Gated Linear Unit
@@ -100,7 +212,7 @@ class ResidualConv1dGLU():
 	def __init__(self, residual_channels, gate_channels, kernel_size,
 			skip_out_channels=None, cin_channels=-1, gin_channels=-1,
 			dropout=1 - .95, padding=None, dilation=1, causal=True,
-			bias=True, *args, **kwargs):
+			use_bias=True, name='ResidualConv1dGLU'):
 		self.dropout = dropout
 
 		if skip_out_channels is None:
@@ -116,25 +228,32 @@ class ResidualConv1dGLU():
 		self.causal = causal
 
 		self.conv = Conv1d1x1(residual_channels, gate_channels, kernel_size,
-			padding=padding, dilation=dilation, bias=bias)
+			padding=padding, dilation=dilation, use_bias=use_bias, name='residual_block_conv')
 
 		#Local conditioning
 		if cin_channels > 0:
 			self.conv1x1c = Conv1d1x1(cin_channels, gate_channels,
-				bias=bias)
+				use_bias=use_bias, name='residual_block_cin_conv')
 		else:
 			self.conv1x1c = None
 
 		#Global conditioning
 		if gin_channels > 0:
 			self.conv1x1g = Conv1d1x1(gin_channels, gate_channels, 
-				bias=bias)
+				use_bias=use_bias, name='residual_block_gin_conv')
 		else:
 			self.conv1x1g = None
 
 		gate_out_channels = gate_channels // 2
-		self.conv1x1_out = Conv1d1x1(gate_out_channels, residual_channels, bias=bias)
-		self.conv1x1_skip = Conv1d1x1(gate_out_channels, skip_out_channels, bias=bias)
+		self.conv1x1_out = Conv1d1x1(gate_out_channels, residual_channels, use_bias=use_bias, name='residual_block_out_conv')
+		self.conv1x1_skip = Conv1d1x1(gate_out_channels, skip_out_channels, use_bias=use_bias, name='residual_block_skip_conv')
+
+	def set_mode(self, is_training):
+		for conv in [self.conv, self.conv1x1c, self.conv1x1g, self.conv1x1_out, self.conv1x1_skip]:
+			try:
+				conv.set_mode(is_training)
+			except AttributeError:
+				pass
 
 	def __call__(self, x, c=None, g=None):
 		return self.step(x, c, g, False)
@@ -181,18 +300,72 @@ class ResidualConv1dGLU():
 			a, b = a + ga, b + gb
 
 		x = tf.nn.tanh(a) * tf.nn.sigmoid(b)
-
 		#For Skip connection
 		s = _conv1x1_forward(self.conv1x1_skip, x, is_incremental)
 
 		#For Residual connection
 		x = _conv1x1_forward(self.conv1x1_out, x, is_incremental)
 
-		x = (x + residual) * np.sqrt(0.5)
+		x = (x + residual) * tf.sqrt(0.5)
 		return x, s
 
-	def clear_buffer(self):
+	def clear_queue(self):
 		for conv in [self.conv, self.conv1x1_out, self.conv1x1_skip,
 				self.conv1x1c, self.conv1x1g]:
 			if conv is not None:
-				self.conv.clear_buffer()
+				self.conv.clear_queue()
+
+
+class ConvTranspose2d:
+	def __init__(self, filters, kernel_size, freq_axis_kernel_size, padding, strides):
+		self.convt = tf.layers.Conv2DTranspose(
+			filters=filters,
+			kernel_size=kernel_size,
+			strides=strides,
+			padding=padding,
+			kernel_initializer=tf.constant_initializer(1 / freq_axis_kernel_size, dtype=tf.float32),
+			bias_initializer=tf.zeros_initializer(),
+			data_format='channels_first')
+
+	def __call__(self, inputs):
+		return self.convt(inputs)
+
+
+
+def MaskedCrossEntropyLoss(outputs, targets, lengths=None, mask=None, max_len=None):
+	if lengths is None and mask is None:
+		raise RuntimeError('Please provide either lengths or mask')
+
+	#[batch_size, time_length]
+	if mask is None:
+		mask = sequence_mask(lengths, max_len, False)
+
+	#One hot encode targets (outputs.shape[-1] = hparams.quantize_channels)
+	targets_ = tf.one_hot(targets, depth=tf.shape(outputs)[-1])
+	
+	with tf.control_dependencies([tf.assert_equal(tf.shape(outputs), tf.shape(targets_))]):
+		losses = tf.nn.softmax_cross_entropy_with_logits_v2(logits=outputs, labels=targets_)
+
+	with tf.control_dependencies([tf.assert_equal(tf.shape(mask), tf.shape(losses))]):
+		masked_loss = losses * mask
+
+	return tf.reduce_sum(masked_loss) / tf.count_nonzero(masked_loss, dtype=tf.float32)
+
+def DiscretizedMixtureLogisticLoss(outputs, targets, hparams, lengths=None, mask=None, max_len=None):
+	if lengths is None and mask is None:
+		raise RuntimeError('Please provide either lengths or mask')
+
+	#[batch_size, time_length, 1]
+	if mask is None:
+		mask = sequence_mask(lengths, max_len, True)
+
+	#[batch_size, time_length, dimension]
+	ones = tf.ones([tf.shape(mask)[0], tf.shape(mask)[1], tf.shape(targets)[-1]], tf.float32)
+	mask_ = mask * ones
+
+	losses = discretized_mix_logistic_loss(
+		outputs, targets, num_classes=hparams.quantize_channels,
+		log_scale_min=hparams.log_scale_min, reduce=False)
+
+	with tf.control_dependencies([tf.assert_equal(tf.shape(losses), tf.shape(targets))]):
+		return tf.reduce_sum(losses * mask_) / tf.reduce_sum(mask_)

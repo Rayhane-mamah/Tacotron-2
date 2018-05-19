@@ -7,7 +7,6 @@ from tensorflow.python.layers import core as layers_core
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.ops import math_ops
-from hparams import hparams
 
 
 #From https://github.com/tensorflow/tensorflow/blob/r1.7/tensorflow/contrib/seq2seq/python/ops/attention_wrapper.py
@@ -115,6 +114,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 	def __init__(self,
 				 num_units,
 				 memory,
+				 hparams,
 				 mask_encoder=True,
 				 memory_sequence_length=None,
 				 smoothing=False,
@@ -196,6 +196,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 
 			# energy shape [batch_size, max_time]
 			energy = _location_sensitive_score(processed_query, processed_location_features, self.keys)
+
 
 		# alignments shape = energy shape = [batch_size, max_time]
 		alignments = self._probability_fn(energy, previous_alignments)
