@@ -1,6 +1,7 @@
 import argparse
 from tacotron.train import tacotron_train
 from wavenet_vocoder.train import wavenet_train
+from tacotron.synthesize import tacotron_synthesize
 from infolog import log
 from hparams import hparams
 import os
@@ -23,6 +24,8 @@ def train(args, log_dir, hparams):
 	log('Tacotron Train\n')
 	log('###########################################################\n')
 	checkpoint = tacotron_train(args, log_dir, hparams)
+	if checkpoint is None:
+		raise('Error occured while training Tacotron, Exiting!')
 	log('\n#############################################################\n')
 	log('Tacotron GTA Synthesis\n')
 	log('###########################################################\n')
