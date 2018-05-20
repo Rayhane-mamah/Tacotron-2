@@ -133,14 +133,14 @@ def model_test_mode(args, feeder, hparams, global_step):
 		return model
 
 def train(log_dir, args, hparams, input_path):
-	save_dir = os.path.join(log_dir, 'pretrained/')
+	save_dir = os.path.join(log_dir, 'wave_pretrained/')
 	eval_dir = os.path.join(log_dir, 'eval-dir')
 	audio_dir = os.path.join(log_dir, 'wavs')
 	plot_dir = os.path.join(log_dir, 'plots')
 	wav_dir = os.path.join(log_dir, 'wavs')
 	eval_audio_dir = os.path.join(eval_dir, 'wavs')
 	eval_plot_dir = os.path.join(eval_dir, 'plots')
-	checkpoint_path = os.path.join(save_dir, 'model.ckpt')
+	checkpoint_path = os.path.join(save_dir, 'wavenet_model.ckpt')
 	input_path = os.path.join(args.base_dir, input_path)
 	os.makedirs(save_dir, exist_ok=True)
 	os.makedirs(wav_dir, exist_ok=True)

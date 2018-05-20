@@ -280,10 +280,10 @@ class Tacotron():
 		# We only start learning rate decay after 50k steps
 
 		# Phase 2: lr in ]1e-5, 1e-3[
-		# decay reach minimal value at step 160k
+		# decay reach minimal value at step 310k
 
 		# Phase 3: lr = 1e-5
-		# clip by minimal learning rate value (step > 160k)
+		# clip by minimal learning rate value (step > 310k)
 		#################################################################
 		hp = self._hparams
 
@@ -291,7 +291,7 @@ class Tacotron():
 		lr = tf.train.exponential_decay(init_lr, 
 			global_step - hp.tacotron_start_decay, #lr = 1e-3 at step 50k
 			self.decay_steps, 
-			self.decay_rate, #lr = 1e-5 around step 160k
+			self.decay_rate, #lr = 1e-5 around step 310k
 			name='lr_exponential_decay')
 
 

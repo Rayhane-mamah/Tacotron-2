@@ -148,15 +148,15 @@ def _teacher_forcing_ratio_decay(init_tfr, global_step, hparams):
 		# We only start learning rate decay after 10k steps
 
 		# Phase 2: tfr in ]0, 1[
-		# decay reach minimal value at step ~150k
+		# decay reach minimal value at step ~220k
 
 		# Phase 3: tfr = 0
-		# clip by minimal teacher forcing ratio value (step >~ 150k)
+		# clip by minimal teacher forcing ratio value (step >~ 220k)
 		#################################################################
 		#Compute natural cosine decay
 		tfr = tf.train.cosine_decay(init_tfr,
 			global_step=global_step - hparams.tacotron_teacher_forcing_start_decay, #tfr = 1 at step 10k
-			decay_steps=hparams.tacotron_teacher_forcing_decay_steps, #tfr = 0 at step ~150k
+			decay_steps=hparams.tacotron_teacher_forcing_decay_steps, #tfr = 0 at step ~220k
 			alpha=hparams.tacotron_teacher_forcing_decay_alpha, #tfr = 0% of init_tfr as final value
 			name='tfr_cosine_decay')
 

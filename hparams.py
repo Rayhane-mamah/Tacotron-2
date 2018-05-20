@@ -20,7 +20,7 @@ hparams = tf.contrib.training.HParams(
 	rescaling_max = 0.999, #Rescaling value
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
 	clip_mels_length = True, #For cases of OOM (Not really recommended, working on a workaround)
-	max_mel_frames = 950,  #Only relevant when clip_mels_length = True
+	max_mel_frames = 900,  #Only relevant when clip_mels_length = True
 
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
@@ -111,7 +111,7 @@ hparams = tf.contrib.training.HParams(
 	freq_axis_kernel_size = 3,
 
 	gin_channels = -1, #Set this to -1 to disable global conditioning, Only used for multi speaker dataset
-	use_bias = True,
+	use_bias = True, #Whether to use bias in convolutional layers of the Wavenet
 
 	max_time_sec = None,
 	max_time_steps = 13000, #Max time steps in audio used to train wavenet (decrease to save memory)
@@ -154,7 +154,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_teacher_forcing_init_ratio = 1., #initial teacher forcing ratio. Relevant if mode='scheduled'
 	tacotron_teacher_forcing_final_ratio = 0., #final teacher forcing ratio. Relevant if mode='scheduled'
 	tacotron_teacher_forcing_start_decay = 10000, #starting point of teacher forcing ratio decay. Relevant if mode='scheduled'
-	tacotron_teacher_forcing_decay_steps = 140000, #Determines the teacher forcing ratio decay slope. Relevant if mode='scheduled'
+	tacotron_teacher_forcing_decay_steps = 220000, #Determines the teacher forcing ratio decay slope. Relevant if mode='scheduled'
 	tacotron_teacher_forcing_decay_alpha = 0., #teacher forcing ratio decay rate. Relevant if mode='scheduled'
 	###########################################################################################################################################
 

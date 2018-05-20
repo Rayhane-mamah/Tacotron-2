@@ -1,4 +1,5 @@
 import argparse
+import tensorflow as tf 
 from tacotron.train import tacotron_train
 from wavenet_vocoder.train import wavenet_train
 from tacotron.synthesize import tacotron_synthesize
@@ -24,12 +25,14 @@ def train(args, log_dir, hparams):
 	log('Tacotron Train\n')
 	log('###########################################################\n')
 	checkpoint = tacotron_train(args, log_dir, hparams)
+	tf.reset_default_graph()
 	if checkpoint is None:
 		raise('Error occured while training Tacotron, Exiting!')
 	log('\n#############################################################\n')
 	log('Tacotron GTA Synthesis\n')
 	log('###########################################################\n')
-	input_path = tacotron_synthesize(args, hparams, checkpoint)
+	#input_path = tacotron_synthesize(args, hparams, checkpoint)
+	input_path = 'tacotron_output/gta/map.txt'
 	log('\n#############################################################\n')
 	log('Wavenet Train\n')
 	log('###########################################################\n')
@@ -44,6 +47,10 @@ def main():
 	parser.add_argument('--wavenet_input', default='tacotron_output/gta/map.txt')
 	parser.add_argument('--name', help='Name of logging directory.')
 	parser.add_argument('--model', default='Tacotron-2')
+	parser.add_argument('--input_dir', default='training_data/', help='folder to contain inputs sentences/targets')
+	parser.add_argument('--output_dir', default='output/', help='folder to contain synthesized mel spectrograms')
+	parser.add_argument('--mode', default='synthesis', help='mode for synthesis of tacotron after training')
+	parser.add_argument('--GTA', default='True', help='Ground truth aligned synthesis, defaults to True, only considered in Tacotron synthesis mode')
 	parser.add_argument('--restore', type=bool, default=True, help='Set this to False to do a fresh training')
 	parser.add_argument('--summary_interval', type=int, default=250,
 		help='Steps between running summary ops')
@@ -51,8 +58,8 @@ def main():
 		help='Steps between writing checkpoints')
 	parser.add_argument('--eval_interval', type=int, default=5000,
 		help='Steps between eval on test data')
-	parser.add_argument('--tacotron_train_steps', type=int, default=180000, help='total number of tacotron training steps')
-	parser.add_argument('--wavenet_train_steps', type=int, default=320000, help='total number of wavenet training steps')
+	parser.add_argument('--tacotron_train_steps', type=int, default=320000, help='total number of tacotron training steps')
+	parser.add_argument('--wavenet_train_steps', type=int, default=360000, help='total number of wavenet training steps')
 	parser.add_argument('--tf_log_level', type=int, default=1, help='Tensorflow C++ log level.')
 	args = parser.parse_args()
 

@@ -89,8 +89,8 @@ def model_test_mode(args, feeder, hparams, global_step):
 		return model
 
 def train(log_dir, args, hparams):
-	save_dir = os.path.join(log_dir, 'pretrained/')
-	checkpoint_path = os.path.join(save_dir, 'model.ckpt')
+	save_dir = os.path.join(log_dir, 'taco_pretrained/')
+	checkpoint_path = os.path.join(save_dir, 'tacotron_model.ckpt')
 	input_path = os.path.join(args.base_dir, args.tacotron_input)
 	plot_dir = os.path.join(log_dir, 'plots')
 	wav_dir = os.path.join(log_dir, 'wavs')
@@ -265,7 +265,7 @@ def train(log_dir, args, hparams):
 
 						#save griffin lim inverted wav for debug (linear -> wav)
 						wav = audio.inv_linear_spectrogram(linear_prediction.T, hparams)
-						audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-waveform-linear.wav'.format(step)), sr=hparams.sample_rate)
+						audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-wave-from-linear.wav'.format(step)), sr=hparams.sample_rate)
 
 					else:
 						input_seq, mel_prediction, alignment, target, target_length = sess.run([model.inputs[0],
@@ -281,7 +281,7 @@ def train(log_dir, args, hparams):
 
 					#save griffin lim inverted wav for debug (mel -> wav)
 					wav = audio.inv_mel_spectrogram(mel_prediction.T, hparams)
-					audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-waveform-mel.wav'.format(step)), sr=hparams.sample_rate)
+					audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-wave-from-mel.wav'.format(step)), sr=hparams.sample_rate)
 
 					#save alignment plot to disk (control purposes)
 					plot.plot_alignment(alignment, os.path.join(plot_dir, 'step-{}-align.png'.format(step)),
@@ -302,4 +302,4 @@ def train(log_dir, args, hparams):
 			coord.request_stop(e)
 
 def tacotron_train(args, log_dir, hparams):
-	train(log_dir, args, hparams)
+	return train(log_dir, args, hparams)
