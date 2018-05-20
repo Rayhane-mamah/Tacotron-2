@@ -108,7 +108,10 @@ def save_checkpoint(sess, saver, checkpoint_path, global_step):
 
 def model_train_mode(args, feeder, hparams, global_step):
 	with tf.variable_scope('model', reuse=tf.AUTO_REUSE) as scope:
-		model = create_model(args.model, hparams)
+		model_name = None
+		if args.model in ('Tacotron-2', 'Both'):
+			model_name = 'WaveNet'
+		model = create_model(model_name or args.model, hparams)
 		#initialize model to train mode
 		model.initialize(feeder.targets, feeder.local_condition_features, feeder.global_condition_features,
 			feeder.input_lengths, x=feeder.inputs)
@@ -119,7 +122,10 @@ def model_train_mode(args, feeder, hparams, global_step):
 
 def model_test_mode(args, feeder, hparams, global_step):
 	with tf.variable_scope('model', reuse=tf.AUTO_REUSE) as scope:
-		model = create_model(args.model, hparams)
+		model_name = None
+		if args.model in ('Tacotron-2', 'Both'):
+			model_name = 'WaveNet'
+		model = create_model(model_name or args.model, hparams)
 		#initialize model to test mode
 		model.initialize(feeder.eval_targets, feeder.eval_local_condition_features, feeder.eval_global_condition_features,
 			feeder.eval_input_lengths)
