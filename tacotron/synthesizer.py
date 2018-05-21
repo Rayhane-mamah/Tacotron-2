@@ -1,18 +1,21 @@
 import os
 import numpy as np
 import tensorflow as tf
-from hparams import hparams
 from librosa import effects
 from tacotron.models import create_model
 from tacotron.utils.text import text_to_sequence
 from tacotron.utils import plot
 from datasets import audio
 from datetime import datetime
+import sounddevice as sd
+import pyaudio
+import wave
+from infolog import log
 
 
 class Synthesizer:
-	def load(self, checkpoint_path, gta=False, model_name='Tacotron'):
-		print('Constructing model: %s' % model_name)
+	def load(self, checkpoint_path, hparams, gta=False, model_name='Tacotron'):
+		log('Constructing model: %s' % model_name)
 		inputs = tf.placeholder(tf.int32, [1, None], 'inputs')
 		input_lengths = tf.placeholder(tf.int32, [1], 'input_lengths')
 		targets = tf.placeholder(tf.float32, [1, None, hparams.num_mels], 'mel_targets')
@@ -26,7 +29,9 @@ class Synthesizer:
 			self.alignment = self.model.alignments[0]
 
 		self.gta = gta
-		print('Loading checkpoint: %s' % checkpoint_path)
+		self._hparams = hparams
+
+		log('Loading checkpoint: %s' % checkpoint_path)
 		self.session = tf.Session()
 		self.session.run(tf.global_variables_initializer())
 		saver = tf.train.Saver()
@@ -34,6 +39,7 @@ class Synthesizer:
 
 
 	def synthesize(self, text, index, out_dir, log_dir, mel_filename):
+		hparams = self._hparams
 		cleaner_names = [x.strip() for x in hparams.cleaners.split(',')]
 		seq = text_to_sequence(text, cleaner_names)
 		feed_dict = {
@@ -53,6 +59,31 @@ class Synthesizer:
 
 		mels = mels.reshape(-1, hparams.num_mels) #Thanks to @imdatsolak for pointing this out
 
+
+		if index is None:
+			#Generate wav and read it
+			wav = audio.inv_mel_spectrogram(mels.T, hparams)
+			audio.save_wav(wav, 'temp.wav', sr=hparams.sample_rate) #Find a better way
+
+			chunk = 512
+			f = wave.open('temp.wav', 'rb')
+			p = pyaudio.PyAudio()
+			stream = p.open(format=p.get_format_from_width(f.getsampwidth()),
+				channels=f.getnchannels(),
+				rate=f.getframerate(),
+				output=True)
+			data = f.readframes(chunk)
+			while data:
+				stream.write(data)
+				data=f.readframes(chunk)
+
+			stream.stop_stream()
+			stream.close()
+
+			p.terminate()
+			return
+
+
 		# Write the spectrogram to disk
 		# Note: outputs mel-spectrogram files and target ones have same names, just different folders
 		mel_filename = os.path.join(out_dir, 'speech-mel-{:05d}.npy'.format(index))
@@ -60,13 +91,13 @@ class Synthesizer:
 
 		if log_dir is not None:
 			#save wav (mel -> wav)
-			wav = audio.inv_mel_spectrogram(mels.T)
-			audio.save_wav(wav, os.path.join(log_dir, 'wavs/speech-wav-{:05d}-mel.wav'.format(index)))
+			wav = audio.inv_mel_spectrogram(mels.T, hparams)
+			audio.save_wav(wav, os.path.join(log_dir, 'wavs/speech-wav-{:05d}-mel.wav'.format(index)), sr=hparams.sample_rate)
 
 			if hparams.predict_linear:
 				#save wav (linear -> wav)
-				wav = audio.inv_linear_spectrogram(linear.T)
-				audio.save_wav(wav, os.path.join(log_dir, 'wavs/speech-wav-{:05d}-linear.wav'.format(index)))
+				wav = audio.inv_linear_spectrogram(linear.T, hparams)
+				audio.save_wav(wav, os.path.join(log_dir, 'wavs/speech-wav-{:05d}-linear.wav'.format(index)), sr=hparams.sample_rate)
 
 			#save alignments
 			plot.plot_alignment(alignment, os.path.join(log_dir, 'plots/speech-alignment-{:05d}.png'.format(index)),
