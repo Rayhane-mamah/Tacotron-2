@@ -31,8 +31,7 @@ def train(args, log_dir, hparams):
 	log('\n#############################################################\n')
 	log('Tacotron GTA Synthesis\n')
 	log('###########################################################\n')
-	#input_path = tacotron_synthesize(args, hparams, checkpoint)
-	input_path = 'tacotron_output/gta/map.txt'
+	input_path = tacotron_synthesize(args, hparams, checkpoint)
 	log('\n#############################################################\n')
 	log('Wavenet Train\n')
 	log('###########################################################\n')
