@@ -115,18 +115,19 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 	assert linear_frames == mel_frames
 
 	#Ensure time resolution adjustement between audio and mel-spectrogram
-	l, r = audio.pad_lr(wav, hparams.fft_size, audio.get_hop_size(hparams))
+	fft_size = hparams.n_fft if hparams.win_size is None else hparams.win_size
+	l, r = audio.pad_lr(wav, fft_size, audio.get_hop_size(hparams))
 
 	#Zero pad for quantized signal
 	out = np.pad(out, (l, r), mode='constant', constant_values=constant_values)
-	time_steps = len(out)
-	assert time_steps >= mel_frames * audio.get_hop_size(hparams)
+	assert len(out) >= mel_frames * audio.get_hop_size(hparams)
 
 	#time resolution adjustement
 	#ensure length of raw audio is multiple of hop size so that we can use
 	#transposed convolution to upsample
 	out = out[:mel_frames * audio.get_hop_size(hparams)]
-	assert time_steps % audio.get_hop_size(hparams) == 0
+	assert len(out) % audio.get_hop_size(hparams) == 0
+	time_steps = len(out)
 
 	# Write the spectrogram and audio to disk
 	audio_filename = 'speech-audio-{:05d}.npy'.format(index)

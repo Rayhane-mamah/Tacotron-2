@@ -33,8 +33,8 @@ def trim_silence(wav, hparams):
 
 	Useful for M-AILABS dataset if we choose to trim the extra 0.5 silence at beginning and end.
 	'''
-	#Thanks @begeekmyfriend for pointing out the params contradiction. Should we set separate params for this function?
-	return librosa.effects.trim(wav, frame_length=hparams.fft_size, hop_length=get_hop_size(hparams))[0]
+	#Thanks @begeekmyfriend and @lautjy for pointing out the params contradiction. These params are separate and tunable per dataset.
+	return librosa.effects.trim(wav, top_db= hparams.trim_top_db, frame_length=hparams.trim_fft_size, hop_length=hparams.trim_hop_size)[0]
 
 def get_hop_size(hparams):
 	hop_size = hparams.hop_size
@@ -74,7 +74,7 @@ def inv_linear_spectrogram(linear_spectrogram, hparams):
 		y = processor.istft(D).astype(np.float32)
 		return y
 	else:
-		return _griffin_lim(S ** hparams.power)
+		return _griffin_lim(S ** hparams.power, hparams)
 	
 
 def inv_mel_spectrogram(mel_spectrogram, hparams):
@@ -92,11 +92,11 @@ def inv_mel_spectrogram(mel_spectrogram, hparams):
 		y = processor.istft(D).astype(np.float32)
 		return y
 	else:
-		return _griffin_lim(S ** hparams.power)
+		return _griffin_lim(S ** hparams.power, hparams)
 
 def _lws_processor(hparams):
 	import lws
-	return lws.lws(hparams.fft_size, get_hop_size(hparams), mode="speech")
+	return lws.lws(hparams.n_fft, get_hop_size(hparams), fftsize=hparams.win_size, mode="speech")
 
 def _griffin_lim(S, hparams):
 	'''librosa implementation of Griffin-Lim
@@ -114,10 +114,10 @@ def _stft(y, hparams):
 	if hparams.use_lws:
 		return _lws_processor(hparams).stft(y).T
 	else:
-		return librosa.stft(y=y, n_fft=hparams.fft_size, hop_length=get_hop_size(hparams))
+		return librosa.stft(y=y, n_fft=hparams.n_fft, hop_length=get_hop_size(hparams), win_length=hparams.win_size)
 
 def _istft(y, hparams):
-	return librosa.istft(y, hop_length=get_hop_size(hparams))
+	return librosa.istft(y, hop_length=get_hop_size(hparams), win_length=hparams.win_size)
 
 def num_frames(length, fsize, fshift):
 	"""Compute number of time frames of spectrogram
@@ -158,7 +158,7 @@ def _mel_to_linear(mel_spectrogram, hparams):
 
 def _build_mel_basis(hparams):
 	assert hparams.fmax <= hparams.sample_rate // 2
-	return librosa.filters.mel(hparams.sample_rate, hparams.fft_size, n_mels=hparams.num_mels,
+	return librosa.filters.mel(hparams.sample_rate, hparams.n_fft, n_mels=hparams.num_mels,
 							   fmin=hparams.fmin, fmax=hparams.fmax)
 
 def _amp_to_db(x, hparams):
