@@ -7,9 +7,28 @@ from infolog import log
 from hparams import hparams
 import os
 import infolog
+from time import sleep
 
 log = infolog.log
 
+
+def save_seq(file, sequence, input_path):
+	'''Save Tacotron-2 training state to disk. (To skip for future runs)
+	'''
+	sequence = [str(int(s)) for s in sequence] + [input_path]
+	with open(file, 'w') as f:
+		f.write('|'.join(sequence))
+
+def read_seq(file):
+	'''Load Tacotron-2 training state from disk. (To skip if not first run)
+	'''
+	if os.path.isfile(file):
+		with open(file, 'r') as f:
+			sequence = f.read().split('|')
+
+		return [bool(int(s)) for s in sequence[:-1]], sequence[-1]
+	else:
+		return [0, 0, 0], ''
 
 def prepare_run(args):
 	modified_hp = hparams.parse(args.hparams)
@@ -21,21 +40,46 @@ def prepare_run(args):
 	return log_dir, modified_hp
 
 def train(args, log_dir, hparams):
-	log('\n#############################################################\n')
-	log('Tacotron Train\n')
-	log('###########################################################\n')
-	checkpoint = tacotron_train(args, log_dir, hparams)
-	tf.reset_default_graph()
-	if checkpoint is None:
-		raise('Error occured while training Tacotron, Exiting!')
-	log('\n#############################################################\n')
-	log('Tacotron GTA Synthesis\n')
-	log('###########################################################\n')
-	input_path = tacotron_synthesize(args, hparams, checkpoint)
-	log('\n#############################################################\n')
-	log('Wavenet Train\n')
-	log('###########################################################\n')
-	wavenet_train(args, log_dir, hparams, input_path)
+	state_file = os.path.join(log_dir, 'state_log')
+	#Get training states
+	(taco_state, GTA_state, wave_state), input_path = read_seq(state_file)
+
+	if not taco_state:
+		log('\n#############################################################\n')
+		log('Tacotron Train\n')
+		log('###########################################################\n')
+		checkpoint = tacotron_train(args, log_dir, hparams)
+		tf.reset_default_graph()
+		#Sleep 1 second to let previous graph close and avoid error messages while synthesis
+		sleep(1)
+		if checkpoint is None:
+			raise('Error occured while training Tacotron, Exiting!')
+		taco_state = 1
+		save_seq(state_file, [taco_state, GTA_state, wave_state], input_path)
+
+	if not GTA_state:
+		log('\n#############################################################\n')
+		log('Tacotron GTA Synthesis\n')
+		log('###########################################################\n')
+		input_path = tacotron_synthesize(args, hparams, checkpoint)
+		GTA_state = 1
+		save_seq(state_file, [taco_state, GTA_state, wave_state], input_path)
+
+	if input_path == '' or input_path is None:
+		raise RuntimeError('input_path has an unpleasant value -> {}'.format(input_path))
+
+	if not wave_state:
+		log('\n#############################################################\n')
+		log('Wavenet Train\n')
+		log('###########################################################\n')
+		checkpoint = wavenet_train(args, log_dir, hparams, input_path)
+		if checkpoint is None:
+			raise ('Error occured while training Wavenet, Exiting!')
+		wave_state = 1
+		save_seq(state_file, [taco_state, GTA_state, wave_state], input_path)
+
+	if wave_state and GTA_state and taco_state:
+		log('TRAINING IS ALREADY COMPLETE!!')
 
 def main():
 	parser = argparse.ArgumentParser()
@@ -57,7 +101,7 @@ def main():
 		help='Steps between writing checkpoints')
 	parser.add_argument('--eval_interval', type=int, default=10000,
 		help='Steps between eval on test data')
-	parser.add_argument('--tacotron_train_steps', type=int, default=160000, help='total number of tacotron training steps')
+	parser.add_argument('--tacotron_train_steps', type=int, default=20000, help='total number of tacotron training steps')
 	parser.add_argument('--wavenet_train_steps', type=int, default=360000, help='total number of wavenet training steps')
 	parser.add_argument('--tf_log_level', type=int, default=1, help='Tensorflow C++ log level.')
 	args = parser.parse_args()

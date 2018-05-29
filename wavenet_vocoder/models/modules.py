@@ -66,7 +66,6 @@ class Conv1d1x1(tf.layers.Conv1D):
 		'''
 		if self.paddings is not None: #dilated conv
 			assert isinstance(self.paddings, int)
-
 			inputs_padded = tf.pad(inputs, [[0, 0], [0, 0], [self.paddings, 0]], "CONSTANT")
 
 			#inputs are channels first
