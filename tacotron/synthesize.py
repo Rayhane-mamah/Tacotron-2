@@ -44,7 +44,7 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	log_dir = os.path.join(output_dir, 'logs-eval')
 
 	if args.model in ('Both', 'Tacotron-2'):
-		assert eval_dir == args.mels_dir #mels_dir = wavenet_input_dir
+		assert os.path.normpath(eval_dir) == os.path.normpath(args.mels_dir) #mels_dir = wavenet_input_dir
 	
 	#Create output path if it doesn't exist
 	os.makedirs(eval_dir, exist_ok=True)
@@ -110,8 +110,23 @@ def tacotron_synthesize(args, hparams, checkpoint, sentences=None):
 	try:
 		checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
 		log('loaded model at {}'.format(checkpoint_path))
-	except:
-		raise AssertionError('Cannot restore checkpoint: {}, did you train a model?'.format(checkpoint))
+	except AttributeError:
+		#Swap logs dir name in case user used Tacotron-2 for train and Both for test (and vice versa)
+		if 'Both' in checkpoint:
+			checkpoint = checkpoint.replace('Both', 'Tacotron-2')
+		elif 'Tacotron-2' in checkpoint:
+			checkpoint = checkpoint.replace('Tacotron-2', 'Both')
+		else:
+			raise AssertionError('Cannot restore checkpoint: {}, did you train a model?'.format(checkpoint))
+
+		try:
+			#Try loading again
+			checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
+			log('loaded model at {}'.format(checkpoint_path))
+		except:
+			raise RuntimeError('Failed to load checkpoint at {}'.format(checkpoint))
+
+		
 
 	wavenet_in_dir = None
 

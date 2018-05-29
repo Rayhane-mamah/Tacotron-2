@@ -54,6 +54,7 @@ class Conv1d1x1(tf.layers.Conv1D):
 			self.paddings = None
 			self.use_bias = use_bias
 			self.paddings = padding
+			self.scope = scope
 
 	def set_mode(self, is_training):
 		self.training = is_training
@@ -118,25 +119,26 @@ class Conv1d1x1(tf.layers.Conv1D):
 	def __call__(self, inputs):
 		'''During this call, we change to channel last scheme for a better generalization and easier bias computation
 		'''
-		#Reshape to dilated conv mode (if this instance is of a dilated convolution)
-		inputs_ = self._to_dilation(inputs)
+		with tf.variable_scope(self.scope):
+			#Reshape to dilated conv mode (if this instance is of a dilated convolution)
+			inputs_ = self._to_dilation(inputs)
 
-		outputs_ = tf.nn.conv1d(inputs_, self.kernel,
-			stride=1, padding='VALID', data_format='NWC')
+			outputs_ = tf.nn.conv1d(inputs_, self.kernel,
+				stride=1, padding='VALID', data_format='NWC')
 
-		if self.use_bias:
-			outputs_ = tf.nn.bias_add(outputs_, self.bias)
+			if self.use_bias:
+				outputs_ = tf.nn.bias_add(outputs_, self.bias)
 
-		#Reshape back ((if this instance is of a dilated convolution))
-		diff = tf.shape(outputs_)[1] * self.dilation_rate - tf.shape(inputs)[-1]
-		outputs = self._from_dilation(outputs_, crop=diff)
+			#Reshape back ((if this instance is of a dilated convolution))
+			diff = tf.shape(outputs_)[1] * self.dilation_rate - tf.shape(inputs)[-1]
+			outputs = self._from_dilation(outputs_, crop=diff)
 
-		#Make sure that outputs have same time steps as inputs
-		#[batch_size, channels(filters), width]
-		with tf.control_dependencies([tf.assert_equal(tf.shape(outputs)[-1], tf.shape(inputs)[-1])]):
-			outputs = tf.identity(outputs, name='output_equal_input_time_assert')
+			#Make sure that outputs have same time steps as inputs
+			#[batch_size, channels(filters), width]
+			with tf.control_dependencies([tf.assert_equal(tf.shape(outputs)[-1], tf.shape(inputs)[-1])]):
+				outputs = tf.identity(outputs, name='output_equal_input_time_assert')
 
-		return outputs
+			return outputs
 
 	def incremental_step(self, inputs):
 		'''At sequential inference times:
@@ -144,39 +146,40 @@ class Conv1d1x1(tf.layers.Conv1D):
 
 		inputs: [batch_size, time_length, channels] ('NWC')! Channels last!
 		'''
-		#input: [batch_size, time_length, channels]
-		if self.training: 
-			raise RuntimeError('incremental_step only supports eval mode')
+		with tf.variable_scope(self.scope):
+			#input: [batch_size, time_length, channels]
+			if self.training: 
+				raise RuntimeError('incremental_step only supports eval mode')
 
-		#reshape weight
-		weight = self._get_linearized_weight(inputs)
-		kw = self.kernel.shape[0]
-		dilation = self.dilation_rate
+			#reshape weight
+			weight = self._get_linearized_weight(inputs)
+			kw = self.kernel.shape[0]
+			dilation = self.dilation_rate
 
-		batch_size = tf.shape(inputs)[0]
-		#Fast dilation
-		#Similar to using tf FIFOQueue to schedule states of dilated convolutions
-		if kw > 1:
-			if self.convolution_queue is None:
-				self.convolution_queue = tf.zeros((batch_size, (kw - 1) + (kw - 1) * (dilation - 1), tf.shape(inputs)[2]))
-			else:
-				#shift queue
-				self.convolution_queue = self.convolution_queue[:, 1:, :]
+			batch_size = tf.shape(inputs)[0]
+			#Fast dilation
+			#Similar to using tf FIFOQueue to schedule states of dilated convolutions
+			if kw > 1:
+				if self.convolution_queue is None:
+					self.convolution_queue = tf.zeros((batch_size, (kw - 1) + (kw - 1) * (dilation - 1), tf.shape(inputs)[2]))
+				else:
+					#shift queue
+					self.convolution_queue = self.convolution_queue[:, 1:, :]
 
-			#append next input
-			self.convolution_queue = tf.concat([self.convolution_queue, tf.expand_dims(inputs[:, -1, :], axis=1)], axis=1)
-			#self.convolution_queue[:, -1, :] = inputs[:, -1, :]
-			inputs = self.convolution_queue
-			if dilation > 1:
-				inputs = inputs[:, 0::dilation, :]
+				#append next input
+				self.convolution_queue = tf.concat([self.convolution_queue, tf.expand_dims(inputs[:, -1, :], axis=1)], axis=1)
+				#self.convolution_queue[:, -1, :] = inputs[:, -1, :]
+				inputs = self.convolution_queue
+				if dilation > 1:
+					inputs = inputs[:, 0::dilation, :]
 
-		#Compute step prediction
-		output = tf.matmul(tf.reshape(inputs, [batch_size, -1]), weight)
-		if self.use_bias:
-			output = tf.nn.bias_add(output, self.bias)
+			#Compute step prediction
+			output = tf.matmul(tf.reshape(inputs, [batch_size, -1]), weight)
+			if self.use_bias:
+				output = tf.nn.bias_add(output, self.bias)
 
-		#[batch_size, 1(time_step), channels(filters)]
-		return tf.reshape(output, [batch_size, 1, self.filters])
+			#[batch_size, 1(time_step), channels(filters)]
+			return tf.reshape(output, [batch_size, 1, self.filters])
 
 	def _get_linearized_weight(self, inputs):
 		if self._linearized_weight is None:

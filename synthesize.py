@@ -3,6 +3,7 @@ from tacotron.synthesize import tacotron_synthesize
 from wavenet_vocoder.synthesize import wavenet_synthesize
 from infolog import log
 from hparams import hparams
+from warnings import warn
 import os
 
 
@@ -11,10 +12,10 @@ def prepare_run(args):
 	os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 	run_name = args.name or args.tacotron_name or args.model
-	taco_checkpoint = os.path.join('logs-' + run_name, args.checkpoint)
+	taco_checkpoint = os.path.join('logs-' + run_name, 'taco_' + args.checkpoint)
 
 	run_name = args.name or args.wavenet_name or args.model
-	wave_checkpoint = os.path.join('logs-' + run_name, args.checkpoint)
+	wave_checkpoint = os.path.join('logs-' + run_name, 'wave_' + args.checkpoint)
 	return taco_checkpoint, wave_checkpoint, modified_hp
 
 def get_sentences(args):
@@ -48,7 +49,7 @@ def main():
 	parser.add_argument('--input_dir', default='training_data/', help='folder to contain inputs sentences/targets')
 	parser.add_argument('--mels_dir', default='tacotron_output/eval/', help='folder to contain mels to synthesize audio from using the Wavenet')
 	parser.add_argument('--output_dir', default='output/', help='folder to contain synthesized mel spectrograms')
-	parser.add_argument('--mode', default='synthesis', help='mode of run: can be one of {}'.format(accepted_modes))
+	parser.add_argument('--mode', default='eval', help='mode of run: can be one of {}'.format(accepted_modes))
 	parser.add_argument('--GTA', default='True', help='Ground truth aligned synthesis, defaults to True, only considered in synthesis mode')
 	parser.add_argument('--text_list', default='', help='Text file contains list of texts to be synthesized. Valid if mode=eval')
 	args = parser.parse_args()
@@ -69,7 +70,7 @@ def main():
 
 	if args.model in ('Both', 'Tacotron-2'):
 		if args.mode == 'live':
-			raise ValueError('Impossible to generate live speech using Tacotron+WaveNet combo! (only eval allowed)')
+			warn('Requested a live evaluation with Tacotron-2, Wavenet will not be used!')
 		if args.mode == 'synthesis':
 			raise ValueError('I don\'t recommend running WaveNet on entire dataset.. The world might end before the synthesis :) (only eval allowed)')
 

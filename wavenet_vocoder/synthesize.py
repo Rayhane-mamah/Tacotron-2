@@ -59,7 +59,20 @@ def wavenet_synthesize(args, hparams, checkpoint):
 	try:
 		checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
 		log('loaded model at {}'.format(checkpoint_path))
-	except:
-		raise AssertionError('Cannot restore checkpoint: {}, did you train a model?'.format(checkpoint))
+	except AttributeError:
+		#Swap logs dir name in case user used Tacotron-2 for train and Both for test (and vice versa)
+		if 'Both' in checkpoint:
+			checkpoint = checkpoint.replace('Both', 'Tacotron-2')
+		elif 'Tacotron-2' in checkpoint:
+			checkpoint = checkpoint.replace('Tacotron-2', 'Both')
+		else: #Synthesizing separately
+			raise AssertionError('Cannot restore checkpoint: {}, did you train a model?'.format(checkpoint))
+
+		try:
+			#Try loading again
+			checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
+			log('loaded model at {}'.format(checkpoint_path))
+		except:
+			raise RuntimeError('Failed to load checkpoint at {}'.format(checkpoint))
 
 	run_synthesis(args, checkpoint_path, output_dir, hparams)
