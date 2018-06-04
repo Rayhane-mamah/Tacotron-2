@@ -15,7 +15,7 @@ hparams = tf.contrib.training.HParams(
 
 	#Audio
 	num_mels = 80, #Number of mel-spectrogram channels and local conditioning dimensionality
-	num_freq = 1025, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
+	num_freq = 513, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
 	rescale = True, #Whether to rescale audio prior to preprocessing
 	rescaling_max = 0.999, #Rescaling value
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
@@ -25,13 +25,13 @@ hparams = tf.contrib.training.HParams(
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
 	# Does not work if n_ffit is not multiple of hop_size!!
-	use_lws=False,
+	use_lws=True,
 	silence_threshold=2, #silence threshold used for sound trimming for wavenet preprocessing
 
 	#Mel spectrogram
-	n_fft = 2048, #Extra window size is filled with 0 paddings to match this parameter
-	hop_size = 275, #For 22050Hz, 275 ~= 12.5 ms
-	win_size = 1100, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
+	n_fft = 1024, #Extra window size is filled with 0 paddings to match this parameter
+	hop_size = 256, #For 22050Hz, 275 ~= 12.5 ms
+	win_size = None, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
 	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset)
 	frame_shift_ms = None,
 
@@ -58,7 +58,7 @@ hparams = tf.contrib.training.HParams(
 	###########################################################################################################################################
 
 	#Tacotron
-	outputs_per_step = 1, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
+	outputs_per_step = 2, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them
 
 	embedding_dim = 512, #dimension of embedding space
@@ -74,9 +74,9 @@ hparams = tf.contrib.training.HParams(
 	attention_kernel = (31, ), #kernel size of attention convolution
 	cumulative_weights = True, #Whether to cumulate (sum) all previous attention weights or simply feed previous weights (Recommended: True)
 
-	prenet_layers = [128, 128], #number of layers and number of units of prenet
+	prenet_layers = [256, 256], #number of layers and number of units of prenet
 	decoder_layers = 2, #number of decoder lstm layers
-	decoder_lstm_units = 512, #number of decoder lstm units on each layer
+	decoder_lstm_units = 1024, #number of decoder lstm units on each layer
 	max_iters = 2500, #Max decoder steps during inference (Just for safety from infinite loop cases)
 
 	postnet_num_layers = 5, #number of postnet convolutional layers
@@ -114,7 +114,7 @@ hparams = tf.contrib.training.HParams(
 
 	cin_channels = 80, #Set this to -1 to disable local conditioning, else it must be equal to num_mels!!
 	upsample_conditional_features = True, #Whether to repeat conditional features or upsample them (The latter is recommended)
-	upsample_scales = [11, 5, 5], #prod(scales) should be equal to hop size
+	upsample_scales = [16, 16], #prod(scales) should be equal to hop size
 	freq_axis_kernel_size = 3,
 
 	gin_channels = -1, #Set this to -1 to disable global conditioning, Only used for multi speaker dataset
@@ -129,11 +129,11 @@ hparams = tf.contrib.training.HParams(
 	tacotron_swap_with_cpu = False, #Whether to use cpu as support to gpu for decoder computation (Not recommended: may cause major slowdowns! Only use when critical!)
 
 	tacotron_batch_size = 48, #number of training samples on each training steps
-	tacotron_reg_weight = 1e-5, #regularization weight (for L2 regularization)
-	tacotron_scale_regularization = False, #Whether to rescale regularization weight to adapt for outputs range (used when reg_weight is high and biasing the model)
+	tacotron_reg_weight = 1e-6, #regularization weight (for L2 regularization)
+	tacotron_scale_regularization = True, #Whether to rescale regularization weight to adapt for outputs range (used when reg_weight is high and biasing the model)
 
 	tacotron_test_size = None, #% of data to keep as test data, if None, tacotron_test_batches must be not None
-	tacotron_test_batches = 32, #number of test batches (For Ljspeech: 10% ~= 41 batches of 32 samples)
+	tacotron_test_batches = 48, #number of test batches (For Ljspeech: 10% ~= 41 batches of 32 samples)
 	tacotron_data_random_state=1234, #random state for train test split repeatability
 
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay

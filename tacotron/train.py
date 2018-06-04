@@ -233,10 +233,10 @@ def train(log_dir, args, hparams):
 					audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-waveform-mel.wav'.format(step)), sr=hparams.sample_rate)
 
 					plot.plot_alignment(align, os.path.join(eval_plot_dir, 'step-{}-eval-align.png'.format(step)),
-						info='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, eloss),
+						info='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, eval_loss),
 						max_len=t_len // hparams.outputs_per_step)
 					plot.plot_spectrogram(mel_p, os.path.join(eval_plot_dir, 'step-{}-eval-mel-spectrogram.png'.format(step)),
-						info='{}, {}, step={}, loss={:.5}'.format(args.model, time_string(), step, eloss), target_spectrogram=mel_t,
+						info='{}, {}, step={}, loss={:.5}'.format(args.model, time_string(), step, eval_loss), target_spectrogram=mel_t,
 						max_len=t_len)
 
 					log('Eval loss for global step {}: {:.3f}'.format(step, eval_loss))
@@ -244,7 +244,7 @@ def train(log_dir, args, hparams):
 					add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, stop_token_loss, eval_loss)
 
 				
-				if step % args.checkpoint_interval == 0:
+				if step % args.checkpoint_interval == 0 or step == args.tacotron_train_steps:
 					#Save model and current global step
 					saver.save(sess, checkpoint_path, global_step=global_step)
 					
