@@ -15,7 +15,7 @@ hparams = tf.contrib.training.HParams(
 
 	#Audio
 	num_mels = 80, #Number of mel-spectrogram channels and local conditioning dimensionality
-	num_freq = 513, #only used when adding linear spectrograms post processing network
+	num_freq = 513, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
 	rescale = True, #Whether to rescale audio prior to preprocessing
 	rescaling_max = 0.999, #Rescaling value
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
@@ -24,14 +24,21 @@ hparams = tf.contrib.training.HParams(
 
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
+	# Does not work if n_ffit is not multiple of hop_size!!
 	use_lws=True,
 	silence_threshold=2, #silence threshold used for sound trimming for wavenet preprocessing
 
 	#Mel spectrogram
-	fft_size = 1024,
-	hop_size = 256,
+	n_fft = 1024, #Extra window size is filled with 0 paddings to match this parameter
+	hop_size = 256, #For 22050Hz, 275 ~= 12.5 ms
+	win_size = None, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
 	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset)
 	frame_shift_ms = None,
+
+	#M-AILABS (and other datasets) trim params
+	trim_fft_size = 512,
+	trim_hop_size = 128,
+	trim_top_db = 60,
 
 	#Mel and Linear spectrograms normalization/scaling and clipping
 	signal_normalization = True,
@@ -40,9 +47,9 @@ hparams = tf.contrib.training.HParams(
 	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max] 
 
 	#Limits
-	min_level_db =- 100,
+	min_level_db = -100,
 	ref_level_db = 20,
-	fmin = 125, #Set this to 75 if your speaker is male! if female, 125 should help taking off noise. (To test depending on dataset)
+	fmin = 25, #Set this to 75 if your speaker is male! if female, 125 should help taking off noise. (To test depending on dataset)
 	fmax = 7600, 
 
 	#Griffin Lim
@@ -51,7 +58,7 @@ hparams = tf.contrib.training.HParams(
 	###########################################################################################################################################
 
 	#Tacotron
-	outputs_per_step = 1, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
+	outputs_per_step = 2, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them
 
 	embedding_dim = 512, #dimension of embedding space
@@ -93,7 +100,7 @@ hparams = tf.contrib.training.HParams(
 	# discretized mixture of logistic distributions output, otherwise one-hot
 	# input and softmax output are assumed.
 	input_type="raw",
-	quantize_channels=65536,  # 65536 (raw) or 256 (mulaw or mulaw-quantize) // number of classes = 256 <=> mu = 255
+	quantize_channels=65536,  # 65536 (16-bit) (raw) or 256 (8-bit) (mulaw or mulaw-quantize) // number of classes = 256 <=> mu = 255
 
 	log_scale_min=float(np.log(1e-14)), #Mixture of logistic distributions minimal log scale
 
@@ -121,9 +128,9 @@ hparams = tf.contrib.training.HParams(
 	tacotron_random_seed = 5339, #Determines initial graph and operations (i.e: model) random state for reproducibility
 	tacotron_swap_with_cpu = False, #Whether to use cpu as support to gpu for decoder computation (Not recommended: may cause major slowdowns! Only use when critical!)
 
-	tacotron_batch_size = 32, #number of training samples on each training steps
-	tacotron_reg_weight = 1e-6, #regularization weight (for l2 regularization)
-	tacotron_scale_regularization = False, #Whether to rescale regularization weight to adapt for outputs range (used when reg_weight is high and biasing the model)
+	tacotron_batch_size = 48, #number of training samples on each training steps
+	tacotron_reg_weight = 1e-6, #regularization weight (for L2 regularization)
+	tacotron_scale_regularization = True, #Whether to rescale regularization weight to adapt for outputs range (used when reg_weight is high and biasing the model)
 
 	tacotron_test_size = None, #% of data to keep as test data, if None, tacotron_test_batches must be not None
 	tacotron_test_batches = 48, #number of test batches (For Ljspeech: 10% ~= 41 batches of 32 samples)
@@ -142,8 +149,8 @@ hparams = tf.contrib.training.HParams(
 
 	tacotron_zoneout_rate = 0.1, #zoneout rate for all LSTM cells in the network
 	tacotron_dropout_rate = 0.5, #dropout rate for all convolutional layers + prenet
-	
-	natural_eval = True, #Whether to use 100% natural eval (to evaluate Curriculum Learning performance) or with same teacher-forcing ratio as training (just for overfit)
+
+	natural_eval = False, #Whether to use 100% natural eval (to evaluate Curriculum Learning performance) or with same teacher-forcing ratio as in training (just for overfit)
 
 	#Decoder RNN learning can take be done in one of two ways:
 	#	Teacher Forcing: vanilla teacher forcing (usually with ratio = 1). mode='constant'
@@ -156,7 +163,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_teacher_forcing_init_ratio = 1., #initial teacher forcing ratio. Relevant if mode='scheduled'
 	tacotron_teacher_forcing_final_ratio = 0., #final teacher forcing ratio. Relevant if mode='scheduled'
 	tacotron_teacher_forcing_start_decay = 10000, #starting point of teacher forcing ratio decay. Relevant if mode='scheduled'
-	tacotron_teacher_forcing_decay_steps = 220000, #Determines the teacher forcing ratio decay slope. Relevant if mode='scheduled'
+	tacotron_teacher_forcing_decay_steps = 280000, #Determines the teacher forcing ratio decay slope. Relevant if mode='scheduled'
 	tacotron_teacher_forcing_decay_alpha = 0., #teacher forcing ratio decay rate. Relevant if mode='scheduled'
 	###########################################################################################################################################
 

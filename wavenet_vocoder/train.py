@@ -225,7 +225,7 @@ def train(log_dir, args, hparams, input_path):
 					log('\nWriting summary at step {}'.format(step))
 					summary_writer.add_summary(sess.run(stats), step)
 
-				if step % args.checkpoint_interval == 0:
+				if step % args.checkpoint_interval == 0 or step == args.wavenet_train_steps:
 					save_log(sess, step, model, plot_dir, audio_dir, hparams=hparams)
 					save_checkpoint(sess, sh_saver, checkpoint_path, global_step)
 
@@ -234,10 +234,11 @@ def train(log_dir, args, hparams, input_path):
 					eval_step(sess, step, eval_model, eval_plot_dir, eval_audio_dir, summary_writer=summary_writer , hparams=model._hparams)
 
 			log('Wavenet training complete after {} global steps'.format(args.wavenet_train_steps))
+			return save_dir
 
 		except Exception as e:
 			log('Exiting due to Exception: {}'.format(e))
 
 
 def wavenet_train(args, log_dir, hparams, input_path):
-	train(log_dir, args, hparams, input_path)
+	return train(log_dir, args, hparams, input_path)

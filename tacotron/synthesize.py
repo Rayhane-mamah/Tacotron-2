@@ -126,15 +126,9 @@ def tacotron_synthesize(args, hparams, checkpoint, sentences=None):
 		except:
 			raise RuntimeError('Failed to load checkpoint at {}'.format(checkpoint))
 
-		
-
-	wavenet_in_dir = None
-
 	if args.mode == 'eval':
-		wavenet_in_dir = run_eval(args, checkpoint_path, output_dir, hparams, sentences)
+		return run_eval(args, checkpoint_path, output_dir, hparams, sentences)
 	elif args.mode == 'synthesis':
-		run_synthesis(args, checkpoint_path, output_dir, hparams)
+		return run_synthesis(args, checkpoint_path, output_dir, hparams)
 	else:
 		run_live(args, checkpoint_path, hparams)
-
-	return wavenet_in_dir

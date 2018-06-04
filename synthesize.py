@@ -3,6 +3,7 @@ from tacotron.synthesize import tacotron_synthesize
 from wavenet_vocoder.synthesize import wavenet_synthesize
 from infolog import log
 from hparams import hparams
+from warnings import warn
 import os
 
 
@@ -69,7 +70,7 @@ def main():
 
 	if args.model in ('Both', 'Tacotron-2'):
 		if args.mode == 'live':
-			raise ValueError('Impossible to generate live speech using Tacotron+WaveNet combo! (only eval allowed)')
+			warn('Requested a live evaluation with Tacotron-2, Wavenet will not be used!')
 		if args.mode == 'synthesis':
 			raise ValueError('I don\'t recommend running WaveNet on entire dataset.. The world might end before the synthesis :) (only eval allowed)')
 
