@@ -1,10 +1,12 @@
+from os.path import join, isfile
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from datasets import audio
 import os
-import numpy as np 
+from os import listdir
+import numpy as np
 from wavenet_vocoder.util import mulaw_quantize, mulaw, is_mulaw, is_mulaw_quantize
-
+from os.path import join, splitext, isdir
 
 def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
 	"""
@@ -29,16 +31,44 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
 	futures = []
 	index = 1
 	for input_dir in input_dirs:
-		with open(os.path.join(input_dir, 'metadata.csv'), encoding='utf-8') as f:
-			for line in f:
-				parts = line.strip().split('|')
-				wav_path = os.path.join(input_dir, 'wavs', '{}.wav'.format(parts[0]))
-				text = parts[2]
+		for wav_path in collect_wav_files(input_dir):
+			txt_path = wav_path.replace('.wav','.txt')
+			if isfile(txt_path):
+				text = load_text(txt_path)
 				futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, index, wav_path, text, hparams)))
 				index += 1
 
 	return [future.result() for future in tqdm(futures) if future.result() is not None]
 
+def load_text(txt_path):
+	text = None
+	print (txt_path)
+	with open(txt_path, 'rb') as f:
+		text = f.read().decode("utf-8")
+		
+	return text
+
+def collect_wav_files(speaker_dir):
+	"""Collect wav files for specific speakers.
+
+	Returns:
+	    list: List of collected wav files.
+	"""
+	paths = []
+	if not isdir(speaker_dir):
+		raise RuntimeError("{} doesn't exist.".format(speaker_dir))
+	for sd in get_sentence_subdirectories(speaker_dir):
+		files = [join(join(speaker_dir, sd), f) for f in listdir(join(speaker_dir, sd))]
+		files = list(filter(lambda x: splitext(x)[1] == ".wav", files))
+		files = sorted(files)
+		for f in files:
+			paths.append(f)
+
+	return paths
+
+def get_sentence_subdirectories(a_dir):
+	return [name for name in listdir(a_dir)
+		if isdir(join(a_dir, name))]
 
 def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hparams):
 	"""

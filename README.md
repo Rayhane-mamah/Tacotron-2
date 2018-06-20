@@ -106,15 +106,11 @@ Preprocessing can then be started using:
 
 > python preprocess.py
 
-dataset can be chosen using the **--dataset** argument. If using M-AILABS dataset, you need to provide the **language, voice, reader, merge_books and book arguments** for your custom need. Default is **Ljspeech**.
+dataset can be chosen using the **--dataset** argument. Default is **Ljspeech**.
 
-Example M-AILABS:
+Example liepa-multi:
 
-> python preprocess.py --dataset='M-AILABS' --language='en_US' --voice='female' --reader='mary_ann' --merge_books=False --book='northandsouth'
-
-or if you want to use all books for a single speaker:
-
-> python preprocess.py --dataset='M-AILABS' --language='en_US' --voice='female' --reader='mary_ann' --merge_books=True
+> python preprocess.py --dataset='liepa-multi' --voice='D245'
 
 This should take no longer than a **few minutes.**
 
