@@ -34,7 +34,7 @@ class ZoneoutLSTMCell(tf.nn.rnn_cell.RNNCell):
 		if zm < 0. or zs > 1.:
 			raise ValueError('One/both provided Zoneout factors are not in [0, 1]')
 
-		self._cell = tf.nn.rnn_cell.LSTMCell(num_units, state_is_tuple=state_is_tuple, name=name)
+		self._cell = tf.nn.rnn_cell.LSTMCell(num_units, state_is_tuple=state_is_tuple)#, name=name)
 		self._zoneout_cell = zoneout_factor_cell
 		self._zoneout_outputs = zoneout_factor_output
 		self.is_training = is_training
