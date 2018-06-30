@@ -21,8 +21,9 @@ log = infolog.log
 
 def add_train_stats(model, hparams):
     with tf.variable_scope('stats') as scope:
-        tf.summary.histogram('mel_outputs', model.mel_outputs)
-        tf.summary.histogram('mel_targets', model.mel_targets)
+        for i in range(hparams.num_gpus):
+            tf.summary.histogram('mel_outputs %d' % i, model.tower_mel_outputs[i])
+            tf.summary.histogram('mel_targets %d' % i, model.tower_mel_targets[i])
         tf.summary.scalar('before_loss', model.before_loss)
         tf.summary.scalar('after_loss', model.after_loss)
         if hparams.predict_linear:
@@ -60,11 +61,11 @@ def model_train_mode(args, feeder, hparams, global_step):
             model_name = 'Tacotron'
         model = create_model(model_name or args.model, hparams)
         if hparams.predict_linear:
-            model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets, linear_targets=feeder.linear_targets, 
+            model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets, split_infos=feeder.split_infos, linear_targets=feeder.linear_targets,
                 targets_lengths=feeder.targets_lengths, global_step=global_step,
                 is_training=True)
         else:
-            model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets, 
+            model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, stop_token_targets=feeder.token_targets, split_infos = feeder.split_infos,
                 targets_lengths=feeder.targets_lengths, global_step=global_step,
                 is_training=True)
         model.add_loss()
@@ -79,11 +80,11 @@ def model_test_mode(args, feeder, hparams, global_step):
             model_name = 'Tacotron'
         model = create_model(model_name or args.model, hparams)
         if hparams.predict_linear:
-            model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets, 
+            model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets, split_infos=feeder.eval_split_infos,
                 linear_targets=feeder.eval_linear_targets, targets_lengths=feeder.eval_targets_lengths, global_step=global_step,
                 is_training=False, is_evaluating=True)
         else:
-            model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets, 
+            model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets, split_infos=feeder.eval_split_infos,
                 targets_lengths=feeder.eval_targets_lengths, global_step=global_step, is_training=False, is_evaluating=True)
         model.add_loss()
         return model
@@ -136,7 +137,7 @@ def train(log_dir, args, hparams):
     log('Tacotron training set to a maximum of {} steps'.format(args.tacotron_train_steps))
 
     #Memory allocation on the GPU as needed
-    config = tf.ConfigProto()
+    config = tf.ConfigProto(allow_soft_placement=True)
     config.gpu_options.allow_growth = True
 
     #Train
@@ -197,11 +198,12 @@ def train(log_dir, args, hparams):
 
                     if hparams.predict_linear:
                         for i in tqdm(range(feeder.test_steps)):
-                            eloss, before_loss, after_loss, stop_token_loss, linear_loss, mel_p, mel_t, t_len, align, lin_p = sess.run(
-                                [eval_model.loss, eval_model.before_loss, eval_model.after_loss,
-                                eval_model.stop_token_loss, eval_model.linear_loss, eval_model.mel_outputs[0], 
-                                eval_model.mel_targets[0], eval_model.targets_lengths[0], 
-                                eval_model.alignments[0], eval_model.linear_outputs[0]])
+                            eloss, before_loss, after_loss, stop_token_loss, linear_loss, mel_p, mel_t, t_len, align, lin_p = sess.run([
+                                eval_model.tower_loss[0], eval_model.tower_before_loss[0], eval_model.tower_after_loss[0],
+                                eval_model.tower_stop_token_loss[0], eval_model.tower_linear_loss[0], eval_model.tower_mel_outputs[0][0],
+                                eval_model.tower_mel_targets[0][0], eval_model.tower_targets_lengths[0][0],
+                                eval_model.tower_alignments[0][0], eval_model.tower_linear_outputs[0][0]
+                                ])
                             eval_losses.append(eloss)
                             before_losses.append(before_loss)
                             after_losses.append(after_loss)
@@ -213,10 +215,11 @@ def train(log_dir, args, hparams):
                         audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-waveform-linear.wav'.format(step)), sr=hparams.sample_rate)
                     else:
                         for i in tqdm(range(feeder.test_steps)):
-                            eloss, before_loss, after_loss, stop_token_loss, mel_p, mel_t, t_len, align = sess.run(
-                                [eval_model.loss, eval_model.before_loss, eval_model.after_loss,
-                                eval_model.stop_token_loss, eval_model.mel_outputs[0], eval_model.mel_targets[0],
-                                eval_model.targets_lengths[0], eval_model.alignments[0]])
+                            eloss, before_loss, after_loss, stop_token_loss, mel_p, mel_t, t_len, align = sess.run([
+                                eval_model.tower_loss[0], eval_model.tower_before_loss[0], eval_model.tower_after_loss[0],
+                                eval_model.tower_stop_token_loss[0], eval_model.tower_mel_outputs[0][0], eval_model.tower_mel_targets[0][0],
+                                eval_model.tower_targets_lengths[0][0], eval_model.tower_alignments[0][0]
+                                ])
                             eval_losses.append(eloss)
                             before_losses.append(before_loss)
                             after_losses.append(after_loss)
@@ -251,12 +254,12 @@ def train(log_dir, args, hparams):
                     log('\nSaving alignment, Mel-Spectrograms and griffin-lim inverted waveform..')
                     if hparams.predict_linear:
                         input_seq, mel_prediction, linear_prediction, alignment, target, target_length = sess.run([
-                            model.inputs[0],
-                            model.mel_outputs[0],
-                            model.linear_outputs[0],
-                            model.alignments[0],
-                            model.mel_targets[0],
-                            model.targets_lengths[0],
+                            model.tower_inputs[0][0],
+                            model.tower_mel_outputs[0][0],
+                            model.tower_linear_outputs[0][0],
+                            model.tower_alignments[0][0],
+                            model.tower_mel_targets[0][0],
+                            model.tower_targets_lengths[0][0],
                             ])
 
                         #save predicted linear spectrogram to disk (debug)
@@ -268,11 +271,12 @@ def train(log_dir, args, hparams):
                         audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-wave-from-linear.wav'.format(step)), sr=hparams.sample_rate)
 
                     else:
-                        input_seq, mel_prediction, alignment, target, target_length = sess.run([model.inputs[0],
-                            model.mel_outputs[0],
-                            model.alignments[0],
-                            model.mel_targets[0],
-                            model.targets_lengths[0],
+                        input_seq, mel_prediction, alignment, target, target_length = sess.run([
+                            model.tower_inputs[0][0],
+                            model.tower_mel_outputs[0][0],
+                            model.tower_alignments[0][0],
+                            model.tower_mel_targets[0][0],
+                            model.tower_targets_lengths[0][0],
                             ])
 
                     #save predicted mel spectrogram to disk (debug)
