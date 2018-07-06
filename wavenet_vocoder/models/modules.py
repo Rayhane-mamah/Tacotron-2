@@ -139,7 +139,7 @@ class Conv1d1x1(tf.layers.Conv1D):
 
             return outputs
 
-    def incremental_step(self, inputs):
+    def incremental_step(self, inputs, conv_queue=None):
         '''At sequential inference times:
         we adopt fast wavenet convolution queues by saving precomputed states for faster generation
 
@@ -159,11 +159,14 @@ class Conv1d1x1(tf.layers.Conv1D):
             #Fast dilation
             #Similar to using tf FIFOQueue to schedule states of dilated convolutions
             if kw > 1:
-                if self.convolution_queue is None:
-                    self.convolution_queue = tf.zeros((batch_size, (kw - 1) + (kw - 1) * (dilation - 1), tf.shape(inputs)[2]))
+                if conv_queue is None:
+                    if self.convolution_queue is None:
+                        self.convolution_queue = tf.zeros((batch_size, (kw - 1) + (kw - 1) * (dilation - 1), tf.shape(inputs)[2]))
+                    else:
+                        #shift queue
+                        self.convolution_queue = self.convolution_queue[:, 1:, :]
                 else:
-                    #shift queue
-                    self.convolution_queue = self.convolution_queue[:, 1:, :]
+                    self.convolution_queue = conv_queue[:, 1:, :]
 
                 #append next input
                 self.convolution_queue = tf.concat([self.convolution_queue, tf.expand_dims(inputs[:, -1, :], axis=1)], axis=1)
@@ -258,12 +261,12 @@ class ResidualConv1dGLU():
                 pass
 
     def __call__(self, x, c=None, g=None):
-        return self.step(x, c, g, False)
+        return self.step(x, c, g, is_incremental=False)
 
-    def incremental_step(self, x, c=None, g=None):
-        return self.step(x, c, g, True)
+    def incremental_step(self, x, c=None, g=None, conv_queue=None):
+        return self.step(x, c, g, conv_queue, True)
 
-    def step(self, x, c, g, is_incremental):
+    def step(self, x, c, g, conv_queue=None, is_incremental=False):
         '''
 
         Args:
@@ -278,7 +281,7 @@ class ResidualConv1dGLU():
         x = tf.layers.dropout(x, rate=self.dropout, training=not is_incremental)
         if is_incremental:
             splitdim = -1
-            x = self.conv.incremental_step(x)
+            x = self.conv.incremental_step(x, conv_queue)
         else:
             splitdim = 1
             x = self.conv(x)

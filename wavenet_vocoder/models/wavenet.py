@@ -533,23 +533,30 @@ class WaveNet():
         initial_outputs_ta = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         initial_loss_outputs_ta = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
-        def condition(time, unused_outputs_ta, unused_current_input, unused_loss_outputs_ta):
+        def condition(time, unused_outputs_ta, unused_current_input, unused_loss_outputs_ta, unused_conv_queue_list):
             return tf.less(time, time_length)
 
-        def body(time, outputs_ta, current_input, loss_outputs_ta):
+        def body(time, outputs_ta, current_input, loss_outputs_ta, conv_queue_list=None):
             #conditioning features for single time step
             ct = None if self.c is None else tf.expand_dims(self.c[:, time, :], axis=1)
             gt = None if self.g_btc is None else tf.expand_dims(self.g_btc[:, time, :], axis=1)
 
             x = self.first_conv.incremental_step(current_input)
+            idx = 0
+            conv_queue_list_update = []
             skips = None
             for conv in self.conv_layers:
-                x, h = conv.incremental_step(x, ct, gt)
+                if conv_queue_list is None:
+                    x, h = conv.incremental_step(x, ct, gt)
+                else:
+                    x, h = conv.incremental_step(x, ct, gt, conv_queue_list[idx])
+                conv_queue_list_update.append(conv.conv.convolution_queue)
+                idx += 1
                 skips = h if skips is None else (skips + h)
             x = skips
             for conv in self.last_conv_layers:
                 try:
-                    x = conv.incremental_step(x)
+                    x  = conv.incremental_step(x)
                 except AttributeError: #When calling Relu activation
                     x = conv(x)
 
@@ -579,23 +586,24 @@ class WaveNet():
                 else:
                     next_input = tf.expand_dims(x, axis=-1) #Expand on the channels dimension
 
-            return (time, outputs_ta, next_input, loss_outputs_ta)
+            return (time, outputs_ta, next_input, loss_outputs_ta, conv_queue_list_update)
+
+        init_res = body(initial_time, initial_outputs_ta, initial_input, initial_loss_outputs_ta)
 
         res = tf.while_loop(
             condition,
             body,
-            loop_vars=[
-                initial_time, initial_outputs_ta, initial_input, initial_loss_outputs_ta
-            ],
+            loop_vars=init_res,
             parallel_iterations=32,
             swap_memory=self._hparams.wavenet_swap_with_cpu)
+
 
         outputs_ta = res[1]
         #[time_length, batch_size, channels]
         outputs = outputs_ta.stack()
 
         #Save eval prediction for eval loss computation
-        eval_outputs = res[-1].stack()
+        eval_outputs = res[-2].stack()
 
         if is_mulaw_quantize(self._hparams.input_type):
             self.y_hat_eval = tf.transpose(eval_outputs, [1, 0, 2])
