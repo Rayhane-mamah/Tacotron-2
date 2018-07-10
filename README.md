@@ -191,6 +191,6 @@ Pre-trained models and audio samples will be added at a later date. You can howe
 - [x] Fix wavenet bug when doing inference
 
 ## To do
-- [] Scope conflict between Tacotron 2 and wavenet
-- [] wavenet multi-GPUs training support
-- [] World vocoder
+- [ ] Scope conflict between Tacotron 2 and wavenet
+- [ ] wavenet multi-GPUs training support
+- [ ] World vocoder
