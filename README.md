@@ -1,6 +1,7 @@
 # Tacotron-2:
 Tensorflow implementation of DeepMind's Tacotron-2. A deep neural network architecture described in this paper: [Natural TTS synthesis by conditioning Wavenet on MEL spectogram predictions](https://arxiv.org/pdf/1712.05884.pdf)
 
+Note: You can check modification at the end of the webpage.
 
 # Repository Structure:
 	Tacotron-2
@@ -184,3 +185,12 @@ Pre-trained models and audio samples will be added at a later date. You can howe
 - [r9y9/wavenet_vocoder](https://github.com/r9y9/wavenet_vocoder)
 - [keithito/tacotron](https://github.com/keithito/tacotron)
 
+# Main work
+## Done
+- [x] Tacotron 2 multi-GPUs training support
+- [x] Fix wavenet bug when doing inference
+
+## To do
+- [] Scope conflict between Tacotron 2 and wavenet
+- [] wavenet multi-GPUs training support
+- [] World vocoder
