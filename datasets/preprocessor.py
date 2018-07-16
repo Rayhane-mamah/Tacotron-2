@@ -124,6 +124,9 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text):
 	#sanity check
 	assert linear_frames == mel_frames
 
+        if mel_frames > hparams.max_mel_frames and hparams.clip_mels_length:
+                return None
+
 	#Ensure time resolution adjustement between audio and mel-spectrogram
 	l, r = audio.pad_lr(wav, hparams.fft_size, audio.get_hop_size())
 

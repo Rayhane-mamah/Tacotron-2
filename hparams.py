@@ -8,18 +8,19 @@ hparams = tf.contrib.training.HParams(
 	# text, you may want to use "basic_cleaners" or "transliteration_cleaners".
 	cleaners='basic_cleaners',
 
-
 	#Audio
 	num_mels = 80, 
 	num_freq = 513, #only used when adding linear spectrograms post processing network
 	rescale = True, 
 	rescaling_max = 0.999,
 	trim_silence = True,
+        clip_mels_length = True, #For cases of OOM (Not really recommended, working on a workaround)
+        max_mel_frames = 960,  #Only relevant when clip_mels_length = True
 
 	#Mel spectrogram
 	fft_size = 1024,
 	hop_size = 256,
-	sample_rate = 16000, #22050 Hz (corresponding to ljspeech dataset)
+	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset)
 	frame_shift_ms = None,
 
 	#Mel and Linear spectrograms normalization/scaling and clipping
@@ -38,14 +39,13 @@ hparams = tf.contrib.training.HParams(
 	power = 1.55,
 	griffin_lim_iters = 60,
 
-
 	#Tacotron
 	outputs_per_step = 2, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them
 
 	embedding_dim = 512, #dimension of embedding space
 
-	enc_conv_num_layers = 5, #number of encoder convolutional layers
+	enc_conv_num_layers = 3, #number of encoder convolutional layers
 	enc_conv_kernel_size = (5, ), #size of encoder convolution filters for each layer
 	enc_conv_channels = 512, #number of encoder convolutions filters for each layer
 	encoder_lstm_units = 256, #number of lstm units for each direction (forward and backward)
@@ -101,7 +101,7 @@ hparams = tf.contrib.training.HParams(
 
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	tacotron_start_decay = 40000, #Step at which learning decay starts
-	tacotron_decay_steps = 25000, #starting point for learning rate decay (and determines the decay slope) (UNDER TEST)
+	tacotron_decay_steps = 40000, #starting point for learning rate decay (and determines the decay slope) (UNDER TEST)
 	tacotron_decay_rate = 0.4, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
 	tacotron_final_learning_rate = 1e-5, #minimal learning rate
@@ -122,43 +122,6 @@ hparams = tf.contrib.training.HParams(
 
 	#Eval sentences
 	sentences = [
-	# From July 8, 2017 New York Times:
-	# 'Scientists at the CERN laboratory say they have discovered a new particle.',
-	# 'There\'s a way to measure the acute emotional intelligence that has never gone out of style.',
-	# 'President Trump met with other leaders at the Group of 20 conference.',
-	# 'The Senate\'s bill to repeal and replace the Affordable Care Act is now imperiled.',
-	# From Google's Tacotron example page:
-	# 'Generative adversarial network or variational auto-encoder.',
-	# 'Basilar membrane and otolaryngology are not auto-correlations.',
-	# 'He has read the whole thing.',
-	# 'He reads books.',
-	# "Don't desert me here in the desert!",
-	# 'He thought it was time to present the present.',
-	# 'Thisss isrealy awhsome.',
-	# 'Punctuation sensitivity, is working.',
-	# 'Punctuation sensitivity is working.',
-	# "The buses aren't the problem, they actually provide a solution.",
-	# "The buses aren't the PROBLEM, they actually provide a SOLUTION.",
-	# "The quick brown fox jumps over the lazy dog.",
-	# "Does the quick brown fox jump over the lazy dog?",
-	# "Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?",
-	# "She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.",
-	# "The blue lagoon is a nineteen eighty American romance adventure film.",
-	# "Tajima Airport serves Toyooka.",
-	# 'Talib Kweli confirmed to AllHipHop that he will be releasing an album in the next year.',
-	#From Training data:
-	# 'the rest being provided with barrack beds, and in dimensions varying from thirty feet by fifteen to fifteen feet by ten.',
-	# 'in giltspur street compter, where he was first lodged.',
-	# 'a man named burnett came with his wife and took up his residence at whitchurch, hampshire, at no great distance from laverstock,',
-	# 'it appears that oswald had only one caller in response to all of his fpcc activities,',
-	# 'he relied on the absence of the strychnia.',
-	# 'scoggins thought it was lighter.',
-	# '''would, it is probable, have eventually overcome the reluctance of some of the prisoners at least, 
-	# and would have possessed so much moral dignity''',
-	# '''the only purpose of this whole sentence is to evaluate the scalability of the model for very long sentences. 
-	# This is not even a long sentence anymore, it has become an entire paragraph. 
-	# Should I stop now? Let\'s add this last sentence in which we talk about nothing special.''',
-	# 'Thank you so much for your support!!'
 	"yu2 jian4 jun1 : wei4 mei3 ge4 you3 cai2 neng2 de ren2 ti2 gong1 ping2 tai2 .",
 	"ta1 shi4 yin1 pin2 ling3 yu4 de tao2 bao3 tian1 mao1 , zai4 zhe4 ge4 ping2 tai2 shang4, ",
 	"mei3 ge4 nei4 rong2 sheng1 chan3 zhe3 dou1 ke3 yi3 hen3 fang1 bian4 de shi1 xian4 zi4 wo3 jia4 zhi2 , geng4 duo1 de ren2 yong1 you3 wei1 chuang4 ye4 de ji1 hui4 .",
