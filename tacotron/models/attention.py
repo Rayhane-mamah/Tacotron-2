@@ -159,7 +159,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 				name=name)
 
 		self.location_convolution = tf.layers.Conv1D(filters=hparams.attention_filters,
-			kernel_size=hparams.attention_kernel, padding='same', use_bias=False, 
+			kernel_size=hparams.attention_kernel, padding='same', use_bias=True,
 			name='location_features_convolution')
 		self.location_layer = tf.layers.Dense(units=num_units, use_bias=False, 
 			dtype=tf.float32, name='location_features_layer')
