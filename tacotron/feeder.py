@@ -38,7 +38,7 @@ class Feeder(threading.Thread):
 		self._linear_dir = os.path.join(os.path.dirname(metadata_filename), 'linear')
 		with open(metadata_filename, encoding='utf-8') as f:
 			self._metadata = [line.strip().split('|') for line in f]
-			frame_shift_ms = hparams.hop_size / hparams.sample_rate
+			frame_shift_ms = hparams.frame_shift_ms / 1000 if hparams.frame_shift_ms is not None else hparams.hop_size / hparams.sample_rate
 			hours = sum([int(x[4]) for x in self._metadata]) * frame_shift_ms / (3600)
 			log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(self._metadata), hours))
 

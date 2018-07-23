@@ -124,8 +124,8 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text):
 	#sanity check
 	assert linear_frames == mel_frames
 
-        if mel_frames > hparams.max_mel_frames and hparams.clip_mels_length:
-                return None
+	if mel_frames > hparams.max_mel_frames and hparams.clip_mels_length:
+		return None
 
 	#Ensure time resolution adjustement between audio and mel-spectrogram
 	l, r = audio.pad_lr(wav, hparams.fft_size, audio.get_hop_size())
@@ -139,6 +139,7 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text):
 	#ensure length of raw audio is multiple of hop size so that we can use
 	#transposed convolution to upsample
 	out = out[:mel_frames * audio.get_hop_size()]
+	time_steps = len(out)
 	assert time_steps % audio.get_hop_size() == 0
 
 	# Write the spectrogram and audio to disk

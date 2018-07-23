@@ -100,10 +100,14 @@ def _griffin_lim(S):
 	return y
 
 def _stft(y):
-	return librosa.stft(y=y, n_fft=hparams.fft_size, hop_length=get_hop_size())
+	hop_size = get_hop_size()
+	frame_size = hop_size * 4
+	return librosa.stft(y=y, n_fft=hparams.fft_size, win_length=frame_size, hop_length=hop_size)
 
 def _istft(y):
-	return librosa.istft(y, hop_length=get_hop_size())
+	hop_size = get_hop_size()
+	frame_size = hop_size * 4
+	return librosa.istft(y, win_length=frame_size, hop_length=hop_size)
 
 def num_frames(length, fsize, fshift):
 	"""Compute number of time frames of spectrogram
