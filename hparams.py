@@ -140,7 +140,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_start_decay = 50000, #Step at which learning decay starts
 	tacotron_decay_steps = 40000, #Determines the learning rate decay slope (UNDER TEST)
 	tacotron_decay_rate = 0.2, #learning rate decay rate (UNDER TEST)
-	tacotron_initial_learning_rate = 1e-3, #starting learning rate
+	tacotron_initial_learning_rate = 1e-4, #starting learning rate
 	tacotron_final_learning_rate = 1e-5, #minimal learning rate
 
 	tacotron_adam_beta1 = 0.9, #AdamOptimizer beta1 parameter
@@ -220,11 +220,9 @@ hparams = tf.contrib.training.HParams(
 	'it appears that oswald had only one caller in response to all of his fpcc activities,',
 	'he relied on the absence of the strychnia.',
 	'scoggins thought it was lighter.',
-	'''would, it is probable, have eventually overcome the reluctance of some of the prisoners at least, 
-	and would have possessed so much moral dignity''',
-	'''Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization. 
-	This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that 
-	the adopted architecture is able to perform this task with wild success.''',
+	#fix bugs in test sentences
+	'would, it is probable, have eventually overcome the reluctance of some of the prisoners at least, and would have possessed so much moral dignity',
+	'Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization.	This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that the adopted architecture is able to perform this task with wild success.',
 	'Thank you so much for your support!',
 	]
 

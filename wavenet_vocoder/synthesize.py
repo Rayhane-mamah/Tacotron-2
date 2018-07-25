@@ -1,3 +1,4 @@
+# bugfix
 import argparse
 import os
 from hparams import hparams, hparams_debug_string
@@ -24,9 +25,12 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 		with open(metadata_filename, encoding='utf-8') as f:
 			metadata = [line.strip().split('|') for line in f]
 			frame_shift_ms = hparams.hop_size / hparams.sample_rate
-			hours = sum([int(x[-1]) for x in metadata]) * frame_shift_ms / (3600)
-			log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(metadata), hours))
+			#hours = sum([int(x[-1]) for x in metadata]) * frame_shift_ms / (3600)
+			#hours = sum([eval(x[-1]) for x in metadata]) * frame_shift_ms / (3600) #x[-1] is the path of a numpy file
+			#log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(metadata), hours))
 
+		#print(metadata)
+		metadata = [x for x in metadata if len(x) == 2] #skip broken lists
 		metadata = np.array(metadata)
 		mel_files = metadata[:, 1]
 		texts = metadata[:, 0]
