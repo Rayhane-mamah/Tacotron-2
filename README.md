@@ -131,7 +131,7 @@ Feature prediction model can **separately** be **trained** using:
 
 > python train.py --model='Tacotron'
 
-checkpoints will be made each **250 steps** and stored under **logs-Tacotron folder.**
+checkpoints will be made each **5000 steps** and stored under **logs-Tacotron folder.**
 
 Naturally, **training the wavenet separately** is done by:
 
