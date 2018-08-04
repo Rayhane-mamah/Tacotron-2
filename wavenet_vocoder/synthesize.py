@@ -28,11 +28,13 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 			log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(metadata), hours))
 
 		metadata = np.array(metadata)
+		speaker_ids = metadata[:, 2]
 		mel_files = metadata[:, 1]
 		texts = metadata[:, 0]
 	else:
 		#else Get all npy files in input_dir (supposing they are mels)
 		mel_files  = [os.path.join(args.mels_dir, f) for f in os.listdir(args.mels_dir) if f.split('.')[-1] == 'npy']
+		speaker_ids = args.speaker_id
 		texts = None
 
 	log('Starting synthesis! (this will take a while..)')
@@ -42,7 +44,9 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	with open(os.path.join(wav_dir, 'map.txt'), 'w') as file:
 		for i, mel_file in enumerate(tqdm(mel_files)):
 			mel_spectro = np.load(mel_file)
-			audio_file = synth.synthesize(mel_spectro, None, i+1, wav_dir, log_dir)
+			basename = mel_file.replace('.npy', '')
+			speaker_id = speaker_ids[i]
+			audio_file = synth.synthesize(mel_spectro, speaker_id, basename, wav_dir, log_dir)
 
 			if texts is None:
 				file.write('{}|{}\n'.format(mel_file, audio_file))

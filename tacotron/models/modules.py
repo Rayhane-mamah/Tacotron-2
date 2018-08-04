@@ -15,6 +15,73 @@ def conv1d(inputs, kernel_size, channels, activation, is_training, drop_rate, sc
 								name='dropout_{}'.format(scope))
 
 
+def post_cbhg(inputs, input_dim, is_training):
+  return cbhg(
+    inputs,
+    None,
+    is_training,
+    scope='post_cbhg',
+    K=8,
+    projections=[256, input_dim])
+
+def cbhg(inputs, input_lengths, is_training, scope, K, projections):
+  with tf.variable_scope(scope):
+    with tf.variable_scope('conv_bank'):
+      # Convolution bank: concatenate on the last axis to stack channels from all convolutions
+      conv_outputs = tf.concat(
+        [conv1d(inputs, k, 128, tf.nn.relu, is_training, 0., 'conv1d_%d' % k) for k in range(1, K+1)],
+        axis=-1
+      )
+
+    # Maxpooling:
+    maxpool_output = tf.layers.max_pooling1d(
+      conv_outputs,
+      pool_size=2,
+      strides=1,
+      padding='same')
+
+    # Two projection layers:
+    proj1_output = conv1d(maxpool_output, 3, projections[0], tf.nn.relu, is_training, 0., 'proj_1')
+    proj2_output = conv1d(proj1_output, 3, projections[1], lambda _: _, is_training, 0., 'proj_2')
+
+    # Residual connection:
+    highway_input = proj2_output + inputs
+
+    # Handle dimensionality mismatch:
+    if highway_input.shape[2] != 128:
+      highway_input = tf.layers.dense(highway_input, 128)
+
+    # 4-layer HighwayNet:
+    for i in range(4):
+      highway_input = highwaynet(highway_input, 'highway_%d' % (i+1))
+    rnn_input = highway_input
+
+    # Bidirectional RNN
+    outputs, states = tf.nn.bidirectional_dynamic_rnn(
+      tf.nn.rnn_cell.GRUCell(128),
+      tf.nn.rnn_cell.GRUCell(128),
+      rnn_input,
+      sequence_length=input_lengths,
+      dtype=tf.float32)
+    return tf.concat(outputs, axis=2)  # Concat forward and backward
+
+
+def highwaynet(inputs, scope):
+  with tf.variable_scope(scope):
+    H = tf.layers.dense(
+      inputs,
+      units=128,
+      activation=tf.nn.relu,
+      name='H')
+    T = tf.layers.dense(
+      inputs,
+      units=128,
+      activation=tf.nn.sigmoid,
+      name='T',
+      bias_initializer=tf.constant_initializer(-1.0))
+    return H * T + inputs * (1.0 - T)
+
+
 class ZoneoutLSTMCell(tf.nn.rnn_cell.RNNCell):
 	'''Wrapper for tf LSTM to create Zoneout LSTM Cell
 
@@ -373,3 +440,33 @@ def MaskedSigmoidCrossEntropy(targets, outputs, targets_lengths, hparams, mask=N
 		masked_loss = losses * mask
 
 	return tf.reduce_sum(masked_loss) / tf.count_nonzero(masked_loss, dtype=tf.float32)
+
+def MaskedLinearLoss(targets, outputs, targets_lengths, hparams, mask=None):
+	'''Computes a masked MAE loss with priority to low frequencies
+	'''
+
+	#[batch_size, time_dimension, 1]
+	#example:
+	#sequence_mask([1, 3, 2], 5) = [[[1., 0., 0., 0., 0.]],
+	#							    [[1., 1., 1., 0., 0.]],
+	#							    [[1., 1., 0., 0., 0.]]]
+	#Note the maxlen argument that ensures mask shape is compatible with r>1
+	#This will by default mask the extra paddings caused by r>1
+	if mask is None:
+		mask = sequence_mask(targets_lengths, hparams.outputs_per_step, True)
+
+	#[batch_size, time_dimension, channel_dimension(freq)]
+	ones = tf.ones(shape=[tf.shape(mask)[0], tf.shape(mask)[1], tf.shape(targets)[-1]], dtype=tf.float32)
+	mask_ = mask * ones
+
+	l1 = tf.abs(targets - outputs)
+	n_priority_freq = int(2000 / (hparams.sample_rate * 0.5) * hparams.num_freq)
+
+	with tf.control_dependencies([tf.assert_equal(tf.shape(targets), tf.shape(mask_))]):
+		masked_l1 = l1 * mask_
+		masked_l1_low = masked_l1[:,:,0:n_priority_freq]
+
+	mean_l1 = tf.reduce_sum(masked_l1) / tf.reduce_sum(mask_)
+	mean_l1_low = tf.reduce_sum(masked_l1_low) / tf.reduce_sum(mask_)
+
+	return 0.5 * mean_l1 + 0.5 * mean_l1_low

@@ -98,9 +98,10 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 			text = meta[5]
 			mel_filename = os.path.join(mel_dir, meta[1])
 			wav_filename = os.path.join(wav_dir, meta[0])
-			mel_output_filename = synth.synthesize(text, i+1, synth_dir, None, mel_filename)
+			basename = os.path.basename(mel_filename).replace('.npy', '')
+			mel_output_filename, speaker_id = synth.synthesize(text, basename, synth_dir, None, mel_filename)
 
-			file.write('{}|{}|{}|{}\n'.format(wav_filename, mel_filename, mel_output_filename, text))
+			file.write('{}|{}|{}|{}|{}\n'.format(wav_filename, mel_filename, mel_output_filename, speaker_id, text))
 	log('synthesized mel spectrograms at {}'.format(synth_dir))
 	return os.path.join(synth_dir, 'map.txt')
 

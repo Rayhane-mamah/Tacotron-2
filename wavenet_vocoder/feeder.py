@@ -20,13 +20,15 @@ class Feeder:
 	def __init__(self, coordinator, metadata_filename, base_dir, hparams):
 		super(Feeder, self).__init__()
 
-		if hparams.gin_channels > 0:
-			raise NotImplementedError('Global conditioning preprocessing has not been added yet, it will be out soon. Thanks for your patience!')
-
 		self._coord = coordinator
 		self._hparams = hparams
 		self._train_offset = 0
 		self._test_offset = 0
+
+		if hparams.symmetric_mels:
+			self._spec_pad = -(hparams.max_abs_value + .1)
+		else:
+			self._spec_pad = -0.1
 
 		#Base directory of the project (to map files from different locations)
 		self._base_dir = base_dir
@@ -87,7 +89,7 @@ class Feeder:
 				self._placeholders.append(tf.placeholder(tf.float32, shape=(None, hparams.num_mels, None), name='local_condition_features'))
 				queue_types.append(tf.float32)
 			if self.global_condition:
-				self._placeholders.append(tf.placeholder(tf.int32, shape=(), name='global_condition_features'))
+				self._placeholders.append(tf.placeholder(tf.int32, shape=(None, 1), name='global_condition_features'))
 				queue_types.append(tf.int32)
 
 			# Create queue for buffering data
@@ -172,7 +174,12 @@ class Feeder:
 		else:
 			local_condition_features = None
 
-		global_condition_features = None
+		if self.global_condition:
+			global_condition_features = meta[3]
+			if global_condition_features == '<no_g>':
+				raise RuntimeError('Please redo the wavenet preprocessing (or GTA synthesis) to assign global condition features!')
+		else:
+			global_condition_features = None
 
 		return (input_data, local_condition_features, global_condition_features, len(input_data))
 
@@ -239,7 +246,12 @@ class Feeder:
 		else:
 			local_condition_features = None
 			
-		global_condition_features = None
+		if self.global_condition:
+			global_condition_features = meta[3]
+			if global_condition_features == '<no_g>':
+				raise RuntimeError('Please redo the wavenet preprocessing (or GTA synthesis) to assign global condition features!')
+		else:
+			global_condition_features = None
 
 		return (input_data, local_condition_features, global_condition_features, len(input_data))
 
@@ -306,7 +318,7 @@ class Feeder:
 
 	def _prepare_global_conditions(self, global_condition, g_features):
 		if global_condition:
-			g_batch = g_features
+			g_batch = np.array(g_features).astype(np.int32).reshape(-1, 1)
 		else:
 			g_batch = None
 		return g_batch
@@ -333,6 +345,8 @@ class Feeder:
 			new_batch = []
 			for b in batch:
 				x, c, g, l = b
+				if len(x) % len(c) != 0 and len(x) % (len(c) + 1) == 0:
+					c = self._pad_specs(c, len(c) + 1) 
 				self._assert_ready_for_upsample(x, c)
 				if max_time_steps is not None:
 					max_steps = _ensure_divisible(max_time_steps, audio.get_hop_size(self._hparams), True)
@@ -360,6 +374,8 @@ class Feeder:
 	def _assert_ready_for_upsample(self, x, c):
 		assert len(x) % len(c) == 0 and len(x) // len(c) == audio.get_hop_size(self._hparams)
 
+	def _pad_specs(self, x, maxlen):
+		return np.pad(x, [(0, maxlen - x.shape[0]), (0, 0)], mode='constant', constant_values=self._spec_pad)
 
 def _pad_inputs(x, maxlen):
 	return np.pad(x, [(0, maxlen - len(x)), (0, 0)], mode='constant', constant_values=_pad)

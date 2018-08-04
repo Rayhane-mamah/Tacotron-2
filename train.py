@@ -56,6 +56,8 @@ def train(args, log_dir, hparams):
 			raise('Error occured while training Tacotron, Exiting!')
 		taco_state = 1
 		save_seq(state_file, [taco_state, GTA_state, wave_state], input_path)
+	else:
+		checkpoint = os.path.join(log_dir, 'taco_pretrained/')
 
 	if not GTA_state:
 		log('\n#############################################################\n')
@@ -64,6 +66,8 @@ def train(args, log_dir, hparams):
 		input_path = tacotron_synthesize(args, hparams, checkpoint)
 		GTA_state = 1
 		save_seq(state_file, [taco_state, GTA_state, wave_state], input_path)
+	else:
+		input_path = os.path.join('tacotron_' + args.output_dir, 'gta', 'map.txt')
 
 	if input_path == '' or input_path is None:
 		raise RuntimeError('input_path has an unpleasant value -> {}'.format(input_path))
@@ -101,12 +105,12 @@ def main():
 		help='Steps between writing checkpoints')
 	parser.add_argument('--eval_interval', type=int, default=10000,
 		help='Steps between eval on test data')
-	parser.add_argument('--tacotron_train_steps', type=int, default=20000, help='total number of tacotron training steps')
-	parser.add_argument('--wavenet_train_steps', type=int, default=360000, help='total number of wavenet training steps')
+	parser.add_argument('--tacotron_train_steps', type=int, default=320000, help='total number of tacotron training steps')
+	parser.add_argument('--wavenet_train_steps', type=int, default=1300000, help='total number of wavenet training steps')
 	parser.add_argument('--tf_log_level', type=int, default=1, help='Tensorflow C++ log level.')
 	args = parser.parse_args()
 
-	accepted_models = ['Tacotron', 'WaveNet', 'Both', 'Tacotron-2']
+	accepted_models = ['Tacotron', 'WaveNet', 'Tacotron-2']
 
 	if args.model not in accepted_models:
 		raise ValueError('please enter a valid model to train: {}'.format(accepted_models))
@@ -117,7 +121,7 @@ def main():
 		tacotron_train(args, log_dir, hparams)
 	elif args.model == 'WaveNet':
 		wavenet_train(args, log_dir, hparams, args.wavenet_input)
-	elif args.model in ('Both', 'Tacotron-2'):
+	elif args.model == 'Tacotron-2':
 		train(args, log_dir, hparams)
 	else:
 		raise ValueError('Model provided {} unknown! {}'.format(args.model, accepted_models))

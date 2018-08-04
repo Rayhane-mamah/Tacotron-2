@@ -15,30 +15,30 @@ hparams = tf.contrib.training.HParams(
 
 	#Audio
 	num_mels = 80, #Number of mel-spectrogram channels and local conditioning dimensionality
-	num_freq = 513, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
+	num_freq = 1025, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
 	rescale = True, #Whether to rescale audio prior to preprocessing
 	rescaling_max = 0.999, #Rescaling value
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
 	clip_mels_length = True, #For cases of OOM (Not really recommended, working on a workaround)
-	max_mel_frames = 900,  #Only relevant when clip_mels_length = True
+	max_mel_frames = 1100,  #Only relevant when clip_mels_length = True
 
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
 	# Does not work if n_ffit is not multiple of hop_size!!
-	use_lws=True,
+	use_lws=False,
 	silence_threshold=2, #silence threshold used for sound trimming for wavenet preprocessing
 
 	#Mel spectrogram
-	n_fft = 1024, #Extra window size is filled with 0 paddings to match this parameter
-	hop_size = 256, #For 22050Hz, 275 ~= 12.5 ms
-	win_size = None, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
-	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset)
+	n_fft = 2048, #Extra window size is filled with 0 paddings to match this parameter
+	hop_size = 300, #For 22050Hz, 275 ~= 12.5 ms
+	win_size = 1200, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
+	sample_rate = 24000, #22050 Hz (corresponding to ljspeech dataset)
 	frame_shift_ms = None,
 
 	#M-AILABS (and other datasets) trim params
 	trim_fft_size = 512,
 	trim_hop_size = 128,
-	trim_top_db = 60,
+	trim_top_db = 23,
 
 	#Mel and Linear spectrograms normalization/scaling and clipping
 	signal_normalization = True,
@@ -49,11 +49,11 @@ hparams = tf.contrib.training.HParams(
 	#Limits
 	min_level_db = -100,
 	ref_level_db = 20,
-	fmin = 25, #Set this to 75 if your speaker is male! if female, 125 should help taking off noise. (To test depending on dataset)
+	fmin = 0, #Set this to 75 if your speaker is male! if female, 125 should help taking off noise. (To test depending on dataset)
 	fmax = 7600, 
 
 	#Griffin Lim
-	power = 1.2, 
+	power = 1.5, 
 	griffin_lim_iters = 60,
 	###########################################################################################################################################
 
@@ -77,17 +77,17 @@ hparams = tf.contrib.training.HParams(
 	prenet_layers = [256, 256], #number of layers and number of units of prenet
 	decoder_layers = 2, #number of decoder lstm layers
 	decoder_lstm_units = 1024, #number of decoder lstm units on each layer
-	max_iters = 2500, #Max decoder steps during inference (Just for safety from infinite loop cases)
+	max_iters = 1000, #Max decoder steps during inference (Just for safety from infinite loop cases)
 
 	postnet_num_layers = 5, #number of postnet convolutional layers
 	postnet_kernel_size = (5, ), #size of postnet convolution filters for each layer
 	postnet_channels = 512, #number of postnet convolution filters for each layer
 
-	mask_encoder = True, #whether to mask encoder padding while computing attention
-	mask_decoder = True, #Whether to use loss mask for padded sequences (if False, <stop_token> loss function will not be weighted, else recommended pos_weight = 20)
+	mask_encoder = False, #whether to mask encoder padding while computing attention
+	mask_decoder = False, #Whether to use loss mask for padded sequences (if False, <stop_token> loss function will not be weighted, else recommended pos_weight = 20)
 
-	cross_entropy_pos_weight = 20, #Use class weights to reduce the stop token classes imbalance (by adding more penalty on False Negatives (FN)) (1 = disabled)
-	predict_linear = False, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
+	cross_entropy_pos_weight = 1, #Use class weights to reduce the stop token classes imbalance (by adding more penalty on False Negatives (FN)) (1 = disabled)
+	predict_linear = True, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
 	###########################################################################################################################################
 
 
@@ -105,8 +105,8 @@ hparams = tf.contrib.training.HParams(
 	log_scale_min=float(np.log(1e-14)), #Mixture of logistic distributions minimal log scale
 
 	out_channels = 10 * 3, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale)
-	layers = 24, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
-	stacks = 4, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
+	layers = 30, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
+	stacks = 3, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
 	residual_channels = 512,
 	gate_channels = 512, #split in 2 in gated convolutions
 	skip_out_channels = 256,
@@ -114,21 +114,24 @@ hparams = tf.contrib.training.HParams(
 
 	cin_channels = 80, #Set this to -1 to disable local conditioning, else it must be equal to num_mels!!
 	upsample_conditional_features = True, #Whether to repeat conditional features or upsample them (The latter is recommended)
-	upsample_scales = [16, 16], #prod(scales) should be equal to hop size
+	upsample_scales = [5, 5, 4, 3], #prod(scales) should be equal to hop size
 	freq_axis_kernel_size = 3,
 
-	gin_channels = -1, #Set this to -1 to disable global conditioning, Only used for multi speaker dataset
+	gin_channels = -1, #Set this to -1 to disable global conditioning, Only used for multi speaker dataset. It defines the depth of the embeddings (Recommended: 512)
+	use_speaker_embedding = True, #whether to make a speaker embedding
+	n_speakers = 6, #number of speakers (rows of the embedding)
+
 	use_bias = True, #Whether to use bias in convolutional layers of the Wavenet
 
 	max_time_sec = None,
-	max_time_steps = 13000, #Max time steps in audio used to train wavenet (decrease to save memory)
+	max_time_steps = 8000, #Max time steps in audio used to train wavenet (decrease to save memory)
 	###########################################################################################################################################
 
 	#Tacotron Training
 	tacotron_random_seed = 5339, #Determines initial graph and operations (i.e: model) random state for reproducibility
 	tacotron_swap_with_cpu = False, #Whether to use cpu as support to gpu for decoder computation (Not recommended: may cause major slowdowns! Only use when critical!)
 
-	tacotron_batch_size = 48, #number of training samples on each training steps
+	tacotron_batch_size = 32, #number of training samples on each training steps
 	tacotron_reg_weight = 1e-6, #regularization weight (for L2 regularization)
 	tacotron_scale_regularization = True, #Whether to rescale regularization weight to adapt for outputs range (used when reg_weight is high and biasing the model)
 
@@ -138,8 +141,8 @@ hparams = tf.contrib.training.HParams(
 
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	tacotron_start_decay = 50000, #Step at which learning decay starts
-	tacotron_decay_steps = 40000, #Determines the learning rate decay slope (UNDER TEST)
-	tacotron_decay_rate = 0.2, #learning rate decay rate (UNDER TEST)
+	tacotron_decay_steps = 50000, #Determines the learning rate decay slope (UNDER TEST)
+	tacotron_decay_rate = 0.4, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
 	tacotron_final_learning_rate = 1e-5, #minimal learning rate
 
@@ -150,6 +153,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_zoneout_rate = 0.1, #zoneout rate for all LSTM cells in the network
 	tacotron_dropout_rate = 0.5, #dropout rate for all convolutional layers + prenet
 
+	tacotron_clip_gradients = False, #whether to clip gradients
 	natural_eval = False, #Whether to use 100% natural eval (to evaluate Curriculum Learning performance) or with same teacher-forcing ratio as in training (just for overfit)
 
 	#Decoder RNN learning can take be done in one of two ways:
@@ -176,10 +180,10 @@ hparams = tf.contrib.training.HParams(
 	wavenet_test_batches = None, #number of test batches.
 	wavenet_data_random_state = 1234, #random state for train test split repeatability
 
-	wavenet_learning_rate = 1e-4,
+	wavenet_learning_rate = 1e-3,
 	wavenet_adam_beta1 = 0.9,
 	wavenet_adam_beta2 = 0.999,
-	wavenet_adam_epsilon = 1e-6,
+	wavenet_adam_epsilon = 1e-8,
 
 	wavenet_ema_decay = 0.9999, #decay rate of exponential moving average
 
