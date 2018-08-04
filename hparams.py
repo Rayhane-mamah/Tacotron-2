@@ -43,7 +43,7 @@ hparams = tf.contrib.training.HParams(
 	#Mel and Linear spectrograms normalization/scaling and clipping
 	signal_normalization = True,
 	allow_clipping_in_normalization = True, #Only relevant if mel_normalization = True
-	symmetric_mels = True, #Whether to scale the data to be symmetric around 0
+	symmetric_mels = False, #Whether to scale the data to be symmetric around 0
 	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max] 
 
 	#Limits
