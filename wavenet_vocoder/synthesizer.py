@@ -29,7 +29,7 @@ class Synthesizer:
 			log('Loading checkpoint: {}'.format(checkpoint_path))
 			self.session = tf.Session()
 			self.session.run(tf.global_variables_initializer())
-			load_averaged_model(self.session, sh_saver, checkpoint_path)
+		load_averaged_model(self.session, sh_saver, checkpoint_path)
 
 	def synthesize(self, mel_spectrogram, speaker_id, index, out_dir, log_dir):
 		hparams = self._hparams
