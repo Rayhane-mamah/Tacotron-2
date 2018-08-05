@@ -44,7 +44,7 @@ class Feeder:
 			test_size=test_size, random_state=hparams.tacotron_data_random_state)
 
 		#Make sure test_indices is a multiple of batch_size else round up
-		len_test_indices = self._round_up(len(test_indices), hparams.tacotron_batch_size)
+		len_test_indices = self._round_up(len(test_indices), hparams.tacotron_batch_size) - hparams.tacotron_batch_size
 		extra_test = test_indices[len_test_indices:]
 		test_indices = test_indices[:len_test_indices]
 		train_indices = np.concatenate([train_indices, extra_test])

@@ -15,7 +15,7 @@ class Synthesizer:
 		local_cond, global_cond = self._check_conditions()
 
 		self.local_conditions = tf.placeholder(tf.float32, shape=[1, None, hparams.num_mels], name='local_condition_features') if local_cond else None
-		self.global_conditions = tf.placeholder(tf.int32, shape=(), name='global_condition_features') if global_cond else None
+		self.global_conditions = tf.placeholder(tf.int32, shape=(1, 1), name='global_condition_features') if global_cond else None
 		self.synthesis_length = tf.placeholder(tf.int32, shape=(), name='synthesis_length') if not local_cond else None
 
 		with tf.variable_scope('model') as scope:
@@ -50,12 +50,12 @@ class Synthesizer:
 		generated_wav = self.session.run(self.model.y_hat, feed_dict=feed_dict)
 
 		#Save wav to disk
-		audio_filename = os.path.join(out_dir, 'speech-audio-{:05d}.wav'.format(index))
+		audio_filename = os.path.join(out_dir, 'wavenet-audio-{}.wav'.format(index))
 		save_wav(generated_wav, audio_filename, sr=hparams.sample_rate)
 
 		#Save waveplot to disk
 		if log_dir is not None:
-			plot_filename = os.path.join(log_dir, 'speech-waveplot-{:05d}.png'.format(index))
+			plot_filename = os.path.join(log_dir, 'wavenet-waveplot-{}.png'.format(index))
 			util.waveplot(plot_filename, generated_wav, None, hparams)
 
 		return audio_filename

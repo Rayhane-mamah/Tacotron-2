@@ -66,6 +66,9 @@ Note:
 - In the previous tree, files **were not represented** and **max depth was set to 3** for simplicity.
 - If you run training of both **models at the same time**, repository structure will be different.
 
+# Pretrained model and Samples:
+Pre-trained models and audio samples will be added at a later date. You can however check some primary insights of the model performance (at early stages of training) [here](https://github.com/Rayhane-mamah/Tacotron-2/issues/4#issuecomment-378741465). THIS IS VERY OUTDATED, I WILL UPDATE THIS SOON
+
 # Model Architecture:
 <p align="center">
   <img src="https://preview.ibb.co/bU8sLS/Tacotron_2_Architecture.png"/>
@@ -97,6 +100,11 @@ We are also running current tests on the [new M-AILABS speech dataset](http://ww
 
 After **downloading** the dataset, **extract** the compressed file, and **place the folder inside the cloned repository.**
 
+# Hparams setting:
+Before proceeding, you must pick the hyperparameters that suit best your needs. While it is possible to change the hyper parameters from command line during preprocessing/training, I still recommend making the changes once and for all on the **hparams.py** file directly.
+
+To pick optimal fft parameters, I have made a **griffin_lim_synthesis_tool** notebook that you can use to invert real extracted mel/linear spectrograms and choose how good your preprocessing is. All other options are well explained in the **hparams.py** and have meaningful names so that you can try multiple things with them.
+
 # Preprocessing
 Before running the following steps, please make sure you are inside **Tacotron-2 folder**
 
@@ -123,15 +131,12 @@ To **train both models** sequentially (one after the other):
 
 > python train.py --model='Tacotron-2'
 
-or:
-
-> python train.py --model='Both'
 
 Feature prediction model can **separately** be **trained** using:
 
 > python train.py --model='Tacotron'
 
-checkpoints will be made each **250 steps** and stored under **logs-Tacotron folder.**
+checkpoints will be made each **5000 steps** and stored under **logs-Tacotron folder.**
 
 Naturally, **training the wavenet separately** is done by:
 
@@ -142,6 +147,7 @@ logs will be stored inside **logs-Wavenet**.
 **Note:**
 - If model argument is not provided, training will default to Tacotron-2 model training. (both models)
 - Please refer to train arguments under [train.py](https://github.com/Rayhane-mamah/Tacotron-2/blob/master/train.py) for a set of options you can use.
+- It is now possible to make wavenet preprocessing alone using **wavenet_proprocess.py**.
 
 # Synthesis
 To **synthesize audio** in an **End-to-End** (text to audio) manner (both models at work):
@@ -170,9 +176,6 @@ Synthesizing the **waveforms** conditionned on previously synthesized Mel-spectr
 **Note:**
 - If model argument is not provided, synthesis will default to Tacotron-2 model synthesis. (End-to-End TTS)
 - Please refer to synthesis arguments under [synthesize.py](https://github.com/Rayhane-mamah/Tacotron-2/blob/master/synthesize.py) for a set of options you can use.
-
-# Pretrained model and Samples:
-Pre-trained models and audio samples will be added at a later date. You can however check some primary insights of the model performance (at early stages of training) [here](https://github.com/Rayhane-mamah/Tacotron-2/issues/4#issuecomment-378741465).
 
 
 # References and Resources:

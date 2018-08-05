@@ -143,15 +143,9 @@ class Tacotron():
 
 
 			if post_condition:
-				#Based on https://github.com/keithito/tacotron/blob/tacotron2-work-in-progress/models/tacotron.py
-				#Post-processing Network to map mels to linear spectrograms using same architecture as the encoder
-				post_processing_cell = TacotronEncoderCell(
-				EncoderConvolutions(is_training, hparams=hp, scope='post_processing_convolutions'),
-				EncoderRNN(is_training, size=hp.encoder_lstm_units,
-					zoneout=hp.tacotron_zoneout_rate, scope='post_processing_LSTM'))
-
-				expand_outputs = post_processing_cell(mel_outputs)
-				linear_outputs = FrameProjection(hp.num_freq, scope='post_processing_projection')(expand_outputs)
+				# Add post-processing CBHG:
+			    post_outputs = post_cbhg(mel_outputs, hp.num_mels, is_training)           # [N, T_out, 256]
+			    linear_outputs = tf.layers.dense(post_outputs, hp.num_freq) 
 
 			#Grab alignments from the final decoder state
 			alignments = tf.transpose(final_decoder_state.alignment_history.stack(), [1, 2, 0])
@@ -202,6 +196,13 @@ class Tacotron():
 				#Compute <stop_token> loss (for learning dynamic generation stop)
 				stop_token_loss = MaskedSigmoidCrossEntropy(self.stop_token_targets,
 					self.stop_token_prediction, self.targets_lengths, hparams=self._hparams)
+				#Compute masked linear loss
+				if hp.predict_linear:
+					#Compute Linear L1 mask loss (priority to low frequencies)
+					linear_loss = MaskedLinearLoss(self.linear_targets, self.linear_outputs,
+						self.targets_lengths, hparams=self._hparams)
+				else:
+					linear_loss=0.
 			else:
 				# Compute loss of predictions before postnet
 				before = tf.losses.mean_squared_error(self.mel_targets, self.decoder_output)
@@ -212,15 +213,15 @@ class Tacotron():
 					labels=self.stop_token_targets,
 					logits=self.stop_token_prediction))
 
-			if hp.predict_linear:
-				#Compute linear loss
-				#From https://github.com/keithito/tacotron/blob/tacotron2-work-in-progress/models/tacotron.py
-				#Prioritize loss for frequencies under 2000 Hz.
-				l1 = tf.abs(self.linear_targets - self.linear_outputs)
-				n_priority_freq = int(2000 / (hp.sample_rate * 0.5) * hp.num_mels)
-				linear_loss = 0.5 * tf.reduce_mean(l1) + 0.5 * tf.reduce_mean(l1[:,:,0:n_priority_freq])
-			else:
-				linear_loss = 0.
+				if hp.predict_linear:
+					#Compute linear loss
+					#From https://github.com/keithito/tacotron/blob/tacotron2-work-in-progress/models/tacotron.py
+					#Prioritize loss for frequencies under 2000 Hz.
+					l1 = tf.abs(self.linear_targets - self.linear_outputs)
+					n_priority_freq = int(2000 / (hp.sample_rate * 0.5) * hp.num_freq)
+					linear_loss = 0.5 * tf.reduce_mean(l1) + 0.5 * tf.reduce_mean(l1[:,:,0:n_priority_freq])
+				else:
+					linear_loss = 0.
 
 			# Compute the regularization weight
 			if hp.tacotron_scale_regularization:
@@ -264,7 +265,10 @@ class Tacotron():
 			self.gradients = gradients
 			#Just for causion
 			#https://github.com/Rayhane-mamah/Tacotron-2/issues/11
-			clipped_gradients, _ = tf.clip_by_global_norm(gradients, 1.)
+			if hp.tacotron_clip_gradients:
+				clipped_gradients, _ = tf.clip_by_global_norm(gradients, 1.)
+			else:
+				clipped_gradients = gradients
 
 			# Add dependency on UPDATE_OPS; otherwise batchnorm won't work correctly. See:
 			# https://github.com/tensorflow/tensorflow/issues/1122
