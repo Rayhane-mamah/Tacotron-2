@@ -81,7 +81,7 @@ def main():
 		_ = tacotron_synthesize(args, hparams, taco_checkpoint, sentences)
 	elif args.model == 'WaveNet':
 		wavenet_synthesize(args, hparams, wave_checkpoint)
-	elif args.model in ('Both', 'Tacotron-2'):
+	elif args.model in 'Tacotron-2':
 		synthesize(args, hparams, taco_checkpoint, wave_checkpoint, sentences)
 	else:
 		raise ValueError('Model provided {} unknown! {}'.format(args.model, accepted_models))

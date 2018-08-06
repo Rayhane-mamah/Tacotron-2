@@ -1,8 +1,10 @@
 import numpy as np 
 import tensorflow as tf 
 
-from .modules import Conv1d1x1, ResidualConv1dGLU, ConvTranspose2d, Embedding, ReluActivation, DiscretizedMixtureLogisticLoss, MaskedCrossEntropyLoss
+from .modules import Conv1d1x1, ResidualConv1dGLU, ConvTranspose2d, Embedding, ReluActivation, LeakyReluActivation
+from .modules import DiscretizedMixtureLogisticLoss, MaskedCrossEntropyLoss, GaussianMaximumLikelihoodEstimation
 from .mixture import sample_from_discretized_mix_logistic
+from .gaussian import sample_from_gaussian
 from wavenet_vocoder.util import *
 from infolog import log
 from wavenet_vocoder import util
@@ -130,10 +132,12 @@ class WaveNet():
 			self.upsample_conv = []
 			for i, s in enumerate(hparams.upsample_scales):
 				with tf.variable_scope('local_conditioning_upsampling_{}'.format(i+1)):
-					convt = ConvTranspose2d(1, (hparams.freq_axis_kernel_size ,s),
+					convt = ConvTranspose2d(1, (hparams.freq_axis_kernel_size, 2 * s),
 						padding='same', strides=(1, s))
 					self.upsample_conv.append(convt)
-					ReluActivation(name='upsample_relu_{}'.format(i+1))
+					self.upsample_conv.append(LeakyReluActivation(alpha=hparams.leaky_alpha,
+						name='upsample_leaky_relu_{}'.format(i+1)))
+					#self.upsample_conv.append(ReluActivation(name='upsample_relu_{}'.format(i+1)))
 
 			self.all_convs += self.upsample_conv
 		else:
@@ -180,6 +184,13 @@ class WaveNet():
 				self.y = y
 				self.input_lengths = input_lengths
 
+				#Add mean and scale stats if using Guassian distribution output (there would be too many logistics if using MoL)
+				if self._hparams.out_channels == 2:
+					self.means = self.y_hat[:, 0, :]
+					self.scales = self.y_hat[:, 1, :]
+				else:
+					self.means = None
+
 				#Graph extension for log saving
 				#[batch_size, time_length]
 				shape_control = (batch_size, tf.shape(x)[-1], 1)
@@ -202,8 +213,12 @@ class WaveNet():
 
 				else:
 					#[batch_size, time_length]
-					y_hat_log = sample_from_discretized_mix_logistic(
-						y_hat_log, log_scale_min=hparams.log_scale_min)
+					if hparams.out_channels == 2:
+						y_hat_log = sample_from_gaussian(
+							y_hat_log, log_scale_min_gauss=hparams.log_scale_min_gauss)
+					else:
+						y_hat_log = sample_from_discretized_mix_logistic(
+							y_hat_log, log_scale_min=hparams.log_scale_min)
 
 					if is_mulaw(hparams.input_type):
 						y_hat_log = util.inv_mulaw(y_hat_log, hparams.quantize_channels)
@@ -352,12 +367,18 @@ class WaveNet():
 				if is_mulaw_quantize(self._hparams.input_type):
 					self.loss = MaskedCrossEntropyLoss(self.y_hat_q[:, :-1, :], self.y[:, 1:], mask=self.mask)
 				else:
-					self.loss = DiscretizedMixtureLogisticLoss(self.y_hat[:, :, :-1], self.y[:, 1:, :], hparams=self._hparams, mask=self.mask)
+					if self._hparams.out_channels == 2:
+						self.loss = GaussianMaximumLikelihoodEstimation(self.y_hat[:, :, :-1], self.y[:, 1:, :], hparams=self._hparams, mask=self.mask)
+					else:
+						self.loss = DiscretizedMixtureLogisticLoss(self.y_hat[:, :, :-1], self.y[:, 1:, :], hparams=self._hparams, mask=self.mask)
 			elif self.is_evaluating:
 				if is_mulaw_quantize(self._hparams.input_type):
 					self.eval_loss = MaskedCrossEntropyLoss(self.y_hat_eval, self.y_eval, lengths=[self.eval_length])
 				else:
-					self.eval_loss = DiscretizedMixtureLogisticLoss(self.y_hat_eval, self.y_eval, hparams=self._hparams, lengths=[self.eval_length])
+					if self._hparams.out_channels == 2:
+						self.eval_loss = GaussianMaximumLikelihoodEstimation(self.y_hat_eval, self.y_eval, hparams=self._hparams, lengths=[self.eval_length])
+					else:
+						self.eval_loss = DiscretizedMixtureLogisticLoss(self.y_hat_eval, self.y_eval, hparams=self._hparams, lengths=[self.eval_length])
 
 
 	def add_optimizer(self, global_step):
@@ -368,6 +389,7 @@ class WaveNet():
 
 			#Adam with constant learning rate
 			learning_rate = self._noam_learning_rate_decay(hp.wavenet_learning_rate, global_step)
+			self.learning_rate = learning_rate
 			optimizer = tf.train.AdamOptimizer(learning_rate, hp.wavenet_adam_beta1,
 				hp.wavenet_adam_beta2, hp.wavenet_adam_epsilon)
 
@@ -474,7 +496,7 @@ class WaveNet():
 
 	def incremental(self, initial_input, c=None, g=None,
 		time_length=100, test_inputs=None,
-		softmax=True, quantize=True, log_scale_min=-7.0):
+		softmax=True, quantize=True, log_scale_min=-7.0, log_scale_min_gauss=-7.0):
 		"""Inceremental forward step
 
 		Inputs of shape [batch_size, channels, time_length] are reshaped to [batch_size, time_length, channels]
@@ -580,8 +602,13 @@ class WaveNet():
 
 			#Generate next input by sampling
 			if self.scalar_input:
-				x = sample_from_discretized_mix_logistic(
-					tf.reshape(x, [batch_size, -1, 1]), log_scale_min=log_scale_min)
+				if self._hparams.out_channels == 2:
+					x = sample_from_gaussian(
+						tf.reshape(x, [batch_size, -1, 1]),
+						log_scale_min_gauss=log_scale_min_gauss)
+				else:
+					x = sample_from_discretized_mix_logistic(
+						tf.reshape(x, [batch_size, -1, 1]), log_scale_min=log_scale_min)
 			else:
 				x = tf.nn.softmax(tf.reshape(x, [batch_size, -1]), axis=1) if softmax \
 					else tf.reshape(x, [batch_size, -1])

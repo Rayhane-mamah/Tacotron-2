@@ -98,7 +98,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 			text = meta[5]
 			mel_filename = os.path.join(mel_dir, meta[1])
 			wav_filename = os.path.join(wav_dir, meta[0])
-			basename = os.path.basename(mel_filename).replace('.npy', '')
+			basename = os.path.basename(mel_filename).replace('.npy', '').replace('mel-', '')
 			mel_output_filename, speaker_id = synth.synthesize(text, basename, synth_dir, None, mel_filename)
 
 			file.write('{}|{}|{}|{}|{}\n'.format(wav_filename, mel_filename, mel_output_filename, speaker_id, text))

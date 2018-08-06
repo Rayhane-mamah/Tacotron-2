@@ -26,7 +26,7 @@ class Synthesizer:
 			else:		
 				self.model.initialize(inputs, input_lengths)
 			self.mel_outputs = self.model.mel_outputs
-			self.linear_outputs = self.model.linear_outputs if hparams.predict_linear else None
+			self.linear_outputs = self.model.linear_outputs if (hparams.predict_linear and not gta) else None
 			self.alignment = self.model.alignments[0]
 
 		self.gta = gta

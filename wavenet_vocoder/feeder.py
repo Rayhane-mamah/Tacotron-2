@@ -307,11 +307,18 @@ class Feeder:
 
 	def _prepare_local_conditions(self, local_condition, c_features):
 		if local_condition:
+
 			maxlen = max([len(x) for x in c_features])
 			c_batch = np.stack([_pad_inputs(x, maxlen) for x in c_features]).astype(np.float32)
 			assert len(c_batch.shape) == 3
 			#[batch_size, c_channels, time_steps]
 			c_batch = np.transpose(c_batch, (0, 2, 1))
+
+			if self._hparams.normalize_for_wavenet:
+				#[-max, max] or [0,max]
+				T2_output_range = (-self._hparams.max_abs_value, self._hparams.max_abs_value) if self._hparams.symmetric_mels else (0, self._hparams.max_abs_value)
+				#rerange to [0, 1]
+				c_batch = np.interp(c_batch, T2_output_range, (0, 1))
 		else:
 			c_batch = None
 		return c_batch
@@ -345,7 +352,7 @@ class Feeder:
 			new_batch = []
 			for b in batch:
 				x, c, g, l = b
-				if len(x) % len(c) != 0 and len(x) % (len(c) + 1) == 0:
+				if len(x) % (len(c) + 1) == 0:
 					c = self._pad_specs(c, len(c) + 1) 
 				self._assert_ready_for_upsample(x, c)
 				if max_time_steps is not None:

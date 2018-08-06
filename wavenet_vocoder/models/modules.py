@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf 
 from wavenet_vocoder.util import sequence_mask
 from .mixture import discretized_mix_logistic_loss
+from .gaussian import gaussian_maximum_likelihood_estimation_loss
 
 class Embedding:
 	"""Embedding class for global conditions.
@@ -17,13 +18,24 @@ class Embedding:
 		return tf.nn.embedding_lookup(self.embedding_table, inputs)
 
 class ReluActivation:
-	"""Simple class to wrap relu activation function in classe for later call.
+	"""Simple class to wrap relu activation function in class for later call.
 	"""
 	def __init__(self, name=None):
 		self.name = name
 
 	def __call__(self, inputs):
 		return tf.nn.relu(inputs, name=self.name)
+
+
+class LeakyReluActivation:
+	'''Simple class to wrap leaky relu activation function in class for later call.
+	'''
+	def __init__(self, alpha=0.3, name=None):
+		self.alpha = alpha
+		self.name = name
+
+	def __call__(self, inputs):
+		return tf.nn.leaky_relu(inputs, alpha=self.alpha, name=self.name)
 
 
 class Conv1d1x1(tf.layers.Conv1D):
@@ -372,6 +384,24 @@ def DiscretizedMixtureLogisticLoss(outputs, targets, hparams, lengths=None, mask
 	losses = discretized_mix_logistic_loss(
 		outputs, targets, num_classes=hparams.quantize_channels,
 		log_scale_min=hparams.log_scale_min, reduce=False)
+
+	with tf.control_dependencies([tf.assert_equal(tf.shape(losses), tf.shape(targets))]):
+		return tf.reduce_sum(losses * mask_) / tf.reduce_sum(mask_)
+
+def GaussianMaximumLikelihoodEstimation(outputs, targets, hparams, lengths=None, mask=None, max_len=None):
+	if lengths is None and mask is None:
+		raise RuntimeError('Please provide either lengths or mask')
+
+	#[batch_size, time_length, 1]
+	if mask is None:
+		mask = sequence_mask(lengths, max_len, True)
+
+	#[batch_size, time_length, dimension]
+	ones = tf.ones([tf.shape(mask)[0], tf.shape(mask)[1], tf.shape(targets)[-1]], tf.float32)
+	mask_ = mask * ones
+
+	losses = gaussian_maximum_likelihood_estimation_loss(
+		outputs, targets, log_scale_min_gauss=hparams.log_scale_min_gauss, reduce=False)
 
 	with tf.control_dependencies([tf.assert_equal(tf.shape(losses), tf.shape(targets))]):
 		return tf.reduce_sum(losses * mask_) / tf.reduce_sum(mask_)

@@ -46,7 +46,7 @@ def add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, s
 	tf.Summary.Value(tag='eval_model/eval_stats/eval_loss', simple_value=loss),
 	]
 	if linear_loss is not None:
-		values.append(tf.Summary.Value(tag='model/eval_stats/eval_linear_loss', simple_value=linear_loss))
+		values.append(tf.Summary.Value(tag='eval_model/eval_stats/eval_linear_loss', simple_value=linear_loss))
 	test_summary = tf.Summary(value=values)
 	summary_writer.add_summary(test_summary, step)
 
@@ -96,6 +96,7 @@ def train(log_dir, args, hparams):
 	wav_dir = os.path.join(log_dir, 'wavs')
 	mel_dir = os.path.join(log_dir, 'mel-spectrograms')
 	eval_dir = os.path.join(log_dir, 'eval-dir')
+	tensorboard_dir = os.path.join(log_dir, 'tacotron_events')
 	eval_plot_dir = os.path.join(eval_dir, 'plots')
 	eval_wav_dir = os.path.join(eval_dir, 'wavs')
 	os.makedirs(eval_dir, exist_ok=True)
@@ -104,6 +105,7 @@ def train(log_dir, args, hparams):
 	os.makedirs(mel_dir, exist_ok=True)
 	os.makedirs(eval_plot_dir, exist_ok=True)
 	os.makedirs(eval_wav_dir, exist_ok=True)
+	os.makedirs(tensorboard_dir, exist_ok=True)
 
 	if hparams.predict_linear:
 		linear_dir = os.path.join(log_dir, 'linear-spectrograms')
@@ -142,7 +144,7 @@ def train(log_dir, args, hparams):
 	#Train
 	with tf.Session(config=config) as sess:
 		try:
-			summary_writer = tf.summary.FileWriter(log_dir, sess.graph)
+			summary_writer = tf.summary.FileWriter(tensorboard_dir, sess.graph)
 			sess.run(tf.global_variables_initializer())
 
 			#saved model restoring

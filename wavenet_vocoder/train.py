@@ -21,14 +21,19 @@ log = infolog.log
 
 def add_train_stats(model):
 	with tf.variable_scope('stats') as scope:
-		tf.summary.histogram('wav_outputs', model.y_hat)
-		tf.summary.histogram('wav_targets', model.y)
-		tf.summary.scalar('loss', model.loss)
+		tf.summary.histogram('wav_outputs', model.y_hat_log)
+		tf.summary.histogram('wav_targets', model.y_log)
+		if model.means is not None:
+			tf.summary.histogram('gaussian_means', model.means)
+			tf.summary.histogram('gaussian_scales', model.scales)
+			
+		tf.summary.scalar('wavenet_learning_rate', model.learning_rate)
+		tf.summary.scalar('wavenet_loss', model.loss)
 		return tf.summary.merge_all()
 
 def add_test_stats(summary_writer, step, eval_loss):
 	values = [
-	tf.Summary.Value(tag='eval_model/eval_stats/eval_loss'),
+	tf.Summary.Value(tag='eval_model/eval_stats/wavenet_eval_loss', simple_value=eval_loss),
 	]
 	test_summary = tf.Summary(value=values)
 	summary_writer.add_summary(test_summary, step)
@@ -138,6 +143,7 @@ def train(log_dir, args, hparams, input_path):
 	audio_dir = os.path.join(log_dir, 'wavs')
 	plot_dir = os.path.join(log_dir, 'plots')
 	wav_dir = os.path.join(log_dir, 'wavs')
+	tensorboard_dir = os.path.join(log_dir, 'wavenet_events')
 	eval_audio_dir = os.path.join(eval_dir, 'wavs')
 	eval_plot_dir = os.path.join(eval_dir, 'plots')
 	checkpoint_path = os.path.join(save_dir, 'wavenet_model.ckpt')
@@ -148,6 +154,7 @@ def train(log_dir, args, hparams, input_path):
 	os.makedirs(plot_dir, exist_ok=True)
 	os.makedirs(eval_audio_dir, exist_ok=True)
 	os.makedirs(eval_plot_dir, exist_ok=True)
+	os.makedirs(tensorboard_dir, exist_ok=True)
 
 	log('Checkpoint_path: {}'.format(checkpoint_path))
 	log('Loading training data from: {}'.format(input_path))
@@ -182,7 +189,7 @@ def train(log_dir, args, hparams, input_path):
 	#Train
 	with tf.Session(config=config) as sess:
 		try:
-			summary_writer = tf.summary.FileWriter(log_dir, sess.graph)
+			summary_writer = tf.summary.FileWriter(tensorboard_dir, sess.graph)
 			sess.run(tf.global_variables_initializer())
 
 			#saved model restoring

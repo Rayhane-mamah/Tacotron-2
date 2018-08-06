@@ -44,6 +44,12 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	with open(os.path.join(wav_dir, 'map.txt'), 'w') as file:
 		for i, mel_file in enumerate(tqdm(mel_files)):
 			mel_spectro = np.load(mel_file)
+			if hparams.normalize_for_wavenet:
+				#[-max, max] or [0,max]
+				T2_output_range = (-hparams.max_abs_value, hparams.max_abs_value) if hparams.symmetric_mels else (0, hparams.max_abs_value)
+				#rerange to [0, 1]
+				mel_spectro = np.interp(mel_spectro, T2_output_range, (0, 1))
+				
 			basename = mel_file.replace('.npy', '')
 			speaker_id = speaker_ids[i]
 			audio_file = synth.synthesize(mel_spectro, speaker_id, basename, wav_dir, log_dir)

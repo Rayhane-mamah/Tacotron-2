@@ -225,10 +225,10 @@ class Feeder:
 	def _pad_token_target(self, t, length):
 		return np.pad(t, (0, length - t.shape[0]), mode='constant', constant_values=self._token_pad)
 
-	def _round_down(self, x, multiple):
-		remainder = x % multiple
-		return x if remainder == 0 else x - remainder
-		
 	def _round_up(self, x, multiple):
 		remainder = x % multiple
 		return x if remainder == 0 else x + multiple - remainder
+
+	def _round_down(self, x, multiple):
+		remainder = x % multiple
+		return x if remainder == 0 else x - remainder
