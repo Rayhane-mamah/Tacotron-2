@@ -187,7 +187,7 @@ class WaveNet():
 				#Add mean and scale stats if using Guassian distribution output (there would be too many logistics if using MoL)
 				if self._hparams.out_channels == 2:
 					self.means = self.y_hat[:, 0, :]
-					self.scales = self.y_hat[:, 1, :]
+					self.log_scales = self.y_hat[:, 1, :]
 				else:
 					self.means = None
 

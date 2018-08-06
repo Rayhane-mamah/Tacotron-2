@@ -25,8 +25,8 @@ def add_train_stats(model):
 		tf.summary.histogram('wav_targets', model.y_log)
 		if model.means is not None:
 			tf.summary.histogram('gaussian_means', model.means)
-			tf.summary.histogram('gaussian_scales', model.scales)
-			
+			tf.summary.histogram('gaussian_log_scales', model.log_scales)
+
 		tf.summary.scalar('wavenet_learning_rate', model.learning_rate)
 		tf.summary.scalar('wavenet_loss', model.loss)
 		return tf.summary.merge_all()
