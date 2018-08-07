@@ -109,7 +109,7 @@ def main():
 	parser.add_argument('--tacotron_train_steps', type=int, default=120000, help='total number of tacotron training steps')
 	parser.add_argument('--wavenet_train_steps', type=int, default=1300000, help='total number of wavenet training steps')
 	parser.add_argument('--tf_log_level', type=int, default=1, help='Tensorflow C++ log level.')
-	parser.add_argument('--slack_url', default='', help='slack webhook notification destination link')
+	parser.add_argument('--slack_url', default=None, help='slack webhook notification destination link')
 	args = parser.parse_args()
 
 	accepted_models = ['Tacotron', 'WaveNet', 'Tacotron-2']

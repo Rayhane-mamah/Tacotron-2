@@ -106,7 +106,7 @@ hparams = tf.contrib.training.HParams(
 	log_scale_min_gauss = float(np.log(1e-7)), #Gaussian distribution minimal allowed log scale
 
 	#To use Gaussian distribution as output distribution instead of mixture of logistics sets "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
-	out_channels = 10 * 3, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
+	out_channels = 2, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
 	layers = 30, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
 	stacks = 3, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
 	residual_channels = 512,
@@ -120,9 +120,9 @@ hparams = tf.contrib.training.HParams(
 	freq_axis_kernel_size = 3,
 	leaky_alpha = 0.4,
 
-	gin_channels = -1, #Set this to -1 to disable global conditioning, Only used for multi speaker dataset. It defines the depth of the embeddings (Recommended: 512)
+	gin_channels = -1, #Set this to -1 to disable global conditioning, Only used for multi speaker dataset. It defines the depth of the embeddings (Recommended: 16)
 	use_speaker_embedding = True, #whether to make a speaker embedding
-	n_speakers = 6, #number of speakers (rows of the embedding)
+	n_speakers = 5, #number of speakers (rows of the embedding)
 
 	use_bias = True, #Whether to use bias in convolutional layers of the Wavenet
 

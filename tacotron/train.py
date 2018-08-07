@@ -158,9 +158,11 @@ def train(log_dir, args, hparams):
 					if (checkpoint_state and checkpoint_state.model_checkpoint_path):
 						log('Loading checkpoint {}'.format(checkpoint_state.model_checkpoint_path), slack=True)
 						load_averaged_model(sess, sh_saver, checkpoint_state.model_checkpoint_path)
+					else:
+						log('No model to load at {}'.format(save_dir), slack=True)
 
-					except tf.errors.OutOfRangeError as e:
-						log('Cannot restore checkpoint: {}'.format(e), slack=True)
+				except tf.errors.OutOfRangeError as e:
+					log('Cannot restore checkpoint: {}'.format(e), slack=True)
 			else:
 				log('Starting new training!', slack=True)
 

@@ -39,7 +39,7 @@ def main():
 	parser.add_argument('--base_dir', default='')
 	parser.add_argument('--hparams', default='',
 		help='Hyperparameter overrides as a comma-separated list of name=value pairs')
-	parser.add_argument('--input_dir', default='all_audio_data')
+	parser.add_argument('--input_dir', default='LJSpeech-1.1/wavs')
 	parser.add_argument('--output', default='tacotron_output/gta/')
 	parser.add_argument('--n_jobs', type=int, default=cpu_count())
 	args = parser.parse_args()
