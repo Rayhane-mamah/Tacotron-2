@@ -1,4 +1,4 @@
-import tensorflow as tf 
+import tensorflow as tf
 
 
 def conv1d(inputs, kernel_size, channels, activation, is_training, drop_rate, scope):
@@ -237,7 +237,7 @@ class Prenet:
 		self.layers_sizes = layers_sizes
 		self.activation = activation
 		self.is_training = is_training
-		
+
 		self.scope = 'prenet' if scope is None else scope
 
 	def __call__(self, inputs):
@@ -274,7 +274,7 @@ class DecoderRNN:
 		self.scope = 'decoder_rnn' if scope is None else scope
 
 		#Create a set of LSTM layers
-		self.rnn_layers = [ZoneoutLSTMCell(size, is_training, 
+		self.rnn_layers = [ZoneoutLSTMCell(size, is_training,
 			zoneout_factor_cell=zoneout,
 			zoneout_factor_output=zoneout,
 			name='decoder_LSTM_{}'.format(i+1)) for i in range(layers)]
@@ -300,7 +300,7 @@ class FrameProjection:
 
 		self.shape = shape
 		self.activation = activation
-		
+
 		self.scope = 'Linear_projection' if scope is None else scope
 		self.dense = tf.layers.Dense(units=shape, activation=activation, name='projection_{}'.format(self.scope))
 
@@ -329,7 +329,7 @@ class StopProjection:
 		"""
 		super(StopProjection, self).__init__()
 		self.is_training = is_training
-		
+
 		self.shape = shape
 		self.activation = activation
 		self.scope = 'stop_token_projection' if scope is None else scope

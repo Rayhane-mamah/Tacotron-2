@@ -1,13 +1,15 @@
-import numpy as np 
-import tensorflow as tf 
-from sklearn.model_selection import train_test_split
-import time
-import threading
 import os
-from .util import is_scalar_input, is_mulaw_quantize
-from infolog import log
+import threading
+import time
+
+import numpy as np
+import tensorflow as tf
 from datasets import audio
+from infolog import log
 from keras.utils import np_utils
+from sklearn.model_selection import train_test_split
+
+from .util import is_mulaw_quantize, is_scalar_input
 
 _batches_per_group = 32
 _pad = 0
@@ -76,7 +78,7 @@ class Feeder:
 				input_placeholder = tf.placeholder(tf.float32, shape=(None, hparams.quantize_channels, None), name='audio_inputs')
 				target_placeholder = tf.placeholder(tf.int32, shape=(None, None, 1), name='audio_targets')
 				target_type = tf.int32
-				
+
 			self._placeholders = [
 			input_placeholder,
 			target_placeholder,
@@ -110,7 +112,7 @@ class Feeder:
 			else:
 				self.local_condition_features = variables[3]
 				self.local_condition_features.set_shape(self._placeholders[3].shape)
-			
+
 			#If global conditioning disabled override g inputs with None
 			if hparams.gin_channels < 0:
 				self.global_condition_features = None
@@ -130,14 +132,14 @@ class Feeder:
 			self.eval_targets.set_shape(self._placeholders[1].shape)
 			self.eval_input_lengths = eval_variables[2]
 			self.eval_input_lengths.set_shape(self._placeholders[2].shape)
-			
+
 			#If local conditioning disabled override c inputs with None
 			if hparams.cin_channels < 0:
 				self.eval_local_condition_features = None
 			else:
 				self.eval_local_condition_features = eval_variables[3]
 				self.eval_local_condition_features.set_shape(self._placeholders[3].shape)
-			
+
 			#If global conditioning disabled override g inputs with None
 			if hparams.gin_channels < 0:
 				self.eval_global_condition_features = None
@@ -245,7 +247,7 @@ class Feeder:
 			local_condition_features = np.load(os.path.join(self._base_dir, mel_file))
 		else:
 			local_condition_features = None
-			
+
 		if self.global_condition:
 			global_condition_features = meta[3]
 			if global_condition_features == '<no_g>':
@@ -258,12 +260,12 @@ class Feeder:
 
 	def _prepare_batch(self, batch):
 		np.random.shuffle(batch)
-		
+
 		#Limit time steps to save GPU Memory usage
 		max_time_steps = self._limit_time()
 		#Adjust time resolution for upsampling
 		batch = self._adjust_time_resolution(batch, self.local_condition, max_time_steps)
-		
+
 		#time lengths
 		input_lengths = [len(x[0]) for x in batch]
 		max_input_length = max(input_lengths)
@@ -353,7 +355,7 @@ class Feeder:
 			for b in batch:
 				x, c, g, l = b
 				if len(x) % (len(c) + 1) == 0:
-					c = self._pad_specs(c, len(c) + 1) 
+					c = self._pad_specs(c, len(c) + 1)
 				self._assert_ready_for_upsample(x, c)
 				if max_time_steps is not None:
 					max_steps = _ensure_divisible(max_time_steps, audio.get_hop_size(self._hparams), True)

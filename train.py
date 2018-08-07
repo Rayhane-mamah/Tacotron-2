@@ -1,13 +1,14 @@
 import argparse
-import tensorflow as tf 
+import os
+from time import sleep
+
+import infolog
+import tensorflow as tf
+from hparams import hparams
+from infolog import log
+from tacotron.synthesize import tacotron_synthesize
 from tacotron.train import tacotron_train
 from wavenet_vocoder.train import wavenet_train
-from tacotron.synthesize import tacotron_synthesize
-from infolog import log
-from hparams import hparams
-import os
-import infolog
-from time import sleep
 
 log = infolog.log
 

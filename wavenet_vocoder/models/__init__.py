@@ -1,4 +1,4 @@
-from .wavenet import WaveNet 
+from .wavenet import WaveNet
 from warnings import warn
 from wavenet_vocoder.util import is_mulaw_quantize
 

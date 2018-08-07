@@ -1,9 +1,10 @@
 import argparse
-from multiprocessing import cpu_count
 import os
-from tqdm import tqdm
+from multiprocessing import cpu_count
+
 from datasets import wavenet_preprocessor
 from hparams import hparams
+from tqdm import tqdm
 
 
 def preprocess(args, input_dir, out_dir, hparams):
@@ -36,7 +37,7 @@ def main():
 	print('initializing preprocessing..')
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--base_dir', default='')
-	parser.add_argument('--hparams', default='', 
+	parser.add_argument('--hparams', default='',
 		help='Hyperparameter overrides as a comma-separated list of name=value pairs')
 	parser.add_argument('--input_dir', default='all_audio_data')
 	parser.add_argument('--output', default='tacotron_output/gta/')

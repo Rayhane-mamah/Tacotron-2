@@ -1,7 +1,10 @@
-import numpy as np 
-import tensorflow as tf 
-import librosa.display as dsp
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
+import librosa.display as dsp
+import numpy as np
+import tensorflow as tf
 
 
 def _assert_valid_input_type(s):

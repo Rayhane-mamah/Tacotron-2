@@ -1,12 +1,12 @@
 import argparse
 import os
-from hparams import hparams, hparams_debug_string
-from wavenet_vocoder.synthesizer import Synthesizer 
-from tqdm import tqdm
-from infolog import log
-import numpy as np 
-import tensorflow as tf 
 
+import numpy as np
+import tensorflow as tf
+from hparams import hparams, hparams_debug_string
+from infolog import log
+from tqdm import tqdm
+from wavenet_vocoder.synthesizer import Synthesizer
 
 
 def run_synthesis(args, checkpoint_path, output_dir, hparams):
@@ -49,7 +49,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 				T2_output_range = (-hparams.max_abs_value, hparams.max_abs_value) if hparams.symmetric_mels else (0, hparams.max_abs_value)
 				#rerange to [0, 1]
 				mel_spectro = np.interp(mel_spectro, T2_output_range, (0, 1))
-				
+
 			basename = mel_file.replace('.npy', '')
 			speaker_id = speaker_ids[i]
 			audio_file = synth.synthesize(mel_spectro, speaker_id, basename, wav_dir, log_dir)
