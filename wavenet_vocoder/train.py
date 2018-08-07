@@ -195,18 +195,18 @@ def train(log_dir, args, hparams, input_path):
 
 			#saved model restoring
 			if args.restore:
-                # Restore saved model if the user requested it, default = True
-                try:
-                    checkpoint_state = tf.train.get_checkpoint_state(save_dir)
+				# Restore saved model if the user requested it, default = True
+				try:
+					checkpoint_state = tf.train.get_checkpoint_state(save_dir)
 
-                    if (checkpoint_state and checkpoint_state.model_checkpoint_path):
-                        log('Loading checkpoint {}'.format(checkpoint_state.model_checkpoint_path), slack=True)
-                        load_averaged_model(sess, sh_saver, checkpoint_state.model_checkpoint_path)
+					if (checkpoint_state and checkpoint_state.model_checkpoint_path):
+						log('Loading checkpoint {}'.format(checkpoint_state.model_checkpoint_path), slack=True)
+						load_averaged_model(sess, sh_saver, checkpoint_state.model_checkpoint_path)
 
-                except tf.errors.OutOfRangeError as e:
-                    log('Cannot restore checkpoint: {}'.format(e), slack=True)
-            else:
-                log('Starting new training!', slack=True)
+				except tf.errors.OutOfRangeError as e:
+					log('Cannot restore checkpoint: {}'.format(e), slack=True)
+			else:
+				log('Starting new training!', slack=True)
 
 			#initializing feeder
 			feeder.start_threads(sess)
