@@ -1,13 +1,14 @@
 import argparse
 import os
 import re
-from hparams import hparams, hparams_debug_string
-from tacotron.synthesizer import Synthesizer
 import time
-from tqdm import tqdm
 from time import sleep
+
+import tensorflow as tf
+from hparams import hparams, hparams_debug_string
 from infolog import log
-import tensorflow as tf 
+from tacotron.synthesizer import Synthesizer
+from tqdm import tqdm
 
 
 
@@ -43,9 +44,9 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	eval_dir = os.path.join(output_dir, 'eval')
 	log_dir = os.path.join(output_dir, 'logs-eval')
 
-	if args.model in ('Both', 'Tacotron-2'):
+	if args.model == 'Tacotron-2':
 		assert os.path.normpath(eval_dir) == os.path.normpath(args.mels_dir) #mels_dir = wavenet_input_dir
-	
+
 	#Create output path if it doesn't exist
 	os.makedirs(eval_dir, exist_ok=True)
 	os.makedirs(log_dir, exist_ok=True)
@@ -56,7 +57,7 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	synth = Synthesizer()
 	synth.load(checkpoint_path, hparams)
 
-	
+
 	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
 		for i, text in enumerate(tqdm(sentences)):
 			start = time.time()
@@ -111,21 +112,8 @@ def tacotron_synthesize(args, hparams, checkpoint, sentences=None):
 	try:
 		checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
 		log('loaded model at {}'.format(checkpoint_path))
-	except AttributeError:
-		#Swap logs dir name in case user used Tacotron-2 for train and Both for test (and vice versa)
-		if 'Both' in checkpoint:
-			checkpoint = checkpoint.replace('Both', 'Tacotron-2')
-		elif 'Tacotron-2' in checkpoint:
-			checkpoint = checkpoint.replace('Tacotron-2', 'Both')
-		else:
-			raise AssertionError('Cannot restore checkpoint: {}, did you train a model?'.format(checkpoint))
-
-		try:
-			#Try loading again
-			checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
-			log('loaded model at {}'.format(checkpoint_path))
-		except:
-			raise RuntimeError('Failed to load checkpoint at {}'.format(checkpoint))
+	except:
+		raise RuntimeError('Failed to load checkpoint at {}'.format(checkpoint))
 
 	if args.mode == 'eval':
 		return run_eval(args, checkpoint_path, output_dir, hparams, sentences)

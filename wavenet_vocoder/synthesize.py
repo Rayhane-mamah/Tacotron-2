@@ -1,11 +1,11 @@
 import argparse
 import os
 from hparams import hparams, hparams_debug_string
-from wavenet_vocoder.synthesizer import Synthesizer 
+from wavenet_vocoder.synthesizer import Synthesizer
 from tqdm import tqdm
 from infolog import log
-import numpy as np 
-import tensorflow as tf 
+import numpy as np
+import tensorflow as tf
 
 
 
@@ -18,7 +18,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	synth = Synthesizer()
 	synth.load(checkpoint_path, hparams)
 
-	if args.model in ('Both', 'Tacotron-2'):
+	if args.model == 'Tacotron-2':
 		#If running all Tacotron-2, synthesize audio from evaluated mels
 		metadata_filename = os.path.join(args.mels_dir, 'map.txt')
 		with open(metadata_filename, encoding='utf-8') as f:
@@ -49,7 +49,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 				T2_output_range = (-hparams.max_abs_value, hparams.max_abs_value) if hparams.symmetric_mels else (0, hparams.max_abs_value)
 				#rerange to [0, 1]
 				mel_spectro = np.interp(mel_spectro, T2_output_range, (0, 1))
-				
+
 			basename = mel_file.replace('.npy', '')
 			speaker_id = speaker_ids[i]
 			audio_file = synth.synthesize(mel_spectro, speaker_id, basename, wav_dir, log_dir)
@@ -69,20 +69,7 @@ def wavenet_synthesize(args, hparams, checkpoint):
 	try:
 		checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
 		log('loaded model at {}'.format(checkpoint_path))
-	except AttributeError:
-		#Swap logs dir name in case user used Tacotron-2 for train and Both for test (and vice versa)
-		if 'Both' in checkpoint:
-			checkpoint = checkpoint.replace('Both', 'Tacotron-2')
-		elif 'Tacotron-2' in checkpoint:
-			checkpoint = checkpoint.replace('Tacotron-2', 'Both')
-		else: #Synthesizing separately
-			raise AssertionError('Cannot restore checkpoint: {}, did you train a model?'.format(checkpoint))
-
-		try:
-			#Try loading again
-			checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
-			log('loaded model at {}'.format(checkpoint_path))
-		except:
-			raise RuntimeError('Failed to load checkpoint at {}'.format(checkpoint))
+	except:
+		raise RuntimeError('Failed to load checkpoint at {}'.format(checkpoint))
 
 	run_synthesis(args, checkpoint_path, output_dir, hparams)

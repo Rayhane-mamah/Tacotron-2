@@ -1,19 +1,19 @@
-import numpy as np 
-from datetime import datetime
+import argparse
 import os
 import subprocess
 import time
-import tensorflow as tf 
 import traceback
-import argparse
+from datetime import datetime
 
-from tacotron.feeder import Feeder
-from hparams import hparams_debug_string
-from tacotron.models import create_model
-from tacotron.utils.text import sequence_to_text
-from tacotron.utils import plot, ValueWindow
 import infolog
+import numpy as np
+import tensorflow as tf
 from datasets import audio
+from hparams import hparams_debug_string
+from tacotron.feeder import Feeder
+from tacotron.models import create_model
+from tacotron.utils import ValueWindow, plot
+from tacotron.utils.text import sequence_to_text
 from tqdm import tqdm
 
 log = infolog.log
@@ -56,15 +56,15 @@ def time_string():
 def model_train_mode(args, feeder, hparams, global_step):
 	with tf.variable_scope('model', reuse=tf.AUTO_REUSE) as scope:
 		model_name = None
-		if args.model in ('Tacotron-2', 'Both'):
+		if args.model == 'Tacotron-2':
 			model_name = 'Tacotron'
 		model = create_model(model_name or args.model, hparams)
 		if hparams.predict_linear:
-			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets, linear_targets=feeder.linear_targets, 
+			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets, linear_targets=feeder.linear_targets,
 				targets_lengths=feeder.targets_lengths, global_step=global_step,
 				is_training=True)
 		else:
-			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets, 
+			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets,
 				targets_lengths=feeder.targets_lengths, global_step=global_step,
 				is_training=True)
 		model.add_loss()
@@ -75,37 +75,39 @@ def model_train_mode(args, feeder, hparams, global_step):
 def model_test_mode(args, feeder, hparams, global_step):
 	with tf.variable_scope('model', reuse=tf.AUTO_REUSE) as scope:
 		model_name = None
-		if args.model in ('Tacotron-2', 'Both'):
+		if args.model == 'Tacotron-2':
 			model_name = 'Tacotron'
 		model = create_model(model_name or args.model, hparams)
 		if hparams.predict_linear:
-			model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets, 
+			model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets,
 				linear_targets=feeder.eval_linear_targets, targets_lengths=feeder.eval_targets_lengths, global_step=global_step,
 				is_training=False, is_evaluating=True)
 		else:
-			model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets, 
+			model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets,
 				targets_lengths=feeder.eval_targets_lengths, global_step=global_step, is_training=False, is_evaluating=True)
 		model.add_loss()
 		return model
 
 def train(log_dir, args, hparams):
-	save_dir = os.path.join(log_dir, 'taco_pretrained/')
-	checkpoint_path = os.path.join(save_dir, 'tacotron_model.ckpt')
-	input_path = os.path.join(args.base_dir, args.tacotron_input)
+	save_dir = os.path.join(log_dir, 'taco_pretrained')
 	plot_dir = os.path.join(log_dir, 'plots')
 	wav_dir = os.path.join(log_dir, 'wavs')
 	mel_dir = os.path.join(log_dir, 'mel-spectrograms')
 	eval_dir = os.path.join(log_dir, 'eval-dir')
-	tensorboard_dir = os.path.join(log_dir, 'tacotron_events')
 	eval_plot_dir = os.path.join(eval_dir, 'plots')
 	eval_wav_dir = os.path.join(eval_dir, 'wavs')
-	os.makedirs(eval_dir, exist_ok=True)
+	tensorboard_dir = os.path.join(log_dir, 'tacotron_events')
+	os.makedirs(save_dir, exist_ok=True)
 	os.makedirs(plot_dir, exist_ok=True)
 	os.makedirs(wav_dir, exist_ok=True)
 	os.makedirs(mel_dir, exist_ok=True)
+	os.makedirs(eval_dir, exist_ok=True)
 	os.makedirs(eval_plot_dir, exist_ok=True)
 	os.makedirs(eval_wav_dir, exist_ok=True)
 	os.makedirs(tensorboard_dir, exist_ok=True)
+
+	checkpoint_path = os.path.join(save_dir, 'tacotron_model.ckpt')
+	input_path = os.path.join(args.base_dir, args.tacotron_input)
 
 	if hparams.predict_linear:
 		linear_dir = os.path.join(log_dir, 'linear-spectrograms')
@@ -149,21 +151,18 @@ def train(log_dir, args, hparams):
 
 			#saved model restoring
 			if args.restore:
-				#Restore saved model if the user requested it, Default = True.
-				try:
-					checkpoint_state = tf.train.get_checkpoint_state(save_dir)
-				except tf.errors.OutOfRangeError as e:
-					log('Cannot restore checkpoint: {}'.format(e))
+                # Restore saved model if the user requested it, default = True
+                try:
+                    checkpoint_state = tf.train.get_checkpoint_state(save_dir)
 
-			if (checkpoint_state and checkpoint_state.model_checkpoint_path):
-				log('Loading checkpoint {}'.format(checkpoint_state.model_checkpoint_path))
-				saver.restore(sess, checkpoint_state.model_checkpoint_path)
+                    if (checkpoint_state and checkpoint_state.model_checkpoint_path):
+                        log('Loading checkpoint {}'.format(checkpoint_state.model_checkpoint_path), slack=True)
+                        load_averaged_model(sess, sh_saver, checkpoint_state.model_checkpoint_path)
 
-			else:
-				if not args.restore:
-					log('Starting new training!')
-				else:
-					log('No model to load at {}'.format(save_dir))
+                except tf.errors.OutOfRangeError as e:
+                    log('Cannot restore checkpoint: {}'.format(e), slack=True)
+            else:
+                log('Starting new training!', slack=True)
 
 			#initializing feeder
 			feeder.start_threads(sess)
@@ -176,9 +175,9 @@ def train(log_dir, args, hparams):
 				loss_window.append(loss)
 				message = 'Step {:7d} [{:.3f} sec/step, loss={:.5f}, avg_loss={:.5f}]'.format(
 					step, time_window.average, loss, loss_window.average)
-				log(message, end='\r')
+				log(message, end='\r', slack=(step % args.checkpoint_interval == 0))
 
-				if np.isnan(loss):
+				if loss > 100 or np.isnan(loss):
 					log('Loss exploded to {:.5f} at step {}'.format(loss, step))
 					raise Exception('Loss exploded')
 
@@ -201,8 +200,8 @@ def train(log_dir, args, hparams):
 						for i in tqdm(range(feeder.test_steps)):
 							eloss, before_loss, after_loss, stop_token_loss, linear_loss, mel_p, mel_t, t_len, align, lin_p = sess.run(
 								[eval_model.loss, eval_model.before_loss, eval_model.after_loss,
-								eval_model.stop_token_loss, eval_model.linear_loss, eval_model.mel_outputs[0], 
-								eval_model.mel_targets[0], eval_model.targets_lengths[0], 
+								eval_model.stop_token_loss, eval_model.linear_loss, eval_model.mel_outputs[0],
+								eval_model.mel_targets[0], eval_model.targets_lengths[0],
 								eval_model.alignments[0], eval_model.linear_outputs[0]])
 							eval_losses.append(eloss)
 							before_losses.append(before_loss)
@@ -245,11 +244,11 @@ def train(log_dir, args, hparams):
 					log('Writing eval summary!')
 					add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, stop_token_loss, eval_loss)
 
-				
+
 				if step % args.checkpoint_interval == 0 or step == args.tacotron_train_steps:
 					#Save model and current global step
 					saver.save(sess, checkpoint_path, global_step=global_step)
-					
+
 					log('\nSaving alignment, Mel-Spectrograms and griffin-lim inverted waveform..')
 					if hparams.predict_linear:
 						input_seq, mel_prediction, linear_prediction, alignment, target, target_length = sess.run([
@@ -295,11 +294,11 @@ def train(log_dir, args, hparams):
 						max_len=target_length)
 					log('Input at step {}: {}'.format(step, sequence_to_text(input_seq)))
 
-			log('Tacotron training complete after {} global steps!'.format(args.tacotron_train_steps))
+			log('Tacotron training complete after {} global steps!'.format(args.tacotron_train_steps), slack=True)
 			return save_dir
 
 		except Exception as e:
-			log('Exiting due to exception: {}'.format(e))
+			log('Exiting due to exception: {}'.format(e), slack=True)
 			traceback.print_exc()
 			coord.request_stop(e)
 
