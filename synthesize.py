@@ -1,10 +1,11 @@
 import argparse
+import os
+from warnings import warn
+
+from hparams import hparams
+from infolog import log
 from tacotron.synthesize import tacotron_synthesize
 from wavenet_vocoder.synthesize import wavenet_synthesize
-from infolog import log
-from hparams import hparams
-from warnings import warn
-import os
 
 
 def prepare_run(args):
@@ -53,8 +54,8 @@ def main():
 	parser.add_argument('--GTA', default='True', help='Ground truth aligned synthesis, defaults to True, only considered in synthesis mode')
 	parser.add_argument('--text_list', default='', help='Text file contains list of texts to be synthesized. Valid if mode=eval')
 	args = parser.parse_args()
-	
-	accepted_models = ['Tacotron', 'WaveNet', 'Both', 'Tacotron-2']
+
+	accepted_models = ['Tacotron', 'WaveNet', 'Tacotron-2']
 
 	if args.model not in accepted_models:
 		raise ValueError('please enter a valid model to synthesize with: {}'.format(accepted_models))
@@ -62,13 +63,13 @@ def main():
 	if args.mode not in accepted_modes:
 		raise ValueError('accepted modes are: {}, found {}'.format(accepted_modes, args.mode))
 
-	if args.mode=='live' and args.model=='Wavenet':
+	if args.mode == 'live' and args.model == 'Wavenet':
 		raise RuntimeError('Wavenet vocoder cannot be tested live due to its slow generation. Live only works with Tacotron!')
 
 	if args.GTA not in ('True', 'False'):
 		raise ValueError('GTA option must be either True or False')
 
-	if args.model in ('Both', 'Tacotron-2'):
+	if args.model == 'Tacotron-2':
 		if args.mode == 'live':
 			warn('Requested a live evaluation with Tacotron-2, Wavenet will not be used!')
 		if args.mode == 'synthesis':
@@ -81,7 +82,7 @@ def main():
 		_ = tacotron_synthesize(args, hparams, taco_checkpoint, sentences)
 	elif args.model == 'WaveNet':
 		wavenet_synthesize(args, hparams, wave_checkpoint)
-	elif args.model in 'Tacotron-2':
+	elif args.model == 'Tacotron-2':
 		synthesize(args, hparams, taco_checkpoint, wave_checkpoint, sentences)
 	else:
 		raise ValueError('Model provided {} unknown! {}'.format(args.model, accepted_models))
