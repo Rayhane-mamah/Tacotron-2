@@ -1,8 +1,8 @@
 import librosa
 import librosa.filters
-import numpy as np 
+import numpy as np
+import tensorflow as tf
 from scipy import signal
-import tensorflow as tf 
 from scipy.io import wavfile
 
 
@@ -10,7 +10,7 @@ def load_wav(path, sr):
 	return librosa.core.load(path, sr=sr)[0]
 
 def save_wav(wav, path, sr):
-	wav *= 32767 / max(0.01, np.max(np.abs(wav))) 
+	wav *= 32767 / max(0.01, np.max(np.abs(wav)))
 	#proposed by @dsmiller
 	wavfile.write(path, sr, wav.astype(np.int16))
 
@@ -75,7 +75,7 @@ def inv_linear_spectrogram(linear_spectrogram, hparams):
 		return y
 	else:
 		return _griffin_lim(S ** hparams.power, hparams)
-	
+
 
 def inv_mel_spectrogram(mel_spectrogram, hparams):
 	'''Converts mel spectrogram to waveform using librosa'''
@@ -186,7 +186,7 @@ def _denormalize(D, hparams):
 	if hparams.allow_clipping_in_normalization:
 		if hparams.symmetric_mels:
 			return (((np.clip(D, -hparams.max_abs_value,
-				hparams.max_abs_value) + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value)) 
+				hparams.max_abs_value) + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value))
 				+ hparams.min_level_db)
 		else:
 			return ((np.clip(D, 0, hparams.max_abs_value) * -hparams.min_level_db / hparams.max_abs_value) + hparams.min_level_db)

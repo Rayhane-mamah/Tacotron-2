@@ -1,6 +1,5 @@
-import numpy as np 
-import tensorflow as tf 
-
+import numpy as np
+import tensorflow as tf
 
 
 def log_sum_exp(x):

@@ -1,10 +1,12 @@
-import numpy as np 
-import tensorflow as tf 
 import os
-from infolog import log
+
+import numpy as np
+import tensorflow as tf
 from datasets.audio import save_wav
+from infolog import log
 from wavenet_vocoder.models import create_model
 from wavenet_vocoder.train import create_shadow_saver, load_averaged_model
+
 from . import util
 
 

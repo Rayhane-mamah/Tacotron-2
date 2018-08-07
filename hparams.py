@@ -1,6 +1,5 @@
-import tensorflow as tf 
-import numpy as np 
-
+import numpy as np
+import tensorflow as tf
 
 # Default hyperparameters
 hparams = tf.contrib.training.HParams(
@@ -44,17 +43,17 @@ hparams = tf.contrib.training.HParams(
 	signal_normalization = True,
 	allow_clipping_in_normalization = True, #Only relevant if mel_normalization = True
 	symmetric_mels = False, #Whether to scale the data to be symmetric around 0
-	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max] 
+	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max]
 	normalize_for_wavenet = True, #whether to rescale to [0, 1] for wavenet.
 
 	#Limits
 	min_level_db = -100,
 	ref_level_db = 20,
 	fmin = 0, #Set this to 75 if your speaker is male! if female, 125 should help taking off noise. (To test depending on dataset)
-	fmax = 7600, 
+	fmax = 7600,
 
 	#Griffin Lim
-	power = 1.5, 
+	power = 1.5,
 	griffin_lim_iters = 60,
 	###########################################################################################################################################
 
@@ -69,7 +68,7 @@ hparams = tf.contrib.training.HParams(
 	enc_conv_channels = 512, #number of encoder convolutions filters for each layer
 	encoder_lstm_units = 256, #number of lstm units for each direction (forward and backward)
 
-	smoothing = False, #Whether to smooth the attention normalization function 
+	smoothing = False, #Whether to smooth the attention normalization function
 	attention_dim = 128, #dimension of attention space
 	attention_filters = 32, #number of attention convolution filters
 	attention_kernel = (31, ), #kernel size of attention convolution
@@ -228,10 +227,10 @@ hparams = tf.contrib.training.HParams(
 	'it appears that oswald had only one caller in response to all of his fpcc activities,',
 	'he relied on the absence of the strychnia.',
 	'scoggins thought it was lighter.',
-	'''would, it is probable, have eventually overcome the reluctance of some of the prisoners at least, 
+	'''would, it is probable, have eventually overcome the reluctance of some of the prisoners at least,
 	and would have possessed so much moral dignity''',
-	'''Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization. 
-	This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that 
+	'''Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization.
+	This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that
 	the adopted architecture is able to perform this task with wild success.''',
 	'Thank you so much for your support!',
 	]

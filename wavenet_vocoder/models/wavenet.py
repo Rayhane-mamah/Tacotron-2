@@ -1,14 +1,13 @@
-import numpy as np 
-import tensorflow as tf 
-
-from .modules import Conv1d1x1, ResidualConv1dGLU, ConvTranspose2d, Embedding, ReluActivation, LeakyReluActivation
-from .modules import DiscretizedMixtureLogisticLoss, MaskedCrossEntropyLoss, GaussianMaximumLikelihoodEstimation
-from .mixture import sample_from_discretized_mix_logistic
-from .gaussian import sample_from_gaussian
-from wavenet_vocoder.util import *
+import numpy as np
+import tensorflow as tf
+from datasets import audio
 from infolog import log
 from wavenet_vocoder import util
-from datasets import audio
+from wavenet_vocoder.util import *
+
+from .gaussian import sample_from_gaussian
+from .mixture import sample_from_discretized_mix_logistic
+from .modules import Conv1d1x1, ConvTranspose2d, DiscretizedMixtureLogisticLoss, Embedding, GaussianMaximumLikelihoodEstimation, LeakyReluActivation, MaskedCrossEntropyLoss, ReluActivation, ResidualConv1dGLU
 
 
 def _expand_global_features(batch_size, time_length, global_features, data_format='BCT'):
@@ -103,7 +102,7 @@ class WaveNet():
 				kernel_size=hparams.kernel_size,
 				skip_out_channels=hparams.skip_out_channels,
 				use_bias=hparams.use_bias,
-				dilation=2**(layer % layers_per_stack), 
+				dilation=2**(layer % layers_per_stack),
 				dropout=hparams.wavenet_dropout,
 				cin_channels=hparams.cin_channels,
 				gin_channels=hparams.gin_channels,
@@ -226,7 +225,7 @@ class WaveNet():
 
 				self.y_hat_log = y_hat_log
 				self.y_log = y_log
-				
+
 				log('  inputs:                    {}'.format(x.shape))
 				if self.local_conditioning_enabled():
 					log('  local_condition:           {}'.format(c.shape))
@@ -237,7 +236,7 @@ class WaveNet():
 
 
 			#evaluating
-			elif self.is_evaluating: 
+			elif self.is_evaluating:
 				#[time_length, ]
 				idx = 0
 				length = input_lengths[idx]
@@ -441,9 +440,9 @@ class WaveNet():
 		Args:
 			x: Tensor of shape [batch_size, channels, time_length], One-hot encoded audio signal.
 			c: Tensor of shape [batch_size, cin_channels, time_length], Local conditioning features.
-			g: Tensor of shape [batch_size, gin_channels, 1] or Ids of shape [batch_size, 1], 
+			g: Tensor of shape [batch_size, gin_channels, 1] or Ids of shape [batch_size, 1],
 				Global conditioning features.
-				Note: set hparams.use_speaker_embedding to False to disable embedding layer and 
+				Note: set hparams.use_speaker_embedding to False to disable embedding layer and
 				use extrnal One-hot encoded features.
 			softmax: Boolean, Whether to apply softmax.
 
@@ -570,7 +569,7 @@ class WaveNet():
 		initial_outputs_ta = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 		initial_loss_outputs_ta = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 		#Only use convolutions queues for Residual Blocks main convolutions (only ones with kernel size 3 and dilations, all others are 1x1)
-		initial_queues = [tf.zeros((batch_size, res_conv.conv.kw + (res_conv.conv.kw - 1) * (res_conv.conv.dilation_rate - 1), res_conv.conv.in_channels), 
+		initial_queues = [tf.zeros((batch_size, res_conv.conv.kw + (res_conv.conv.kw - 1) * (res_conv.conv.dilation_rate - 1), res_conv.conv.in_channels),
 			name='convolution_queue_{}'.format(i+1)) for i, res_conv in enumerate(self.conv_layers)]
 
 		def condition(time, unused_outputs_ta, unused_current_input, unused_loss_outputs_ta, unused_queues):

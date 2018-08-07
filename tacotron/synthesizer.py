@@ -1,16 +1,17 @@
 import os
+import wave
+from datetime import datetime
+
 import numpy as np
+import pyaudio
+import sounddevice as sd
 import tensorflow as tf
+from datasets import audio
+from infolog import log
 from librosa import effects
 from tacotron.models import create_model
-from tacotron.utils.text import text_to_sequence
 from tacotron.utils import plot
-from datasets import audio
-from datetime import datetime
-import sounddevice as sd
-import pyaudio
-import wave
-from infolog import log
+from tacotron.utils.text import text_to_sequence
 
 
 class Synthesizer:
@@ -23,7 +24,7 @@ class Synthesizer:
 			self.model = create_model(model_name, hparams)
 			if gta:
 				self.model.initialize(inputs, input_lengths, targets, gta=gta)
-			else:		
+			else:
 				self.model.initialize(inputs, input_lengths)
 			self.mel_outputs = self.model.mel_outputs
 			self.linear_outputs = self.model.linear_outputs if (hparams.predict_linear and not gta) else None

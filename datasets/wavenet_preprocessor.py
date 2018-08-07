@@ -1,9 +1,10 @@
+import os
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
+
+import numpy as np
 from datasets import audio
-import os
-import numpy as np 
-from wavenet_vocoder.util import mulaw_quantize, mulaw, is_mulaw, is_mulaw_quantize
+from wavenet_vocoder.util import is_mulaw, is_mulaw_quantize, mulaw, mulaw_quantize
 
 
 def build_from_path(hparams, input_dir, mel_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
@@ -23,7 +24,7 @@ def build_from_path(hparams, input_dir, mel_dir, wav_dir, n_jobs=12, tqdm=lambda
 		- A list of tuple describing the train examples. this should be written to train.txt
 	"""
 
-	# We use ProcessPoolExecutor to parallelize across processes, this is just for 
+	# We use ProcessPoolExecutor to parallelize across processes, this is just for
 	# optimization purposes and it can be omited
 	executor = ProcessPoolExecutor(max_workers=n_jobs)
 	futures = []
@@ -88,7 +89,7 @@ def _process_utterance(mel_dir, wav_dir, index, wav_path, hparams):
 		out = mulaw(wav, hparams.quantize_channels)
 		constant_values = mulaw(0., hparams.quantize_channels)
 		out_dtype = np.float32
-	
+
 	else:
 		#[-1, 1]
 		out = wav

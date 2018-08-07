@@ -1,7 +1,8 @@
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import numpy as np 
+
+import numpy as np
 
 
 def split_title_line(title_text, max_words=5):
