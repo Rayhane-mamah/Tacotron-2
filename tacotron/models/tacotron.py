@@ -1,13 +1,12 @@
-import tensorflow as tf 
-from tacotron.utils.symbols import symbols
+import tensorflow as tf
 from infolog import log
-from tacotron.models.helpers import TacoTrainingHelper, TacoTestHelper
-from tacotron.models.modules import *
-from tensorflow.contrib.seq2seq import dynamic_decode
-from tacotron.models.Architecture_wrappers import TacotronEncoderCell, TacotronDecoderCell
-from tacotron.models.custom_decoder import CustomDecoder
+from tacotron.models.Architecture_wrappers import TacotronDecoderCell, TacotronEncoderCell
 from tacotron.models.attention import LocationSensitiveAttention
-
+from tacotron.models.custom_decoder import CustomDecoder
+from tacotron.models.helpers import TacoTestHelper, TacoTrainingHelper
+from tacotron.models.modules import *
+from tacotron.utils.symbols import symbols
+from tensorflow.contrib.seq2seq import dynamic_decode
 
 
 class Tacotron():
@@ -16,7 +15,7 @@ class Tacotron():
 	def __init__(self, hparams):
 		self._hparams = hparams
 
-		
+
 	def initialize(self, inputs, input_lengths, mel_targets=None, stop_token_targets=None, linear_targets=None, targets_lengths=None, gta=False,
 			global_step=None, is_training=False, is_evaluating=False):
 		"""
@@ -79,7 +78,7 @@ class Tacotron():
 			prenet = Prenet(is_training, layers_sizes=hp.prenet_layers, drop_rate=hp.tacotron_dropout_rate, scope='decoder_prenet')
 			#Attention Mechanism
 			attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs, hparams=hp,
-				mask_encoder=hp.mask_encoder, memory_sequence_length=input_lengths, smoothing=hp.smoothing, 
+				mask_encoder=hp.mask_encoder, memory_sequence_length=input_lengths, smoothing=hp.smoothing,
 				cumulate_weights=hp.cumulative_weights)
 			#Decoder LSTM Cells
 			decoder_lstm = DecoderRNN(is_training, layers=hp.decoder_layers,
@@ -120,19 +119,19 @@ class Tacotron():
 				swap_memory=hp.tacotron_swap_with_cpu)
 
 
-			# Reshape outputs to be one output per entry 
+			# Reshape outputs to be one output per entry
 			#==> [batch_size, non_reduced_decoder_steps (decoder_steps * r), num_mels]
 			decoder_output = tf.reshape(frames_prediction, [batch_size, -1, hp.num_mels])
 			stop_token_prediction = tf.reshape(stop_token_prediction, [batch_size, -1])
 
-		
+
 			#Postnet
 			postnet = Postnet(is_training, hparams=hp, scope='postnet_convolutions')
 
 			#Compute residual using post-net ==> [batch_size, decoder_steps * r, postnet_channels]
 			residual = postnet(decoder_output)
 
-			#Project residual to same dimension as mel spectrogram 
+			#Project residual to same dimension as mel spectrogram
 			#==> [batch_size, decoder_steps * r, num_mels]
 			residual_projection = FrameProjection(hp.num_mels, scope='postnet_projection')
 			projected_residual = residual_projection(residual)
@@ -145,7 +144,7 @@ class Tacotron():
 			if post_condition:
 				# Add post-processing CBHG:
 			    post_outputs = post_cbhg(mel_outputs, hp.num_mels, is_training)           # [N, T_out, 256]
-			    linear_outputs = tf.layers.dense(post_outputs, hp.num_freq) 
+			    linear_outputs = tf.layers.dense(post_outputs, hp.num_freq)
 
 			#Grab alignments from the final decoder state
 			alignments = tf.transpose(final_decoder_state.alignment_history.stack(), [1, 2, 0])
@@ -292,9 +291,9 @@ class Tacotron():
 		hp = self._hparams
 
 		#Compute natural exponential decay
-		lr = tf.train.exponential_decay(init_lr, 
+		lr = tf.train.exponential_decay(init_lr,
 			global_step - hp.tacotron_start_decay, #lr = 1e-3 at step 50k
-			self.decay_steps, 
+			self.decay_steps,
 			self.decay_rate, #lr = 1e-5 around step 310k
 			name='lr_exponential_decay')
 

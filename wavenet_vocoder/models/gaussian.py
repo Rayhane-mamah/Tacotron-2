@@ -1,5 +1,5 @@
-import numpy as np 
-import tensorflow as tf 
+import numpy as np
+import tensorflow as tf
 
 
 def gaussian_maximum_likelihood_estimation_loss(y_hat, y, log_scale_min_gauss, reduce=True):

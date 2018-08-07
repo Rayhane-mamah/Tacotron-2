@@ -2,11 +2,8 @@
 
 import tensorflow as tf
 from tensorflow.contrib.seq2seq.python.ops.attention_wrapper import BahdanauAttention
-from tensorflow.python.ops import nn_ops
 from tensorflow.python.layers import core as layers_core
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import variable_scope
-from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import array_ops, math_ops, nn_ops, variable_scope
 
 
 #From https://github.com/tensorflow/tensorflow/blob/r1.7/tensorflow/contrib/seq2seq/python/ops/attention_wrapper.py
@@ -103,7 +100,7 @@ class LocationSensitiveAttention(BahdanauAttention):
   tion by jointly learning to align and translate,” in Proceedings
   of ICLR, 2015."
 	to use previous alignments as additional location features.
-	
+
 	This attention is described in:
 	J. K. Chorowski, D. Bahdanau, D. Serdyuk, K. Cho, and Y. Ben-
   gio, “Attention-based models for speech recognition,” in Ad-
@@ -130,7 +127,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 				in memory.  If provided, the memory tensor rows are masked with zeros
 				for values past the respective sequence lengths. Only relevant if mask_encoder = True.
 			smoothing (optional): Boolean. Determines which normalization function to use.
-				Default normalization function (probablity_fn) is softmax. If smoothing is 
+				Default normalization function (probablity_fn) is softmax. If smoothing is
 				enabled, we replace softmax with:
 						a_{i, j} = sigmoid(e_{i, j}) / sum_j(sigmoid(e_{i, j}))
 				Introduced in:
@@ -138,7 +135,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 				  gio, “Attention-based models for speech recognition,” in Ad-
 				  vances in Neural Information Processing Systems, 2015, pp.
 				  577–585.
-				This is mainly used if the model wants to attend to multiple inputs parts 
+				This is mainly used if the model wants to attend to multiple inputs parts
 				at the same decoding step. We probably won't be using it since multiple sound
 				frames may depend from the same character, probably not the way around.
 				Note:
@@ -161,7 +158,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 		self.location_convolution = tf.layers.Conv1D(filters=hparams.attention_filters,
 			kernel_size=hparams.attention_kernel, padding='same', use_bias=True,
 			bias_initializer=tf.zeros_initializer(), name='location_features_convolution')
-		self.location_layer = tf.layers.Dense(units=num_units, use_bias=False, 
+		self.location_layer = tf.layers.Dense(units=num_units, use_bias=False,
 			dtype=tf.float32, name='location_features_layer')
 		self._cumulate = cumulate_weights
 
@@ -206,5 +203,5 @@ class LocationSensitiveAttention(BahdanauAttention):
 			next_state = alignments + previous_alignments
 		else:
 			next_state = alignments
-			
+
 		return alignments, next_state

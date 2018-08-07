@@ -1,19 +1,15 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import collections
-import tensorflow as tf
 
+import tensorflow as tf
+from tacotron.models.helpers import TacoTestHelper, TacoTrainingHelper
 from tensorflow.contrib.seq2seq.python.ops import decoder
 from tensorflow.contrib.seq2seq.python.ops import helper as helper_py
-from tensorflow.python.framework import ops
-from tensorflow.python.framework import tensor_shape
+from tensorflow.python.framework import ops, tensor_shape
 from tensorflow.python.layers import base as layers_base
 from tensorflow.python.ops import rnn_cell_impl
 from tensorflow.python.util import nest
-from tacotron.models.helpers import TacoTrainingHelper, TacoTestHelper
-
 
 
 class CustomDecoderOutput(

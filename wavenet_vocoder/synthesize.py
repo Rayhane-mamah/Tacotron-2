@@ -1,12 +1,12 @@
 import argparse
 import os
-from hparams import hparams, hparams_debug_string
-from wavenet_vocoder.synthesizer import Synthesizer
-from tqdm import tqdm
-from infolog import log
+
 import numpy as np
 import tensorflow as tf
-
+from hparams import hparams, hparams_debug_string
+from infolog import log
+from tqdm import tqdm
+from wavenet_vocoder.synthesizer import Synthesizer
 
 
 def run_synthesis(args, checkpoint_path, output_dir, hparams):
