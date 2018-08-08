@@ -157,7 +157,7 @@ def train(log_dir, args, hparams):
 
 					if (checkpoint_state and checkpoint_state.model_checkpoint_path):
 						log('Loading checkpoint {}'.format(checkpoint_state.model_checkpoint_path), slack=True)
-						load_averaged_model(sess, sh_saver, checkpoint_state.model_checkpoint_path)
+						saver.restore(sess, checkpoint_state.model_checkpoint_path)
 					else:
 						log('No model to load at {}'.format(save_dir), slack=True)
 
