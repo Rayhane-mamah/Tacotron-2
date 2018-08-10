@@ -26,7 +26,7 @@ class Synthesizer:
 				input_lengths=None, synthesis_length=self.synthesis_length)
 
 			self._hparams = hparams
-			sh_saver = create_shadow_saver(self.model)
+			sh_saver = create_shadow_saver(self.model, checkpoint_path)
 
 			log('Loading checkpoint: {}'.format(checkpoint_path))
 			self.session = tf.Session()
