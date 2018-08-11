@@ -55,28 +55,25 @@ def create_shadow_saver(model, checkpoint_path, global_step=None):
 
 	#Check all variables in checkpoint
 	#Make an Intersection
-	shadow_variables = [s.replace('model_1', 'model') for s in shadow_variables]
-	tensor_list = []
-	orig_stdout = sys.stdout
-	f = open('tmp', 'w')
-	sys.stdout = f
-	chkp.print_tensors_in_checkpoint_file(checkpoint_path, tensor_name='', all_tensors=False, all_tensor_names=True)
-	sys.stdout = orig_stdout
-	f.close()
-	f = open('tmp', 'r')
-	while True:
-		line = f.readline()
-		if not line: break
-		shadow_variable = line.split(':  ')[1].strip()
-		tensor_list.append(shadow_variable)
-	f.close()
-	tensor_in = [i for i, x in enumerate(shadow_variables) if x in tensor_list]
-	shadow_variables = [x for i, x in enumerate(shadow_variables) if i in tensor_in]
-	variables = [x for i, x in enumerate(variables) if i in tensor_in]
-
-	if global_step is not None:
-		shadow_variables += ['global_step']
-		variables += [global_step]
+	if(os.path.exists(checkpoint_path)):
+	    shadow_variables = [s.replace('model_1', 'model') for s in shadow_variables]
+	    tensor_list = []
+	    orig_stdout = sys.stdout
+	    f = open('tmp', 'w')
+	    sys.stdout = f
+	    chkp.print_tensors_in_checkpoint_file(checkpoint_path, tensor_name='', all_tensors=False, all_tensor_names=True)
+	    sys.stdout = orig_stdout
+	    f.close()
+	    f = open('tmp', 'r')
+	    while True:
+	    	line = f.readline()
+	    	if not line: break
+	    	shadow_variable = line.split(':  ')[1].strip()
+	    	tensor_list.append(shadow_variable)
+	    f.close()
+	    tensor_in = [i for i, x in enumerate(shadow_variables) if x in tensor_list]
+	    shadow_variables = [x for i, x in enumerate(shadow_variables) if i in tensor_in]
+	    variables = [x for i, x in enumerate(variables) if i in tensor_in]
 
 	shadow_dict = dict(zip(shadow_variables, variables)) #dict(zip(keys, values)) -> {key1: value1, key2: value2, ...}
 
