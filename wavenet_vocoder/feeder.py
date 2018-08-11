@@ -354,8 +354,14 @@ class Feeder:
 			new_batch = []
 			for b in batch:
 				x, c, g, l = b
-				if len(x) % (len(c) + 1) == 0:
-					c = self._pad_specs(c, len(c) + 1)
+				if len(x) < len(c) * audio.get_hop_size(self._hparams):
+					pad_length = audio.get_hop_size(self._hparams) * len(c) - len(x)
+					if pad_length % 2 == 0:
+						x = np.pad(x, (pad_length//2, pad_length//2),mode='constant', constant_values=_pad )
+					else: 
+						x = np.pad(x, (pad_length//2, (pad_length+1)//2),mode='constant', constant_values=_pad )
+				else:
+					c = self._pad_specs(c, len(x) // audio.get_hop_size(self._hparams))
 				self._assert_ready_for_upsample(x, c)
 				if max_time_steps is not None:
 					max_steps = _ensure_divisible(max_time_steps, audio.get_hop_size(self._hparams), True)
