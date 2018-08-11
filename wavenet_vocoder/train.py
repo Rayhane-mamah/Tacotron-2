@@ -55,7 +55,7 @@ def create_shadow_saver(model, checkpoint_path, global_step=None):
 
 	#Check all variables in checkpoint
 	#Make an Intersection
-	if(os.path.exists(checkpoint_path)):
+	if(os.path.isfile(checkpoint_path+'.index')):
 	    shadow_variables = [s.replace('model_1', 'model') for s in shadow_variables]
 	    tensor_list = []
 	    orig_stdout = sys.stdout
