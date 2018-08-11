@@ -23,9 +23,10 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 		metadata_filename = os.path.join(args.mels_dir, 'map.txt')
 		with open(metadata_filename, encoding='utf-8') as f:
 			metadata = [line.strip().split('|') for line in f]
+
 			frame_shift_ms = hparams.hop_size / hparams.sample_rate
-			hours = sum([int(x[-1]) for x in metadata]) * frame_shift_ms / (3600)
-			log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(metadata), hours))
+			# hours = sum([int(x[-1]) for x in metadata]) * frame_shift_ms / (3600)
+			# log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(metadata), hours))
 
 		metadata = np.array(metadata)
 		speaker_ids = metadata[:, 2]
@@ -50,9 +51,9 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 				#rerange to [0, 1]
 				mel_spectro = np.interp(mel_spectro, T2_output_range, (0, 1))
 
-			basename = mel_file.replace('.npy', '')
+			basename = mel_file.replace('.npy', '') #what is this??
 			speaker_id = speaker_ids[i]
-			audio_file = synth.synthesize(mel_spectro, speaker_id, basename, wav_dir, log_dir)
+			audio_file = synth.synthesize(mel_spectro, speaker_id, i, wav_dir, log_dir) #mel_spectrogram, speaker_id, index, out_dir, log_dir
 
 			if texts is None:
 				file.write('{}|{}\n'.format(mel_file, audio_file))
