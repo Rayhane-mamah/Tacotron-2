@@ -15,6 +15,8 @@ from tacotron.utils import ValueWindow
 from wavenet_vocoder.feeder import Feeder
 from wavenet_vocoder.models import create_model
 
+from tensorflow.python.tools import inspect_checkpoint as chkp
+
 from . import util
 
 log = infolog.log
@@ -40,7 +42,7 @@ def add_test_stats(summary_writer, step, eval_loss):
 	summary_writer.add_summary(test_summary, step)
 
 
-def create_shadow_saver(model, global_step=None):
+def create_shadow_saver(model, checkpoint_path, global_step=None):
 	'''Load shadow variables of saved model.
 
 	Inspired by: https://www.tensorflow.org/api_docs/python/tf/train/ExponentialMovingAverage
@@ -51,11 +53,30 @@ def create_shadow_saver(model, global_step=None):
 	shadow_variables = [model.ema.average_name(v) for v in model.variables]
 	variables = model.variables
 
-	if global_step is not None:
-		shadow_variables += ['global_step']
-		variables += [global_step]
+	#Check all variables in checkpoint
+	#Make an Intersection
+	if(os.path.isfile(checkpoint_path+'.index')):
+	    shadow_variables = [s.replace('model_1', 'model') for s in shadow_variables]
+	    tensor_list = []
+	    orig_stdout = sys.stdout
+	    f = open('tmp', 'w')
+	    sys.stdout = f
+	    chkp.print_tensors_in_checkpoint_file(checkpoint_path, tensor_name='', all_tensors=False, all_tensor_names=True)
+	    sys.stdout = orig_stdout
+	    f.close()
+	    f = open('tmp', 'r')
+	    while True:
+	    	line = f.readline()
+	    	if not line: break
+	    	shadow_variable = line.split(':  ')[1].strip()
+	    	tensor_list.append(shadow_variable)
+	    f.close()
+	    tensor_in = [i for i, x in enumerate(shadow_variables) if x in tensor_list]
+	    shadow_variables = [x for i, x in enumerate(shadow_variables) if i in tensor_in]
+	    variables = [x for i, x in enumerate(variables) if i in tensor_in]
 
 	shadow_dict = dict(zip(shadow_variables, variables)) #dict(zip(keys, values)) -> {key1: value1, key2: value2, ...}
+
 	return tf.train.Saver(shadow_dict, max_to_keep=5)
 
 def load_averaged_model(sess, sh_saver, checkpoint_path):
@@ -179,7 +200,7 @@ def train(log_dir, args, hparams, input_path):
 	step = 0
 	time_window = ValueWindow(100)
 	loss_window = ValueWindow(100)
-	sh_saver = create_shadow_saver(model, global_step)
+	sh_saver = create_shadow_saver(model, checkpoint_path, global_step)
 
 	log('Wavenet training set to a maximum of {} steps'.format(args.wavenet_train_steps))
 
