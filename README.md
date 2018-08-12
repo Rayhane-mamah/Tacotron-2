@@ -147,7 +147,7 @@ logs will be stored inside **logs-Wavenet**.
 **Note:**
 - If model argument is not provided, training will default to Tacotron-2 model training. (both models)
 - Please refer to train arguments under [train.py](https://github.com/Rayhane-mamah/Tacotron-2/blob/master/train.py) for a set of options you can use.
-- It is now possible to make wavenet preprocessing alone using **wavenet_preprocess.py**.
+- It is now possible to make wavenet preprocessing alone using **wavenet_proprocess.py**.
 
 # Synthesis
 To **synthesize audio** in an **End-to-End** (text to audio) manner (both models at work):

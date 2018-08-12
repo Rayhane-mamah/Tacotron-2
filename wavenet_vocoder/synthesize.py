@@ -51,7 +51,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 		for i, mel_batch in enumerate(tqdm(mel_files)):
 			mel_spectros = [np.load(mel_file) for mel_file in mel_batch]
 
-			basenames = [mel_file.replace('.npy', '') for mel_file in mel_batch]
+			basenames = [os.path.basename(mel_file).replace('.npy', '') for mel_file in mel_batch]
 			speaker_id_batch = None if speaker_ids is None else speaker_ids[i]
 			audio_files = synth.synthesize(mel_spectros, speaker_id_batch, basenames, wav_dir, log_dir)
 
