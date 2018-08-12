@@ -126,7 +126,7 @@ def _process_utterance(mel_dir, wav_dir, index, wav_path, hparams):
 
 	#global condition features
 	if hparams.gin_channels > 0:
-		raise RuntimeError('When activating global conditions, please set your speaker_id rules in line 128 of datasets/wavenet_preprocessor.py to use them during training')
+		raise RuntimeError('When activating global conditions, please set your speaker_id rules in line 129 of datasets/wavenet_preprocessor.py to use them during training')
 		speaker_id = '<no_g>' #put the rule to determine how to assign speaker ids (using file names maybe? file basenames are available in "index" variable)
 	else:
 		speaker_id = '<no_g>'

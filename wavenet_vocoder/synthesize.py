@@ -22,42 +22,46 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 		#If running all Tacotron-2, synthesize audio from evaluated mels
 		metadata_filename = os.path.join(args.mels_dir, 'map.txt')
 		with open(metadata_filename, encoding='utf-8') as f:
-			metadata = [line.strip().split('|') for line in f]
-			frame_shift_ms = hparams.hop_size / hparams.sample_rate
-			hours = sum([int(x[-1]) for x in metadata]) * frame_shift_ms / (3600)
-			log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(metadata), hours))
+			metadata = np.array([line.strip().split('|') for line in f])
 
-		metadata = np.array(metadata)
 		speaker_ids = metadata[:, 2]
 		mel_files = metadata[:, 1]
 		texts = metadata[:, 0]
+
+		speaker_ids = None if (speaker_ids == '<no_g>').all() else speaker_ids
 	else:
 		#else Get all npy files in input_dir (supposing they are mels)
 		mel_files  = [os.path.join(args.mels_dir, f) for f in os.listdir(args.mels_dir) if f.split('.')[-1] == 'npy']
-		speaker_ids = args.speaker_id
+		speaker_ids = None if args.speaker_id is None else args.speaker_id.replace(' ', '').split(',')
+
+		if speaker_ids is not None:
+			assert len(speaker_ids) == len(mel_files)
+
 		texts = None
 
 	log('Starting synthesis! (this will take a while..)')
 	os.makedirs(log_dir, exist_ok=True)
 	os.makedirs(wav_dir, exist_ok=True)
 
+	mel_files = [mel_files[i: i+hparams.wavenet_synthesis_batch_size] for i in range(0, len(mel_files), hparams.wavenet_synthesis_batch_size)]
+	speaker_ids = None if speaker_ids is None else [speaker_ids[i: i+hparams.wavenet_synthesis_batch_size] for i in range(0, len(speaker_ids), hparams.wavenet_synthesis_batch_size)]
+	texts = None if texts is None else [texts[i: i+hparams.wavenet_synthesis_batch_size] for i in range(0, len(texts), hparams.wavenet_synthesis_batch_size)]
+
 	with open(os.path.join(wav_dir, 'map.txt'), 'w') as file:
-		for i, mel_file in enumerate(tqdm(mel_files)):
-			mel_spectro = np.load(mel_file)
-			if hparams.normalize_for_wavenet:
-				#[-max, max] or [0,max]
-				T2_output_range = (-hparams.max_abs_value, hparams.max_abs_value) if hparams.symmetric_mels else (0, hparams.max_abs_value)
-				#rerange to [0, 1]
-				mel_spectro = np.interp(mel_spectro, T2_output_range, (0, 1))
+		for i, mel_batch in enumerate(tqdm(mel_files)):
+			mel_spectros = [np.load(mel_file) for mel_file in mel_batch]
 
-			basename = mel_file.replace('.npy', '')
-			speaker_id = speaker_ids[i]
-			audio_file = synth.synthesize(mel_spectro, speaker_id, basename, wav_dir, log_dir)
+			basenames = [mel_file.replace('.npy', '') for mel_file in mel_batch]
+			speaker_id_batch = None if speaker_ids is None else speaker_ids[i]
+			audio_files = synth.synthesize(mel_spectros, speaker_id_batch, basenames, wav_dir, log_dir)
 
-			if texts is None:
-				file.write('{}|{}\n'.format(mel_file, audio_file))
-			else:
-				file.write('{}|{}|{}\n'.format(texts[i], mel_file, audio_file))
+			speaker_logs = ['<no_g>'] * len(mel_batch) if speaker_id_batch is None else speaker_id_batch
+
+			for j, mel_file in enumerate(mel_batch):
+				if texts is None:
+					file.write('{}|{}\n'.format(mel_file, audio_files[j], speaker_logs[j]))
+				else:
+					file.write('{}|{}|{}\n'.format(texts[i][j], mel_file, audio_files[j], speaker_logs[j]))
 
 	log('synthesized audio waveforms at {}'.format(wav_dir))
 

@@ -11,8 +11,9 @@ from sklearn.model_selection import train_test_split
 
 from .util import is_mulaw_quantize, is_scalar_input
 
+
+
 _batches_per_group = 32
-_pad = 0
 
 
 class Feeder:
@@ -311,14 +312,15 @@ class Feeder:
 		if local_condition:
 
 			maxlen = max([len(x) for x in c_features])
-			c_batch = np.stack([_pad_inputs(x, maxlen) for x in c_features]).astype(np.float32)
+			#[-max, max] or [0,max]
+			T2_output_range = (-self._hparams.max_abs_value, self._hparams.max_abs_value) if self._hparams.symmetric_mels else (0, self._hparams.max_abs_value)
+
+			c_batch = np.stack([_pad_inputs(x, maxlen, _pad=T2_output_range[0]) for x in c_features]).astype(np.float32)
 			assert len(c_batch.shape) == 3
 			#[batch_size, c_channels, time_steps]
 			c_batch = np.transpose(c_batch, (0, 2, 1))
 
 			if self._hparams.normalize_for_wavenet:
-				#[-max, max] or [0,max]
-				T2_output_range = (-self._hparams.max_abs_value, self._hparams.max_abs_value) if self._hparams.symmetric_mels else (0, self._hparams.max_abs_value)
 				#rerange to [0, 1]
 				c_batch = np.interp(c_batch, T2_output_range, (0, 1))
 		else:
@@ -354,8 +356,6 @@ class Feeder:
 			new_batch = []
 			for b in batch:
 				x, c, g, l = b
-				if len(x) % (len(c) + 1) == 0:
-					c = self._pad_specs(c, len(c) + 1)
 				self._assert_ready_for_upsample(x, c)
 				if max_time_steps is not None:
 					max_steps = _ensure_divisible(max_time_steps, audio.get_hop_size(self._hparams), True)
@@ -373,7 +373,7 @@ class Feeder:
 			new_batch = []
 			for b in batch:
 				x, c, g, l = b
-				x = audio.trim(x)
+				x = audio.trim_silence(x, hparams)
 				if max_time_steps is not None and len(x) > max_time_steps:
 					start = np.random.randint(0, len(c) - max_time_steps)
 					x = x[start: start + max_time_steps]
@@ -383,13 +383,10 @@ class Feeder:
 	def _assert_ready_for_upsample(self, x, c):
 		assert len(x) % len(c) == 0 and len(x) // len(c) == audio.get_hop_size(self._hparams)
 
-	def _pad_specs(self, x, maxlen):
-		return np.pad(x, [(0, maxlen - x.shape[0]), (0, 0)], mode='constant', constant_values=self._spec_pad)
-
-def _pad_inputs(x, maxlen):
+def _pad_inputs(x, maxlen, _pad=0):
 	return np.pad(x, [(0, maxlen - len(x)), (0, 0)], mode='constant', constant_values=_pad)
 
-def _pad_targets(x, maxlen):
+def _pad_targets(x, maxlen, _pad=0):
 	return np.pad(x, (0, maxlen - len(x)), mode='constant', constant_values=_pad)
 
 def _round_up(x, multiple):

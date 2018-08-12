@@ -249,6 +249,8 @@ class WaveNet():
 				if g is not None:
 					g = tf.expand_dims(g[idx], axis=0)
 
+				batch_size = tf.shape(c)[0]
+
 				#Start silence frame
 				if is_mulaw_quantize(hparams.input_type):
 					initial_value = mulaw_quantize(0, hparams.quantize_channels)
@@ -260,9 +262,9 @@ class WaveNet():
 				#[channels, ]
 				if is_mulaw_quantize(hparams.input_type):
 					initial_input = tf.one_hot(indices=initial_value, depth=hparams.quantize_channels, dtype=tf.float32)
-					initial_input = tf.reshape(initial_input, [1, 1, hparams.quantize_channels])
+					initial_input = tf.tile(tf.reshape(initial_input, [1, 1, hparams.quantize_channels]), [batch_size, 1, 1])
 				else:
-					initial_input = tf.ones([1, 1, 1], tf.float32) * initial_value
+					initial_input = tf.ones([batch_size, 1, 1], tf.float32) * initial_value
 
 				#Fast eval
 				y_hat = self.incremental(initial_input, c=c, g=g, time_length=length,
@@ -297,6 +299,7 @@ class WaveNet():
 
 			#synthesizing
 			else:
+				batch_size = tf.shape(c)[0]
 				if c is None:
 					assert synthesis_length is not None
 				else:
@@ -331,9 +334,9 @@ class WaveNet():
 				if is_mulaw_quantize(hparams.input_type):
 					assert initial_value >= 0 and initial_value < hparams.quantize_channels
 					initial_input = tf.one_hot(indices=initial_value, depth=hparams.quantize_channels, dtype=tf.float32)
-					initial_input = tf.reshape(initial_input, [1, 1, hparams.quantize_channels])
+					initial_input = tf.tile(tf.reshape(initial_input, [1, 1, hparams.quantize_channels]), [batch_size, 1, 1])
 				else:
-					initial_input = tf.ones([1, 1, 1], tf.float32) * initial_value
+					initial_input = tf.ones([batch_size, 1, 1], tf.float32) * initial_value
 
 				y_hat = self.incremental(initial_input, c=c, g=g, time_length=synthesis_length,
 					softmax=False, quantize=True, log_scale_min=hparams.log_scale_min)
@@ -517,7 +520,7 @@ class WaveNet():
 			Tensor of shape [batch_size, channels, time_length] or [batch_size, channels, 1]
 				Generated one_hot encoded samples
 		"""
-		batch_size = 1
+		batch_size = tf.shape(initial_input)[0]
 
 		#Note: should reshape to [batch_size, time_length, channels]
 		#not [batch_size, channels, time_length]

@@ -60,9 +60,9 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
 		for i, text in enumerate(tqdm(sentences)):
 			start = time.time()
-			mel_filename = synth.synthesize(text, i+1, eval_dir, log_dir, None)
+			mel_filename, speaker_id = synth.synthesize([text], [i+1], eval_dir, log_dir, None)
 
-			file.write('{}|{}\n'.format(text, mel_filename))
+			file.write('{}|{}|{}\n'.format(text, mel_filename[0], speaker_id[0]))
 	log('synthesized mel spectrograms at {}'.format(eval_dir))
 	return eval_dir
 
@@ -90,18 +90,21 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 		hours = sum([int(x[4]) for x in metadata]) * frame_shift_ms / (3600)
 		log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(metadata), hours))
 
+	metadata = [metadata[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(metadata), hparams.tacotron_synthesis_batch_size)]
+
 	log('starting synthesis')
 	mel_dir = os.path.join(args.input_dir, 'mels')
 	wav_dir = os.path.join(args.input_dir, 'audio')
 	with open(os.path.join(synth_dir, 'map.txt'), 'w') as file:
 		for i, meta in enumerate(tqdm(metadata)):
-			text = meta[5]
-			mel_filename = os.path.join(mel_dir, meta[1])
-			wav_filename = os.path.join(wav_dir, meta[0])
-			basename = os.path.basename(mel_filename).replace('.npy', '').replace('mel-', '')
-			mel_output_filename, speaker_id = synth.synthesize(text, basename, synth_dir, None, mel_filename)
+			texts = [m[5] for m in meta]
+			mel_filenames = [os.path.join(mel_dir, m[1]) for m in meta]
+			wav_filenames = [os.path.join(wav_dir, m[0]) for m in meta]
+			basenames = [os.path.basename(m).replace('.npy', '').replace('mel-', '') for m in mel_filenames]
+			mel_output_filenames, speaker_ids = synth.synthesize(texts, basenames, synth_dir, None, mel_filenames)
 
-			file.write('{}|{}|{}|{}|{}\n'.format(wav_filename, mel_filename, mel_output_filename, speaker_id, text))
+			for elems in zip(wav_filenames, mel_filenames, mel_output_filenames, speaker_ids, texts):
+				file.write('|'.join([str(x) for x in elems]) + '\n')
 	log('synthesized mel spectrograms at {}'.format(synth_dir))
 	return os.path.join(synth_dir, 'map.txt')
 

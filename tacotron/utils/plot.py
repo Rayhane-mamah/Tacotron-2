@@ -40,7 +40,7 @@ def plot_alignment(alignment, path, info=None, split_title=False, max_len=None):
 	plt.close()
 
 
-def plot_spectrogram(pred_spectrogram, path, info=None, split_title=False, target_spectrogram=None, max_len=None):
+def plot_spectrogram(pred_spectrogram, path, info=None, split_title=False, target_spectrogram=None, max_len=None, auto_aspect=False):
 	if max_len is not None:
 		target_spectrogram = target_spectrogram[:max_len]
 		pred_spectrogram = pred_spectrogram[:max_len]
@@ -60,14 +60,20 @@ def plot_spectrogram(pred_spectrogram, path, info=None, split_title=False, targe
 		ax1 = fig.add_subplot(311)
 		ax2 = fig.add_subplot(312)
 
-		im = ax1.imshow(np.rot90(target_spectrogram), interpolation='none')
+		if auto_aspect:
+			im = ax1.imshow(np.rot90(target_spectrogram), aspect='auto', interpolation='none')
+		else:
+			im = ax1.imshow(np.rot90(target_spectrogram), interpolation='none')
 		ax1.set_title('Target Mel-Spectrogram')
 		fig.colorbar(mappable=im, shrink=0.65, orientation='horizontal', ax=ax1)
 		ax2.set_title('Predicted Mel-Spectrogram')
 	else:
 		ax2 = fig.add_subplot(211)
 
-	im = ax2.imshow(np.rot90(pred_spectrogram), interpolation='none')
+	if auto_aspect:
+		im = ax2.imshow(np.rot90(pred_spectrogram), aspect='auto', interpolation='none')
+	else:
+		im = ax2.imshow(np.rot90(pred_spectrogram), interpolation='none')
 	fig.colorbar(mappable=im, shrink=0.65, orientation='horizontal', ax=ax2)
 
 	plt.tight_layout()

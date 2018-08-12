@@ -142,6 +142,9 @@ hparams = tf.contrib.training.HParams(
 	tacotron_test_batches = 48, #number of test batches (For Ljspeech: 10% ~= 41 batches of 32 samples)
 	tacotron_data_random_state=1234, #random state for train test split repeatability
 
+	#Usually your GPU can handle 16x tacotron_batch_size during synthesis for the same memory amount during training (because no gradients to keep and ops to register for backprop)
+	tacotron_synthesis_batch_size = 32 * 16, #This ensures GTA synthesis goes up to 40x faster than one sample at a time and uses 100% of your GPU computation power.
+
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	tacotron_start_decay = 50000, #Step at which learning decay starts
 	tacotron_decay_steps = 50000, #Determines the learning rate decay slope (UNDER TEST)
@@ -182,6 +185,10 @@ hparams = tf.contrib.training.HParams(
 	wavenet_test_size = 0.0441, #% of data to keep as test data, if None, wavenet_test_batches must be not None
 	wavenet_test_batches = None, #number of test batches.
 	wavenet_data_random_state = 1234, #random state for train test split repeatability
+
+	#During synthesis, there is no max_time_steps limitation so the model can sample much longer audio than 8000 steps. (Audio can go up to 500k steps, equivalent to ~21sec on 24kHz)
+	#Usually your GPU can handle 1x~2x wavenet_batch_size during synthesis for the same memory amount during training (because no gradients to keep and ops to register for backprop)
+	wavenet_synthesis_batch_size = 4 * 2, #This ensure that wavenet synthesis goes up to 4x~8x faster when synthesizing multiple sentences. Watch out for OOM with long audios.
 
 	wavenet_learning_rate = 1e-3,
 	wavenet_adam_beta1 = 0.9,
@@ -227,11 +234,10 @@ hparams = tf.contrib.training.HParams(
 	'it appears that oswald had only one caller in response to all of his fpcc activities,',
 	'he relied on the absence of the strychnia.',
 	'scoggins thought it was lighter.',
-	'''would, it is probable, have eventually overcome the reluctance of some of the prisoners at least,
-	and would have possessed so much moral dignity''',
-	'''Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization.
-	This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that
-	the adopted architecture is able to perform this task with wild success.''',
+	'would, it is probable, have eventually overcome the reluctance of some of the prisoners at least, and would have possessed so much moral dignity',
+	'Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization.\
+	This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that\
+	the adopted architecture is able to perform this task with wild success.',
 	'Thank you so much for your support!',
 	]
 
