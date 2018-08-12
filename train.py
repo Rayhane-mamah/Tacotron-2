@@ -102,7 +102,7 @@ def main():
 	parser.add_argument('--restore', type=bool, default=True, help='Set this to False to do a fresh training')
 	parser.add_argument('--summary_interval', type=int, default=250,
 		help='Steps between running summary ops')
-	parser.add_argument('--checkpoint_interval', type=int, default=5000,
+	parser.add_argument('--checkpoint_interval', type=int, default=20,
 		help='Steps between writing checkpoints')
 	parser.add_argument('--eval_interval', type=int, default=10000,
 		help='Steps between eval on test data')

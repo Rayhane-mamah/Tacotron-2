@@ -615,7 +615,7 @@ class WaveNet():
 				x = tf.nn.softmax(tf.reshape(x, [batch_size, -1]), axis=1) if softmax \
 					else tf.reshape(x, [batch_size, -1])
 				if quantize:
-					sample = tf.multinomial(tf.reshape(x, [batch_size, -1]), 1)[0] #Pick a sample using x as probability
+					sample = tf.multinomial(tf.reshape(x, [batch_size, -1]), batch_size)[0] #Pick a sample using x as probability
 					x = tf.one_hot(sample, depth=self._hparams.quantize_channels)
 
 			outputs_ta = outputs_ta.write(time, x)
