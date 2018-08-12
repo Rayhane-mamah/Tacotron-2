@@ -99,14 +99,14 @@ hparams = tf.contrib.training.HParams(
 	# If input_type is raw or mulaw, network assumes scalar input and
 	# discretized mixture of logistic distributions output, otherwise one-hot
 	# input and softmax output are assumed.
-	input_type="mulaw-quantize",
-	quantize_channels=2 ** 8,  # 65536 (16-bit) (raw) or 256 (8-bit) (mulaw or mulaw-quantize) // number of classes = 256 <=> mu = 255
+	input_type="raw",
+	quantize_channels=2 ** 16,  # 65536 (16-bit) (raw) or 256 (8-bit) (mulaw or mulaw-quantize) // number of classes = 256 <=> mu = 255
 
 	log_scale_min=float(np.log(1e-14)), #Mixture of logistic distributions minimal log scale
 	log_scale_min_gauss = float(np.log(1e-7)), #Gaussian distribution minimal allowed log scale
 
 	#To use Gaussian distribution as output distribution instead of mixture of logistics sets "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
-	out_channels = 2 ** 8, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
+	out_channels = 2, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
 	layers = 30, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
 	stacks = 3, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
 	residual_channels = 512,
@@ -127,7 +127,7 @@ hparams = tf.contrib.training.HParams(
 	use_bias = True, #Whether to use bias in convolutional layers of the Wavenet
 
 	max_time_sec = None,
-	max_time_steps = 8000, #Max time steps in audio used to train wavenet (decrease to save memory)
+	max_time_steps = 13000, #Max time steps in audio used to train wavenet (decrease to save memory) (Recommend: 8000 on modest GPUs, 13000 on stronger ones)
 	###########################################################################################################################################
 
 	#Tacotron Training
@@ -186,7 +186,7 @@ hparams = tf.contrib.training.HParams(
 	wavenet_test_batches = None, #number of test batches.
 	wavenet_data_random_state = 1234, #random state for train test split repeatability
 
-	#During synthesis, there is no max_time_steps limitation so the model can sample much longer audio than 8000 steps. (Audio can go up to 500k steps, equivalent to ~21sec on 24kHz)
+	#During synthesis, there is no max_time_steps limitation so the model can sample much longer audio than 8k(or 13k) steps. (Audio can go up to 500k steps, equivalent to ~21sec on 24kHz)
 	#Usually your GPU can handle 1x~2x wavenet_batch_size during synthesis for the same memory amount during training (because no gradients to keep and ops to register for backprop)
 	wavenet_synthesis_batch_size = 4 * 2, #This ensure that wavenet synthesis goes up to 4x~8x faster when synthesizing multiple sentences. Watch out for OOM with long audios.
 
