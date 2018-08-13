@@ -6,10 +6,6 @@ hparams = tf.contrib.training.HParams(
 	# Comma-separated list of cleaners to run on text prior to training and eval. For non-English
 	# text, you may want to use "basic_cleaners" or "transliteration_cleaners".
 	cleaners='english_cleaners',
-
-	#Hardware setup (TODO: multi-GPU parallel tacotron training)
-	use_all_gpus = False, #Whether to use all GPU resources. If True, total number of available gpus will override num_gpus.
-	num_gpus = 1, #Determines the number of gpus in use
 	###########################################################################################################################################
 
 	#Audio
@@ -105,7 +101,7 @@ hparams = tf.contrib.training.HParams(
 	log_scale_min=float(np.log(1e-14)), #Mixture of logistic distributions minimal log scale
 	log_scale_min_gauss = float(np.log(1e-7)), #Gaussian distribution minimal allowed log scale
 
-	#To use Gaussian distribution as output distribution instead of mixture of logistics sets "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
+	#To use Gaussian distribution as output distribution instead of mixture of logistics, set "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
 	out_channels = 2, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
 	layers = 30, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
 	stacks = 3, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
