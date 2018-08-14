@@ -40,7 +40,11 @@ class CustomDecoder(decoder.Decoder):
 		Raises:
 			TypeError: if `cell`, `helper` or `output_layer` have an incorrect type.
 		"""
-		rnn_cell_impl.assert_like_rnncell(type(cell), cell)
+		if (tf.__version__ < '1.10'):
+			if not rnn_cell_impl._like_rnncell(cell):  # pylint: disable=protected-access
+				raise TypeError("cell must be an RNNCell, received: %s" % type(cell))
+		else:
+			rnn_cell_impl.assert_like_rnncell(type(cell), cell)
 		if not isinstance(helper, helper_py.Helper):
 			raise TypeError("helper must be a Helper, received: %s" % type(helper))
 		if (output_layer is not None
