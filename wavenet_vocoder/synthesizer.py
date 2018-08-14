@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 import tensorflow as tf
-from datasets.audio import save_wav, get_hop_size
+from datasets.audio import save_wavenet_wav, get_hop_size
 from infolog import log
 from wavenet_vocoder.models import create_model
 from wavenet_vocoder.train import create_shadow_saver, load_averaged_model
@@ -56,7 +56,7 @@ class Synthesizer:
 			#rerange to [0, 1]
 			c_batch = np.interp(c_batch, T2_output_range, (0, 1))
 
-		g = None if speaker_ids is None else np.asarray(speaker_ids, dtype=np.int32).reshape(self._hparams.wavenet_synthesis_batch_size, 1)
+		g = None if speaker_ids is None else np.asarray(speaker_ids, dtype=np.int32).reshape(len(c_batch), 1)
 		feed_dict = {}
 
 		if local_cond:
@@ -75,7 +75,7 @@ class Synthesizer:
 		for i, generated_wav in enumerate(generated_wavs):
 			#Save wav to disk
 			audio_filename = os.path.join(out_dir, 'wavenet-audio-{}.wav'.format(basenames[i]))
-			save_wav(generated_wav, audio_filename, sr=hparams.sample_rate)
+			save_wavenet_wav(generated_wav, audio_filename, sr=hparams.sample_rate)
 			audio_filenames.append(audio_filename)
 
 			#Save waveplot to disk

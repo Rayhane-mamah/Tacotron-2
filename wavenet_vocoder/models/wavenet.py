@@ -319,10 +319,6 @@ class WaveNet():
 					#time_length will be corrected using the upsample network
 					c = tf.transpose(c, [0, 2, 1])
 
-				if g is not None:
-					assert g.shape == (1, 1)
-
-
 				#Start silence frame
 				if is_mulaw_quantize(hparams.input_type):
 					initial_value = mulaw_quantize(0, hparams.quantize_channels)
@@ -342,12 +338,12 @@ class WaveNet():
 					softmax=False, quantize=True, log_scale_min=hparams.log_scale_min)
 
 				if is_mulaw_quantize(hparams.input_type):
-					y_hat = tf.reshape(tf.argmax(y_hat, axis=1), [-1])
+					y_hat = tf.reshape(tf.argmax(y_hat, axis=1), [batch_size, -1])
 					y_hat = util.inv_mulaw_quantize(y_hat, hparams.quantize_channels)
 				elif is_mulaw(hparams.input_type):
-					y_hat = util.inv_mulaw(tf.reshape(y_hat, [-1]), hparams.quantize_channels)
+					y_hat = util.inv_mulaw(tf.reshape(y_hat, [batch_size, -1]), hparams.quantize_channels)
 				else:
-					y_hat = tf.reshape(y_hat, [-1])
+					y_hat = tf.reshape(y_hat, [batch_size, -1])
 
 				self.y_hat = y_hat
 
@@ -611,23 +607,28 @@ class WaveNet():
 				else:
 					x = sample_from_discretized_mix_logistic(
 						tf.reshape(x, [batch_size, -1, 1]), log_scale_min=log_scale_min)
+
+				next_input = tf.expand_dims(x, axis=-1) #Expand on the channels dimension
 			else:
 				x = tf.nn.softmax(tf.reshape(x, [batch_size, -1]), axis=1) if softmax \
 					else tf.reshape(x, [batch_size, -1])
 				if quantize:
-					sample = tf.multinomial(tf.reshape(x, [batch_size, -1]), 1)[0] #Pick a sample using x as probability
+					#[batch_size, 1]
+					sample = tf.multinomial(x, 1) #Pick a sample using x as probability (one for each batche)
+					#[batch_size, 1, quantize_channels] (time dimension extended by default)
 					x = tf.one_hot(sample, depth=self._hparams.quantize_channels)
+
+				next_input = x
+
+			if len(x.shape) == 3:
+				x = tf.squeeze(x, [1])
 
 			outputs_ta = outputs_ta.write(time, x)
 			time = time + 1
 			#output = x (maybe next input)
 			if test_inputs is not None:
+				#override next_input with ground truth
 				next_input = tf.expand_dims(test_inputs[:, time, :], axis=1)
-			else:
-				if is_mulaw_quantize(self._hparams.input_type):
-					next_input = tf.expand_dims(x, axis=1) #Expand on the time dimension
-				else:
-					next_input = tf.expand_dims(x, axis=-1) #Expand on the channels dimension
 
 			return (time, outputs_ta, next_input, loss_outputs_ta, new_queues)
 

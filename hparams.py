@@ -6,10 +6,6 @@ hparams = tf.contrib.training.HParams(
 	# Comma-separated list of cleaners to run on text prior to training and eval. For non-English
 	# text, you may want to use "basic_cleaners" or "transliteration_cleaners".
 	cleaners='english_cleaners',
-
-	#Hardware setup (TODO: multi-GPU parallel tacotron training)
-	use_all_gpus = False, #Whether to use all GPU resources. If True, total number of available gpus will override num_gpus.
-	num_gpus = 1, #Determines the number of gpus in use
 	###########################################################################################################################################
 
 	#Audio
@@ -100,12 +96,12 @@ hparams = tf.contrib.training.HParams(
 	# discretized mixture of logistic distributions output, otherwise one-hot
 	# input and softmax output are assumed.
 	input_type="raw",
-	quantize_channels=65536,  # 65536 (16-bit) (raw) or 256 (8-bit) (mulaw or mulaw-quantize) // number of classes = 256 <=> mu = 255
+	quantize_channels=2 ** 16,  # 65536 (16-bit) (raw) or 256 (8-bit) (mulaw or mulaw-quantize) // number of classes = 256 <=> mu = 255
 
 	log_scale_min=float(np.log(1e-14)), #Mixture of logistic distributions minimal log scale
 	log_scale_min_gauss = float(np.log(1e-7)), #Gaussian distribution minimal allowed log scale
 
-	#To use Gaussian distribution as output distribution instead of mixture of logistics sets "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
+	#To use Gaussian distribution as output distribution instead of mixture of logistics, set "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
 	out_channels = 2, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
 	layers = 30, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
 	stacks = 3, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
@@ -116,7 +112,7 @@ hparams = tf.contrib.training.HParams(
 
 	cin_channels = 80, #Set this to -1 to disable local conditioning, else it must be equal to num_mels!!
 	upsample_conditional_features = True, #Whether to repeat conditional features or upsample them (The latter is recommended)
-	upsample_scales = [15, 20], #prod(scales) should be equal to hop size
+	upsample_scales = [15, 20], #prod(upsample_scales) should be equal to hop_size
 	freq_axis_kernel_size = 3,
 	leaky_alpha = 0.4,
 
@@ -127,7 +123,7 @@ hparams = tf.contrib.training.HParams(
 	use_bias = True, #Whether to use bias in convolutional layers of the Wavenet
 
 	max_time_sec = None,
-	max_time_steps = 8000, #Max time steps in audio used to train wavenet (decrease to save memory)
+	max_time_steps = 13000, #Max time steps in audio used to train wavenet (decrease to save memory) (Recommend: 8000 on modest GPUs, 13000 on stronger ones)
 	###########################################################################################################################################
 
 	#Tacotron Training
@@ -186,7 +182,7 @@ hparams = tf.contrib.training.HParams(
 	wavenet_test_batches = None, #number of test batches.
 	wavenet_data_random_state = 1234, #random state for train test split repeatability
 
-	#During synthesis, there is no max_time_steps limitation so the model can sample much longer audio than 8000 steps. (Audio can go up to 500k steps, equivalent to ~21sec on 24kHz)
+	#During synthesis, there is no max_time_steps limitation so the model can sample much longer audio than 8k(or 13k) steps. (Audio can go up to 500k steps, equivalent to ~21sec on 24kHz)
 	#Usually your GPU can handle 1x~2x wavenet_batch_size during synthesis for the same memory amount during training (because no gradients to keep and ops to register for backprop)
 	wavenet_synthesis_batch_size = 4 * 2, #This ensure that wavenet synthesis goes up to 4x~8x faster when synthesizing multiple sentences. Watch out for OOM with long audios.
 
@@ -213,28 +209,14 @@ hparams = tf.contrib.training.HParams(
 	'Basilar membrane and otolaryngology are not auto-correlations.',
 	'He has read the whole thing.',
 	'He reads books.',
-	"Don't desert me here in the desert!",
 	'He thought it was time to present the present.',
 	'Thisss isrealy awhsome.',
 	'Punctuation sensitivity, is working.',
 	'Punctuation sensitivity is working.',
-	"The buses aren't the problem, they actually provide a solution.",
-	"The buses aren't the PROBLEM, they actually provide a SOLUTION.",
-	"The quick brown fox jumps over the lazy dog.",
-	"does the quick brown fox jump over the lazy dog?",
 	"Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?",
 	"She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.",
-	"The blue lagoon is a nineteen eighty American romance adventure film.",
 	"Tajima Airport serves Toyooka.",
-	'Talib Kweli confirmed to AllHipHop that he will be releasing an album in the next year.',
-	#From Training data:
-	'the rest being provided with barrack beds, and in dimensions varying from thirty feet by fifteen to fifteen feet by ten.',
-	'in giltspur street compter, where he was first lodged.',
-	'a man named burnett came with his wife and took up his residence at whitchurch, hampshire, at no great distance from laverstock,',
-	'it appears that oswald had only one caller in response to all of his fpcc activities,',
-	'he relied on the absence of the strychnia.',
-	'scoggins thought it was lighter.',
-	'would, it is probable, have eventually overcome the reluctance of some of the prisoners at least, and would have possessed so much moral dignity',
+	#From The web (random long utterance)
 	'Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization.\
 	This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that\
 	the adopted architecture is able to perform this task with wild success.',

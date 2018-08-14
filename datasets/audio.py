@@ -14,6 +14,9 @@ def save_wav(wav, path, sr):
 	#proposed by @dsmiller
 	wavfile.write(path, sr, wav.astype(np.int16))
 
+def save_wavenet_wav(wav, path, sr):
+	librosa.output.write_wav(path, wav, sr=sr)
+
 #From https://github.com/r9y9/wavenet_vocoder/blob/master/audio.py
 def start_and_end_indices(quantized, silence_threshold=2):
 	for start in range(quantized.size):
