@@ -184,7 +184,7 @@ hparams = tf.contrib.training.HParams(
 
 	#During synthesis, there is no max_time_steps limitation so the model can sample much longer audio than 8k(or 13k) steps. (Audio can go up to 500k steps, equivalent to ~21sec on 24kHz)
 	#Usually your GPU can handle 1x~2x wavenet_batch_size during synthesis for the same memory amount during training (because no gradients to keep and ops to register for backprop)
-	wavenet_synthesis_batch_size = 4*2, #This ensure that wavenet synthesis goes up to 4x~8x faster when synthesizing multiple sentences. Watch out for OOM with long audios.
+	wavenet_synthesis_batch_size = 4 * 2, #This ensure that wavenet synthesis goes up to 4x~8x faster when synthesizing multiple sentences. Watch out for OOM with long audios.
 
 	wavenet_learning_rate = 1e-3,
 	wavenet_adam_beta1 = 0.9,
