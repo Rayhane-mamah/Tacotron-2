@@ -109,7 +109,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	return os.path.join(synth_dir, 'map.txt')
 
 def tacotron_synthesize(args, hparams, checkpoint, sentences=None):
-	output_dir = 'tacotron_' + args.output_dir
+	output_dir = os.path.join(args.output_dir, 'tacotron_' + args.output_dir)
 
 	try:
 		checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
