@@ -61,7 +61,7 @@ def linearspectrogram(wav, hparams):
 	return S
 
 def melspectrogram(wav, hparams):
-	D = _stft(wav, hparams)
+	D = _stft(preemphasis(wav, hparams.preemphasis), hparams)
 	S = _amp_to_db(_linear_to_mel(np.abs(D), hparams), hparams) - hparams.ref_level_db
 
 	if hparams.signal_normalization:
@@ -99,9 +99,9 @@ def inv_mel_spectrogram(mel_spectrogram, hparams):
 		processor = _lws_processor(hparams)
 		D = processor.run_lws(S.astype(np.float64).T ** hparams.power)
 		y = processor.istft(D).astype(np.float32)
-		return y
+		return inv_preemphasis(y)
 	else:
-		return _griffin_lim(S ** hparams.power, hparams)
+		return inv_preemphasis(_griffin_lim(S ** hparams.power, hparams), hparams.preemphasis)
 
 def _lws_processor(hparams):
 	import lws
