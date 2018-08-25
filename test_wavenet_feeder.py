@@ -1,10 +1,10 @@
+import argparse
 import numpy as np 
 import os
-import argparse 
-from hparams import hparams
-from datasets import audio
-from tqdm import tqdm
 
+from datasets import audio
+from hparams import hparams
+from tqdm import tqdm
 
 
 def _limit_time(hparams):
@@ -33,6 +33,7 @@ def get_groups(args, hparams, meta, local_condition):
 		local_condition_features = None
 
 	return (input_data, local_condition_features, None, len(input_data))
+
 
 def _adjust_time_resolution(hparams, batch, local_condition, max_time_steps):
 		'''Adjust time resolution between audio and local condition
@@ -65,8 +66,10 @@ def _adjust_time_resolution(hparams, batch, local_condition, max_time_steps):
 				new_batch.append((x, c, g, l))
 			return new_batch
 
+
 def _assert_ready_for_upsample(hparams, x, c):
 	assert len(x) % len(c) == 0 and len(x) // len(c) == audio.get_hop_size(hparams)
+
 
 def check_time_alignment(hparams, batch, local_condition):
 	#No need to check beyond this step when preparing data
@@ -74,6 +77,7 @@ def check_time_alignment(hparams, batch, local_condition):
 	max_time_steps = _limit_time(hparams)
 	#Adjust time resolution for upsampling
 	batch = _adjust_time_resolution(hparams, batch, local_condition, max_time_steps)
+
 
 def _ensure_divisible(length, divisible_by=256, lower=True):
 	if length % divisible_by == 0:
@@ -83,6 +87,7 @@ def _ensure_divisible(length, divisible_by=256, lower=True):
 	else:
 		return length + (divisible_by - length % divisible_by)
 
+
 def run(args, hparams):
 	with open(args.metadata, 'r') as file:
 		metadata = [line.strip().split('|') for line in file]
@@ -90,11 +95,10 @@ def run(args, hparams):
 	local_condition = hparams.cin_channels > 0
 
 	examples = [get_groups(args, hparams, meta, local_condition) for meta in metadata]
-	batches = [examples[i: i+hparams.wavenet_batch_size] for i in range(0, len(examples), hparams.wavenet_batch_size)]
+	batches = [examples[i: i + hparams.wavenet_batch_size] for i in range(0, len(examples), hparams.wavenet_batch_size)]
 
 	for batch in tqdm(batches):
 		check_time_alignment(hparams, batch, local_condition)
-
 
 
 def main():
