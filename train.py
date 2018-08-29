@@ -16,14 +16,14 @@ def save_seq(file, sequence, input_path):
 	'''Save Tacotron-2 training state to disk. (To skip for future runs)
 	'''
 	sequence = [str(int(s)) for s in sequence] + [input_path]
-	with open(file, 'w') as f:
+	with open(file, 'w', encoding="utf-8") as f:
 		f.write('|'.join(sequence))
 
 def read_seq(file):
 	'''Load Tacotron-2 training state from disk. (To skip if not first run)
 	'''
 	if os.path.isfile(file):
-		with open(file, 'r') as f:
+		with open(file, 'r', encoding="utf-8") as f:
 			sequence = f.read().split('|')
 
 		return [bool(int(s)) for s in sequence[:-1]], sequence[-1]

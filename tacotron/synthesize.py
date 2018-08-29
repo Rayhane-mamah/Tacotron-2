@@ -56,8 +56,7 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	synth = Synthesizer()
 	synth.load(checkpoint_path, hparams)
 
-	
-	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
+	with open(os.path.join(eval_dir, 'map.txt'), 'w', encoding="utf-8") as file:
 		for i, text in enumerate(tqdm(sentences)):
 			start = time.time()
 			mel_filename = synth.synthesize(text, i+1, eval_dir, log_dir, None)
@@ -93,7 +92,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	log('starting synthesis')
 	mel_dir = os.path.join(args.input_dir, 'mels')
 	wav_dir = os.path.join(args.input_dir, 'audio')
-	with open(os.path.join(synth_dir, 'map.txt'), 'w') as file:
+	with open(os.path.join(synth_dir, 'map.txt'), 'w', encoding="utf-8") as file:
 		for i, meta in enumerate(tqdm(metadata)):
 			text = meta[5]
 			mel_filename = os.path.join(mel_dir, meta[1])

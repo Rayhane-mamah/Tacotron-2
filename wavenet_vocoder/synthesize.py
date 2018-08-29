@@ -39,7 +39,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	os.makedirs(log_dir, exist_ok=True)
 	os.makedirs(wav_dir, exist_ok=True)
 
-	with open(os.path.join(wav_dir, 'map.txt'), 'w') as file:
+	with open(os.path.join(wav_dir, 'map.txt'), 'w', encoding="utf-8") as file:
 		for i, mel_file in enumerate(tqdm(mel_files)):
 			mel_spectro = np.load(mel_file)
 			audio_file = synth.synthesize(mel_spectro, None, i+1, wav_dir, log_dir)
