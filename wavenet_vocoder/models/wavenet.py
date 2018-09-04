@@ -153,7 +153,7 @@ class WaveNet():
 			except AttributeError:
 				pass
 
-	def initialize(self, y, c, g, input_lengths, x=None, synthesis_length=None):
+	def initialize(self, y, c, g, input_lengths, split_infos=None, x=None, synthesis_length=None):
 		'''Initialize wavenet graph for train, eval and test cases.
 		'''
 		hparams = self._hparams
@@ -415,7 +415,7 @@ class WaveNet():
 		# Noam scheme from tensor2tensor:
 		warmup_steps = 4000.0
 		step = tf.cast(global_step + 1, dtype=tf.float32)
-		return tf.maximum(init_lr * warmup_steps**0.5 * tf.minimum(step * warmup_steps**-1.5, step**-0.5), 1e-4)
+		return tf.maximum(init_lr * warmup_steps**0.5 * tf.minimum(step * warmup_steps**-1.5, step**-0.5), 1e-8) # 1e-4 to 1e-8
 
 
 	def get_mask(self, input_lengths, maxlen=None):
