@@ -9,7 +9,7 @@ from tqdm import tqdm
 from wavenet_vocoder.synthesizer import Synthesizer
 
 
-def run_synthesis(args, checkpoint_path, output_dir, hparams):
+def run_synthesis(args, checkpoint_path, input_dir, output_dir, hparams):
 	log_dir = os.path.join(output_dir, 'plots')
 	wav_dir = os.path.join(output_dir, 'wavs')
 
@@ -20,7 +20,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 
 	if args.model == 'Tacotron-2':
 		#If running all Tacotron-2, synthesize audio from evaluated mels
-		metadata_filename = os.path.join(args.mels_dir, 'map.txt')
+		metadata_filename = os.path.join(input_dir, 'map.txt')
 		with open(metadata_filename, encoding='utf-8') as f:
 			metadata = np.array([line.strip().split('|') for line in f])
 
@@ -31,7 +31,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 		speaker_ids = None if (speaker_ids == '<no_g>').all() else speaker_ids
 	else:
 		#else Get all npy files in input_dir (supposing they are mels)
-		mel_files  = [os.path.join(args.mels_dir, f) for f in os.listdir(args.mels_dir) if f.split('.')[-1] == 'npy']
+		mel_files  = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.split('.')[-1] == 'npy']
 		speaker_ids = None if args.speaker_id is None else args.speaker_id.replace(' ', '').split(',')
 
 		if speaker_ids is not None:
@@ -68,12 +68,12 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 
 
 def wavenet_synthesize(args, hparams, checkpoint):
-	output_dir = 'wavenet_' + args.output_dir
-
+	input_dir = os.path.join(args.base_dir, 'tacotron_' + args.output_dir, 'eval')
+	output_dir = os.path.join(args.base_dir, 'wavenet_' + args.output_dir)
 	try:
 		checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
 		log('loaded model at {}'.format(checkpoint_path))
 	except:
 		raise RuntimeError('Failed to load checkpoint at {}'.format(checkpoint))
 
-	run_synthesis(args, checkpoint_path, output_dir, hparams)
+	run_synthesis(args, checkpoint_path, input_dir, output_dir, hparams)
