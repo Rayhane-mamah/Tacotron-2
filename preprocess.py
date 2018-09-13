@@ -1,10 +1,9 @@
 import argparse
-import os
 from multiprocessing import cpu_count
-
-from datasets import preprocessor
-from hparams import hparams
+import os
 from tqdm import tqdm
+from datasets import preprocessor, preprocessor_liepa
+from hparams import hparams
 
 
 def preprocess(args, input_folders, out_dir, hparams):
@@ -14,7 +13,12 @@ def preprocess(args, input_folders, out_dir, hparams):
 	os.makedirs(mel_dir, exist_ok=True)
 	os.makedirs(wav_dir, exist_ok=True)
 	os.makedirs(linear_dir, exist_ok=True)
-	metadata = preprocessor.build_from_path(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
+
+	if args.dataset.startswith('liepa'):
+		metadata = preprocessor_liepa.build_from_path(hparams, input_folders, None, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
+	else:
+		metadata = preprocessor.build_from_path(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
+
 	write_metadata(metadata, out_dir)
 
 def write_metadata(metadata, out_dir):
@@ -36,7 +40,7 @@ def norm_data(args):
 	merge_books = (args.merge_books=='True')
 
 	print('Selecting data folders..')
-	supported_datasets = ['LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS']
+	supported_datasets = ['LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS', 'liepa-multi']
 	if args.dataset not in supported_datasets:
 		raise ValueError('dataset value entered {} does not belong to supported datasets: {}'.format(
 			args.dataset, supported_datasets))
@@ -44,6 +48,10 @@ def norm_data(args):
 	if args.dataset.startswith('LJSpeech'):
 		return [os.path.join(args.base_dir, args.dataset)]
 
+	if args.dataset.startswith('liepa'):
+		if not args.voice:
+			raise ValueError('`--voice` parameter not defiend for  datasets {}'.format(args.dataset))
+		return [os.path.join(args.base_dir, voice) for voice in args.voice.split(',')]
 
 	if args.dataset == 'M-AILABS':
 		supported_languages = ['en_US', 'en_UK', 'fr_FR', 'it_IT', 'de_DE', 'es_ES', 'ru_RU',

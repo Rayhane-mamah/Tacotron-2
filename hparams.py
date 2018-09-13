@@ -5,12 +5,12 @@ import tensorflow as tf
 hparams = tf.contrib.training.HParams(
 	# Comma-separated list of cleaners to run on text prior to training and eval. For non-English
 	# text, you may want to use "basic_cleaners" or "transliteration_cleaners".
-	cleaners='english_cleaners',
+	cleaners='basic_cleaners',
 	###########################################################################################################################################
 
 	#Audio
 	num_mels = 80, #Number of mel-spectrogram channels and local conditioning dimensionality
-	num_freq = 1025, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
+	num_freq = 513, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
 	rescale = True, #Whether to rescale audio prior to preprocessing
 	rescaling_max = 0.999, #Rescaling value
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
@@ -20,20 +20,20 @@ hparams = tf.contrib.training.HParams(
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
 	# Does not work if n_ffit is not multiple of hop_size!!
-	use_lws=False,
+	use_lws=True,
 	silence_threshold=2, #silence threshold used for sound trimming for wavenet preprocessing
 
 	#Mel spectrogram
-	n_fft = 2048, #Extra window size is filled with 0 paddings to match this parameter
-	hop_size = 300, #For 22050Hz, 275 ~= 12.5 ms
-	win_size = 1200, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
-	sample_rate = 24000, #22050 Hz (corresponding to ljspeech dataset)
+	n_fft = 1024, #Extra window size is filled with 0 paddings to match this parameter
+	hop_size = 256, #For 22050Hz, 275 ~= 12.5 ms
+	win_size = None, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
+	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset)
 	frame_shift_ms = None,
 
 	#M-AILABS (and other datasets) trim params
 	trim_fft_size = 512,
 	trim_hop_size = 128,
-	trim_top_db = 23,
+	trim_top_db = 60,
 
 	#Mel and Linear spectrograms normalization/scaling and clipping
 	signal_normalization = True,
@@ -49,7 +49,7 @@ hparams = tf.contrib.training.HParams(
 	fmax = 7600,
 
 	#Griffin Lim
-	power = 1.5,
+	power = 1.1,
 	griffin_lim_iters = 60,
 	###########################################################################################################################################
 
@@ -199,28 +199,25 @@ hparams = tf.contrib.training.HParams(
 
 	#Eval sentences (if no eval file was specified, these sentences are used for eval)
 	sentences = [
-	# From July 8, 2017 New York Times:
-	'Scientists at the CERN laboratory say they have discovered a new particle.',
-	'There\'s a way to measure the acute emotional intelligence that has never gone out of style.',
-	'President Trump met with other leaders at the Group of 20 conference.',
-	'The Senate\'s bill to repeal and replace the Affordable Care Act is now imperiled.',
-	# From Google's Tacotron example page:
-	'Generative adversarial network or variational auto-encoder.',
-	'Basilar membrane and otolaryngology are not auto-correlations.',
-	'He has read the whole thing.',
-	'He reads books.',
-	'He thought it was time to present the present.',
-	'Thisss isrealy awhsome.',
-	'Punctuation sensitivity, is working.',
-	'Punctuation sensitivity is working.',
-	"Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?",
-	"She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.",
-	"Tajima Airport serves Toyooka.",
-	#From The web (random long utterance)
-	'Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization.\
-	This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that\
-	the adopted architecture is able to perform this task with wild success.',
-	'Thank you so much for your support!',
+	# From Liepa database teksto_pavyzdys.txt:
+	'Paulius Grinkevičius',
+	'15min.lt',
+	'IT specialistai Lietuvoje ir toliau gyvens kaip karaliai – jų reiks 5 kartus daugiau, nei gali pasiūlyti aukštosios mokyklos',
+	'Per ateinančius trejus metus Lietuvoje informacinių technologijų ir ryšių (IRT) specialistų reikės penkis kartus daugiau, nei parengs mūsų aukštosios mokyklos. Tai stabdys tiek didelių, tiek ir smulkių bei vidutinių įmonių augimą ir lems dar didesnę konkurenciją IT sektoriuje, rodo INFOBALT atliktas IT specialistų poreikio tyrimas.',
+	'"INFOBALT" Inovacijų vadovas Andrius Plečkaitis antradienį apžvelgdamas pastarųjų metų IT specialistų poreikio augimo tendencijas sakė, kad darbo vietų poreikio augimas susijęs su užsienio kapitalo IT įmonių atėjimu į Lietuvą, taip pat auga ir vietos kapitalo įmonės – vien jų eksportas į užsienį pernai padidėjo 82 procentais.',
+	'Į informacines ir ryšių technologijas (IRT) stojančiųjų mažėja nuo 2008 m., kitąmet tikimasi, kad pirmą kartą per penkerius metus šis skaičius pradės augti.',
+	'Apklausę įmones matome, kad apie 90 proc. įmonių nori didinti darbuotojų skaičių. 2014–2016 metais reiks 17,5 tūkst. specialistų, aukštosios mokyklos paruoš 3,2 tūkstančių, – sako A.Plečkaitis. – Tokius rezultatus lemia įmonių, tarp jų ir startuolių, augimas. 46 proc. smulkių, iki dešimties darbuotojų turinčių įmonių artimiausiais metais žada plėstis ir samdyti naujų darbuotojų, mažos ir vidutinės – 11 proc., o stambios įmonės – 14 procentų.',
+	'Pasak A.Plečkaičio, didelį nerimą kelia ir tai, kad studijas baigia tik maždaug pusė įstojusių į IRT specialybes. Bendrai aukštąsias mokyklas Lietuvoje baigia daugiau kaip 62 proc. studentų, o IRT specialybių – 51 procentas.',
+	'Penki pasiūlymai per savaitę',
+	'Personalo atrankos įmonės "Alliance for Recruitment" partneris Vytenis Šidlauskas kalba, kad IRT specialistų poreikis dėl technologijų skverbties į mūsų gyvenimą bus dar didesnis.',
+	'Pasak jo, paprasti darbo skelbimai su siūlymais nebepatraukia darbuotojų dėmesio – esą bene vienintelis būdas prisivilioti gerą IT specialistą – jį pervilioti iš kitos įmonės. O toks darbuotojų persamdymas kenkia visai rinkai.',
+	'"Pralošia ir ta įmonė, kuri prisivilioja darbuotoją, taip pat ir ta, kuri jo netenka, nes reikia kelti atlyginimus. Šalies konkurencingumo mastu naudos praktiškai nėra. Mūsų jau nestebina, kad paskambinus IT specialistui pakviesti į darbo pokalbį šis sako – "esate penktas, kuris man skambina dėl IRT darbo šią savaitę", – pasakoja V.Šidlauskas.',
+	'Jis vidurinių mokyklų moksleivius ragina rinktis IT specialybes, kurios garantuos ir stabilias pajamas ateityje. V.Šidlauskas sako, kad IRT studijas baigęs ir maždaug trejų metų patirtį turintis specialistas nesunkiai per mėnesį gali uždirbti 4–5 tūkst. litų.',
+	'IT specialistų stygius kels paslaugų kainas',
+	'Švietimo ir mokslo ministerijos atstovas Rimantas Vaitkus sako, kad su IT specialistų trūkumu susiduriame ir kitose šalyse.',
+	'Pasak jo, IT specialistų poreikio problemas ketinama spręsti didinant valstybės užsakymų dalį į šias specialybes, pagerinus studijų apmokėjimo sąlygas.',
+	'Tyrime pateikiamos išvados, kad sparčiausiai turėtų augti stambios IT įmonės, o vidutinio dydžio IT įmonės konkuruos su didelėmis ir didins atlyginimus, o tai kels IT paslaugų ir produktų kainas.',
+	'Be to, problemų turės ir startuolių įmonės, nes šioms bus sunku pritraukti kvalifikuotų specialistų.',
 	]
 
 	)

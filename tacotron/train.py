@@ -56,7 +56,7 @@ def time_string():
 def model_train_mode(args, feeder, hparams, global_step):
 	with tf.variable_scope('model', reuse=tf.AUTO_REUSE) as scope:
 		model_name = None
-		if args.model == 'Tacotron-2':
+		if args.model in ('Tacotron-2', 'Both'):
 			model_name = 'Tacotron'
 		model = create_model(model_name or args.model, hparams)
 		if hparams.predict_linear:
@@ -75,7 +75,7 @@ def model_train_mode(args, feeder, hparams, global_step):
 def model_test_mode(args, feeder, hparams, global_step):
 	with tf.variable_scope('model', reuse=tf.AUTO_REUSE) as scope:
 		model_name = None
-		if args.model == 'Tacotron-2':
+		if args.model in ('Tacotron-2', 'Both'):
 			model_name = 'Tacotron'
 		model = create_model(model_name or args.model, hparams)
 		if hparams.predict_linear:
