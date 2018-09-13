@@ -1,13 +1,13 @@
-import numpy as np 
 import os
 import threading
 import time
 import traceback
-from tacotron.utils.text import text_to_sequence
+
+import numpy as np
+import tensorflow as tf
 from infolog import log
 from sklearn.model_selection import train_test_split
-import tensorflow as tf 
-
+from tacotron.utils.text import text_to_sequence
 
 _batches_per_group = 32
 
@@ -37,14 +37,14 @@ class Feeder:
 		if hparams.tacotron_test_size is None:
 			assert hparams.tacotron_test_batches is not None
 
-		test_size = (hparams.tacotron_test_size if hparams.tacotron_test_size is not None 
+		test_size = (hparams.tacotron_test_size if hparams.tacotron_test_size is not None
 			else hparams.tacotron_test_batches * hparams.tacotron_batch_size)
 		indices = np.arange(len(self._metadata))
 		train_indices, test_indices = train_test_split(indices,
 			test_size=test_size, random_state=hparams.tacotron_data_random_state)
 
 		#Make sure test_indices is a multiple of batch_size else round up
-		len_test_indices = self._round_up(len(test_indices), hparams.tacotron_batch_size)
+		len_test_indices = self._round_down(len(test_indices), hparams.tacotron_batch_size)
 		extra_test = test_indices[len_test_indices:]
 		test_indices = test_indices[:len_test_indices]
 		train_indices = np.concatenate([train_indices, extra_test])
@@ -228,3 +228,7 @@ class Feeder:
 	def _round_up(self, x, multiple):
 		remainder = x % multiple
 		return x if remainder == 0 else x + multiple - remainder
+
+	def _round_down(self, x, multiple):
+		remainder = x % multiple
+		return x if remainder == 0 else x - remainder

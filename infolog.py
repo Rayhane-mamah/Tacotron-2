@@ -1,9 +1,8 @@
 import atexit
-from datetime import datetime
 import json
-from threading import Thread 
+from datetime import datetime
+from threading import Thread
 from urllib.request import Request, urlopen
-
 
 _format = '%Y-%m-%d %H:%M:%S.%f'
 _file = None

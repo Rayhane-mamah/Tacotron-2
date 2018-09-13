@@ -1,16 +1,19 @@
-import numpy as np 
-import tensorflow as tf 
-from sklearn.model_selection import train_test_split
-import time
-import threading
 import os
-from .util import is_scalar_input, is_mulaw_quantize
-from infolog import log
+import threading
+import time
+
+import numpy as np
+import tensorflow as tf
 from datasets import audio
+from infolog import log
 from keras.utils import np_utils
+from sklearn.model_selection import train_test_split
+
+from .util import is_mulaw_quantize, is_scalar_input
+
+
 
 _batches_per_group = 32
-_pad = 0
 
 
 class Feeder:
@@ -20,13 +23,15 @@ class Feeder:
 	def __init__(self, coordinator, metadata_filename, base_dir, hparams):
 		super(Feeder, self).__init__()
 
-		if hparams.gin_channels > 0:
-			raise NotImplementedError('Global conditioning preprocessing has not been added yet, it will be out soon. Thanks for your patience!')
-
 		self._coord = coordinator
 		self._hparams = hparams
 		self._train_offset = 0
 		self._test_offset = 0
+
+		if hparams.symmetric_mels:
+			self._spec_pad = -(hparams.max_abs_value + .1)
+		else:
+			self._spec_pad = -0.1
 
 		#Base directory of the project (to map files from different locations)
 		self._base_dir = base_dir
@@ -74,7 +79,7 @@ class Feeder:
 				input_placeholder = tf.placeholder(tf.float32, shape=(None, hparams.quantize_channels, None), name='audio_inputs')
 				target_placeholder = tf.placeholder(tf.int32, shape=(None, None, 1), name='audio_targets')
 				target_type = tf.int32
-				
+
 			self._placeholders = [
 			input_placeholder,
 			target_placeholder,
@@ -87,7 +92,7 @@ class Feeder:
 				self._placeholders.append(tf.placeholder(tf.float32, shape=(None, hparams.num_mels, None), name='local_condition_features'))
 				queue_types.append(tf.float32)
 			if self.global_condition:
-				self._placeholders.append(tf.placeholder(tf.int32, shape=(), name='global_condition_features'))
+				self._placeholders.append(tf.placeholder(tf.int32, shape=(None, 1), name='global_condition_features'))
 				queue_types.append(tf.int32)
 
 			# Create queue for buffering data
@@ -108,7 +113,7 @@ class Feeder:
 			else:
 				self.local_condition_features = variables[3]
 				self.local_condition_features.set_shape(self._placeholders[3].shape)
-			
+
 			#If global conditioning disabled override g inputs with None
 			if hparams.gin_channels < 0:
 				self.global_condition_features = None
@@ -128,14 +133,14 @@ class Feeder:
 			self.eval_targets.set_shape(self._placeholders[1].shape)
 			self.eval_input_lengths = eval_variables[2]
 			self.eval_input_lengths.set_shape(self._placeholders[2].shape)
-			
+
 			#If local conditioning disabled override c inputs with None
 			if hparams.cin_channels < 0:
 				self.eval_local_condition_features = None
 			else:
 				self.eval_local_condition_features = eval_variables[3]
 				self.eval_local_condition_features.set_shape(self._placeholders[3].shape)
-			
+
 			#If global conditioning disabled override g inputs with None
 			if hparams.gin_channels < 0:
 				self.eval_global_condition_features = None
@@ -172,7 +177,12 @@ class Feeder:
 		else:
 			local_condition_features = None
 
-		global_condition_features = None
+		if self.global_condition:
+			global_condition_features = meta[3]
+			if global_condition_features == '<no_g>':
+				raise RuntimeError('Please redo the wavenet preprocessing (or GTA synthesis) to assign global condition features!')
+		else:
+			global_condition_features = None
 
 		return (input_data, local_condition_features, global_condition_features, len(input_data))
 
@@ -238,20 +248,25 @@ class Feeder:
 			local_condition_features = np.load(os.path.join(self._base_dir, mel_file))
 		else:
 			local_condition_features = None
-			
-		global_condition_features = None
+
+		if self.global_condition:
+			global_condition_features = meta[3]
+			if global_condition_features == '<no_g>':
+				raise RuntimeError('Please redo the wavenet preprocessing (or GTA synthesis) to assign global condition features!')
+		else:
+			global_condition_features = None
 
 		return (input_data, local_condition_features, global_condition_features, len(input_data))
 
 
 	def _prepare_batch(self, batch):
 		np.random.shuffle(batch)
-		
+
 		#Limit time steps to save GPU Memory usage
 		max_time_steps = self._limit_time()
 		#Adjust time resolution for upsampling
 		batch = self._adjust_time_resolution(batch, self.local_condition, max_time_steps)
-		
+
 		#time lengths
 		input_lengths = [len(x[0]) for x in batch]
 		max_input_length = max(input_lengths)
@@ -295,18 +310,26 @@ class Feeder:
 
 	def _prepare_local_conditions(self, local_condition, c_features):
 		if local_condition:
+
 			maxlen = max([len(x) for x in c_features])
-			c_batch = np.stack([_pad_inputs(x, maxlen) for x in c_features]).astype(np.float32)
+			#[-max, max] or [0,max]
+			T2_output_range = (-self._hparams.max_abs_value, self._hparams.max_abs_value) if self._hparams.symmetric_mels else (0, self._hparams.max_abs_value)
+
+			c_batch = np.stack([_pad_inputs(x, maxlen, _pad=T2_output_range[0]) for x in c_features]).astype(np.float32)
 			assert len(c_batch.shape) == 3
 			#[batch_size, c_channels, time_steps]
 			c_batch = np.transpose(c_batch, (0, 2, 1))
+
+			if self._hparams.normalize_for_wavenet:
+				#rerange to [0, 1]
+				c_batch = np.interp(c_batch, T2_output_range, (0, 1))
 		else:
 			c_batch = None
 		return c_batch
 
 	def _prepare_global_conditions(self, global_condition, g_features):
 		if global_condition:
-			g_batch = g_features
+			g_batch = np.array(g_features).astype(np.int32).reshape(-1, 1)
 		else:
 			g_batch = None
 		return g_batch
@@ -350,7 +373,7 @@ class Feeder:
 			new_batch = []
 			for b in batch:
 				x, c, g, l = b
-				x = audio.trim(x)
+				x = audio.trim_silence(x, hparams)
 				if max_time_steps is not None and len(x) > max_time_steps:
 					start = np.random.randint(0, len(c) - max_time_steps)
 					x = x[start: start + max_time_steps]
@@ -360,11 +383,10 @@ class Feeder:
 	def _assert_ready_for_upsample(self, x, c):
 		assert len(x) % len(c) == 0 and len(x) // len(c) == audio.get_hop_size(self._hparams)
 
-
-def _pad_inputs(x, maxlen):
+def _pad_inputs(x, maxlen, _pad=0):
 	return np.pad(x, [(0, maxlen - len(x)), (0, 0)], mode='constant', constant_values=_pad)
 
-def _pad_targets(x, maxlen):
+def _pad_targets(x, maxlen, _pad=0):
 	return np.pad(x, (0, maxlen - len(x)), mode='constant', constant_values=_pad)
 
 def _round_up(x, multiple):
