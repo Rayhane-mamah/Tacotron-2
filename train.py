@@ -112,7 +112,7 @@ def main():
 	parser.add_argument('--slack_url', default=None, help='slack webhook notification destination link')
 	args = parser.parse_args()
 
-	accepted_models = ['Tacotron', 'WaveNet', 'Tacotron-2']
+	accepted_models = ['Tacotron', 'WaveNet', 'Tacotron-2', 'liepa-multi']
 
 	if args.model not in accepted_models:
 		raise ValueError('please enter a valid model to train: {}'.format(accepted_models))
