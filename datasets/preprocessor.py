@@ -116,12 +116,20 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 	#sanity check
 	assert linear_frames == mel_frames
 
-	#Ensure time resolution adjustement between audio and mel-spectrogram
-	fft_size = hparams.n_fft if hparams.win_size is None else hparams.win_size
-	l, r = audio.pad_lr(wav, fft_size, audio.get_hop_size(hparams))
+	if hparams.use_lws:
+		#Ensure time resolution adjustement between audio and mel-spectrogram
+		fft_size = hparams.n_fft if hparams.win_size is None else hparams.win_size
+		l, r = audio.pad_lr(wav, fft_size, audio.get_hop_size(hparams))
 
-	#Zero pad for quantized signal
-	out = np.pad(out, (l, r), mode='constant', constant_values=constant_values)
+		#Zero pad audio signal
+		out = np.pad(out, (l, r), mode='constant', constant_values=constant_values)
+	else:
+		#Ensure time resolution adjustement between audio and mel-spectrogram
+		pad = audio.librosa_pad_lr(wav, hparams.n_fft, audio.get_hop_size(hparams))
+
+		#Reflect pad audio signal (Just like it's done in Librosa to avoid frame inconsistency)
+		out = np.pad(out, pad, mode='reflect')
+
 	assert len(out) >= mel_frames * audio.get_hop_size(hparams)
 
 	#time resolution adjustement

@@ -17,11 +17,15 @@ def save_wav(wav, path, sr):
 def save_wavenet_wav(wav, path, sr):
 	librosa.output.write_wav(path, wav, sr=sr)
 
-def preemphasis(wav, k):
-	return signal.lfilter([1, -k], [1], wav)
+def preemphasis(wav, k, preemphasize=True):
+	if preemphasize:
+		return signal.lfilter([1, -k], [1], wav)
+	return wav
 
-def inv_preemphasis(wav, k):
-	return signal.lfilter([1], [1, -k], wav)
+def inv_preemphasis(wav, k, inv_preemphasize=True):
+	if inv_preemphasize:
+		return signal.lfilter([1], [1, -k], wav)
+	return wav
 
 #From https://github.com/r9y9/wavenet_vocoder/blob/master/audio.py
 def start_and_end_indices(quantized, silence_threshold=2):
@@ -53,7 +57,7 @@ def get_hop_size(hparams):
 	return hop_size
 
 def linearspectrogram(wav, hparams):
-	D = _stft(preemphasis(wav, hparams.preemphasis), hparams)
+	D = _stft(preemphasis(wav, hparams.preemphasis, hparams.preemphasize), hparams)
 	S = _amp_to_db(np.abs(D), hparams) - hparams.ref_level_db
 
 	if hparams.signal_normalization:
@@ -61,7 +65,7 @@ def linearspectrogram(wav, hparams):
 	return S
 
 def melspectrogram(wav, hparams):
-	D = _stft(preemphasis(wav, hparams.preemphasis), hparams)
+	D = _stft(preemphasis(wav, hparams.preemphasis, hparams.preemphasize), hparams)
 	S = _amp_to_db(_linear_to_mel(np.abs(D), hparams), hparams) - hparams.ref_level_db
 
 	if hparams.signal_normalization:
@@ -81,9 +85,9 @@ def inv_linear_spectrogram(linear_spectrogram, hparams):
 		processor = _lws_processor(hparams)
 		D = processor.run_lws(S.astype(np.float64).T ** hparams.power)
 		y = processor.istft(D).astype(np.float32)
-		return inv_preemphasis(y, hparams.preemphasis)
+		return inv_preemphasis(y, hparams.preemphasis, hparams.preemphasize)
 	else:
-		return inv_preemphasis(_griffin_lim(S ** hparams.power, hparams), hparams.preemphasis)
+		return inv_preemphasis(_griffin_lim(S ** hparams.power, hparams), hparams.preemphasis, hparams.preemphasize)
 
 
 def inv_mel_spectrogram(mel_spectrogram, hparams):
@@ -99,9 +103,9 @@ def inv_mel_spectrogram(mel_spectrogram, hparams):
 		processor = _lws_processor(hparams)
 		D = processor.run_lws(S.astype(np.float64).T ** hparams.power)
 		y = processor.istft(D).astype(np.float32)
-		return inv_preemphasis(y)
+		return inv_preemphasis(y, hparams.preemphasis, hparams.preemphasize)
 	else:
-		return inv_preemphasis(_griffin_lim(S ** hparams.power, hparams), hparams.preemphasis)
+		return inv_preemphasis(_griffin_lim(S ** hparams.power, hparams), hparams.preemphasis, hparams.preemphasize)
 
 def _lws_processor(hparams):
 	import lws
@@ -128,6 +132,8 @@ def _stft(y, hparams):
 def _istft(y, hparams):
 	return librosa.istft(y, hop_length=get_hop_size(hparams), win_length=hparams.win_size)
 
+##########################################################
+#Those are only correct when using lws!!! (This was messing with Wavenet quality for a long time!)
 def num_frames(length, fsize, fshift):
 	"""Compute number of time frames of spectrogram
 	"""
@@ -147,6 +153,12 @@ def pad_lr(x, fsize, fshift):
 	T = len(x) + 2 * pad
 	r = (M - 1) * fshift + fsize - T
 	return pad, pad + r
+##########################################################
+#Librosa correct padding
+def librosa_pad_lr(x, fsize, fshift):
+	'''compute right padding (final frame)
+	'''
+	return int(fsize // 2)
 
 
 # Conversions

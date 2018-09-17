@@ -29,9 +29,9 @@ class Feeder:
 		self._test_offset = 0
 
 		if hparams.symmetric_mels:
-			self._spec_pad = -(hparams.max_abs_value + .1)
+			self._spec_pad = -hparams.max_abs_value
 		else:
-			self._spec_pad = -0.1
+			self._spec_pad = 0.
 
 		#Base directory of the project (to map files from different locations)
 		self._base_dir = base_dir

@@ -34,7 +34,7 @@ def add_train_stats(model):
 
 def add_test_stats(summary_writer, step, eval_loss):
 	values = [
-	tf.Summary.Value(tag='eval_model/eval_stats/wavenet_eval_loss', simple_value=eval_loss),
+	tf.Summary.Value(tag='Wavenet_eval_model/eval_stats/wavenet_eval_loss', simple_value=eval_loss),
 	]
 	test_summary = tf.Summary(value=values)
 	summary_writer.add_summary(test_summary, step)
@@ -112,12 +112,12 @@ def save_checkpoint(sess, saver, checkpoint_path, global_step):
 	saver.save(sess, checkpoint_path, global_step=global_step)
 
 
-def model_train_mode(args, feeder, hparams, global_step):
-	with tf.variable_scope('model', reuse=tf.AUTO_REUSE) as scope:
+def model_train_mode(args, feeder, hparams, global_step, init=False):
+	with tf.variable_scope('WaveNet_model', reuse=tf.AUTO_REUSE) as scope:
 		model_name = None
 		if args.model == 'Tacotron-2':
 			model_name = 'WaveNet'
-		model = create_model(model_name or args.model, hparams)
+		model = create_model(model_name or args.model, hparams, init)
 		#initialize model to train mode
 		model.initialize(feeder.targets, feeder.local_condition_features, feeder.global_condition_features,
 			feeder.input_lengths, x=feeder.inputs)
@@ -127,7 +127,7 @@ def model_train_mode(args, feeder, hparams, global_step):
 		return model, stats
 
 def model_test_mode(args, feeder, hparams, global_step):
-	with tf.variable_scope('model', reuse=tf.AUTO_REUSE) as scope:
+	with tf.variable_scope('WaveNet_model', reuse=tf.AUTO_REUSE) as scope:
 		model_name = None
 		if args.model == 'Tacotron-2':
 			model_name = 'WaveNet'
@@ -186,6 +186,7 @@ def train(log_dir, args, hparams, input_path):
 	#Memory allocation on the memory
 	config = tf.ConfigProto()
 	config.gpu_options.allow_growth = True
+	run_init = False
 
 	#Train
 	with tf.Session(config=config) as sess:
@@ -202,15 +203,31 @@ def train(log_dir, args, hparams, input_path):
 					if (checkpoint_state and checkpoint_state.model_checkpoint_path):
 						log('Loading checkpoint {}'.format(checkpoint_state.model_checkpoint_path), slack=True)
 						load_averaged_model(sess, sh_saver, checkpoint_state.model_checkpoint_path)
+					else:
+						log('No model to load at {}'.format(save_dir), slack=True)
+						if hparams.wavenet_weight_normalization:
+							run_init = True
 
 				except tf.errors.OutOfRangeError as e:
 					log('Cannot restore checkpoint: {}'.format(e), slack=True)
 			else:
 				log('Starting new training!', slack=True)
+				if hparams.wavenet_weight_normalization:
+					run_init = True
+
+			if run_init:
+				log('\nApplying Weight normalization in fresh training. Applying data dependent initialization forward pass..')
+				#Create init_model
+				init_model, _ = model_train_mode(args, feeder, hparams, global_step, init=True)
 
 			#initializing feeder
 			feeder.start_threads(sess)
 
+			if run_init:
+				#Run one forward pass for model parameters initialization (make prediction on init_batch)
+				_ = sess.run(init_model.y_hat)
+				log('Data dependent initialization done. Starting training!')
+			
 			#Training loop
 			while not coord.should_stop() and step < args.wavenet_train_steps:
 				start_time = time.time()

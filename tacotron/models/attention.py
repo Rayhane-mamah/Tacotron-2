@@ -61,7 +61,7 @@ def _location_sensitive_score(W_query, W_fil, W_keys):
 	num_units = W_keys.shape[-1].value or array_ops.shape(W_keys)[-1]
 
 	v_a = tf.get_variable(
-		'attention_variable', shape=[num_units], dtype=dtype,
+		'attention_variable_projection', shape=[num_units], dtype=dtype,
 		initializer=tf.contrib.layers.xavier_initializer())
 	b_a = tf.get_variable(
 		'attention_bias', shape=[num_units], dtype=dtype,
@@ -135,9 +135,9 @@ class LocationSensitiveAttention(BahdanauAttention):
 				  gio, “Attention-based models for speech recognition,” in Ad-
 				  vances in Neural Information Processing Systems, 2015, pp.
 				  577–585.
-				This is mainly used if the model wants to attend to multiple inputs parts
+				This is mainly used if the model wants to attend to multiple input parts
 				at the same decoding step. We probably won't be using it since multiple sound
-				frames may depend from the same character, probably not the way around.
+				frames may depend on the same character/phone, probably not the way around.
 				Note:
 					We still keep it implemented in case we want to test it. They used it in the
 					paper in the context of speech recognition, where one phoneme may depend on

@@ -1,85 +1,80 @@
 import tensorflow as tf
 
 
-def conv1d(inputs, kernel_size, channels, activation, is_training, drop_rate, scope):
-	with tf.variable_scope(scope):
-		conv1d_output = tf.layers.conv1d(
-			inputs,
-			filters=channels,
-			kernel_size=kernel_size,
-			activation=None,
-			padding='same')
-		batched = tf.layers.batch_normalization(conv1d_output, training=is_training)
-		activated = activation(batched)
-		return tf.layers.dropout(activated, rate=drop_rate, training=is_training,
-								name='dropout_{}'.format(scope))
+class HighwayNet:
+	def __init__(self, units, name=None):
+		self.units = units
+		self.scope = 'HighwayNet' if name is None else name
+
+		self.H_layer = tf.layers.Dense(units=self.units, activation=tf.nn.relu, name='H')
+		self.T_layer = tf.layers.Dense(units=self.units, activation=tf.nn.sigmoid, name='T', bias_initializer=tf.constant_initializer(-1.))
+
+	def __call__(self, inputs):
+		with tf.variable_scope(self.scope):
+			H = self.H_layer(inputs)
+			T = self.T_layer(inputs)
+			return H * T + inputs * (1. - T)
 
 
-def post_cbhg(inputs, input_dim, is_training):
-  return cbhg(
-    inputs,
-    None,
-    is_training,
-    scope='post_cbhg',
-    K=8,
-    projections=[256, input_dim])
+class CBHG:
+	def __init__(self, K, conv_channels, pool_size, projections, projection_kernel_size, n_highwaynet_layers, highway_units, rnn_units, is_training, name=None):
+		self.K = K
+		self.conv_channels = conv_channels
+		self.pool_size = pool_size
 
-def cbhg(inputs, input_lengths, is_training, scope, K, projections):
-  with tf.variable_scope(scope):
-    with tf.variable_scope('conv_bank'):
-      # Convolution bank: concatenate on the last axis to stack channels from all convolutions
-      conv_outputs = tf.concat(
-        [conv1d(inputs, k, 128, tf.nn.relu, is_training, 0., 'conv1d_%d' % k) for k in range(1, K+1)],
-        axis=-1
-      )
+		self.projections = projections
+		self.projection_kernel_size = projection_kernel_size
 
-    # Maxpooling:
-    maxpool_output = tf.layers.max_pooling1d(
-      conv_outputs,
-      pool_size=2,
-      strides=1,
-      padding='same')
+		self.is_training = is_training
+		self.scope = 'CBHG' if name is None else name
 
-    # Two projection layers:
-    proj1_output = conv1d(maxpool_output, 3, projections[0], tf.nn.relu, is_training, 0., 'proj_1')
-    proj2_output = conv1d(proj1_output, 3, projections[1], lambda _: _, is_training, 0., 'proj_2')
+		self.highway_units = highway_units
+		self.highwaynet_layers = [HighwayNet(highway_units, name='{}_highwaynet_{}'.format(self.scope, i+1)) for i in range(n_highwaynet_layers)]
+		self._fw_cell = tf.nn.rnn_cell.GRUCell(rnn_units, name='{}_forward_RNN'.format(self.scope))
+		self._bw_cell = tf.nn.rnn_cell.GRUCell(rnn_units, name='{}_backward_RNN'.format(self.scope))
 
-    # Residual connection:
-    highway_input = proj2_output + inputs
+	def __call__(self, inputs, input_lengths):
+		with tf.variable_scope(self.scope):
+			with tf.variable_scope('conv_bank'):
+				#Convolution bank: concatenate on the last axis to stack channels from all convolutions
+				#The convolution bank uses multiple different kernel sizes to have many insights of the input sequence
+				#This makes one of the strengths of the CBHG block on sequences.
+				conv_outputs = tf.concat(
+					[conv1d(inputs, k, self.conv_channels, tf.nn.relu, self.is_training, 0., 'conv1d_{}'.format(k)) for k in range(1, self.K+1)],
+					axis=-1
+					)
 
-    # Handle dimensionality mismatch:
-    if highway_input.shape[2] != 128:
-      highway_input = tf.layers.dense(highway_input, 128)
+			#Maxpooling (dimension reduction, Using max instead of average helps finding "Edges" in mels)
+			maxpool_output = tf.layers.max_pooling1d(
+				conv_outputs,
+				pool_size=self.pool_size,
+				strides=1,
+				padding='same')
 
-    # 4-layer HighwayNet:
-    for i in range(4):
-      highway_input = highwaynet(highway_input, 'highway_%d' % (i+1))
-    rnn_input = highway_input
+			#Two projection layers
+			proj1_output = conv1d(maxpool_output, self.projection_kernel_size, self.projections[0], tf.nn.relu, self.is_training, 0., 'proj1')
+			proj2_output = conv1d(proj1_output, self.projection_kernel_size, self.projections[1], lambda _: _, self.is_training, 0., 'proj2')
 
-    # Bidirectional RNN
-    outputs, states = tf.nn.bidirectional_dynamic_rnn(
-      tf.nn.rnn_cell.GRUCell(128),
-      tf.nn.rnn_cell.GRUCell(128),
-      rnn_input,
-      sequence_length=input_lengths,
-      dtype=tf.float32)
-    return tf.concat(outputs, axis=2)  # Concat forward and backward
+			#Residual connection
+			highway_input = proj2_output + inputs
 
+			#Additional projection in case of dimension mismatch (for HighwayNet "residual" connection)
+			if highway_input.shape[2] != self.highway_units:
+				highway_input = tf.layers.dense(highway_input, self.highway_units)
 
-def highwaynet(inputs, scope):
-  with tf.variable_scope(scope):
-    H = tf.layers.dense(
-      inputs,
-      units=128,
-      activation=tf.nn.relu,
-      name='H')
-    T = tf.layers.dense(
-      inputs,
-      units=128,
-      activation=tf.nn.sigmoid,
-      name='T',
-      bias_initializer=tf.constant_initializer(-1.0))
-    return H * T + inputs * (1.0 - T)
+			#4-layer HighwayNet
+			for highwaynet in self.highwaynet_layers:
+				highway_input = highwaynet(highway_input)
+			rnn_input = highway_input
+
+			#Bidirectional RNN
+			outputs, states = tf.nn.bidirectional_dynamic_rnn(
+				self._fw_cell,
+				self._bw_cell,
+				rnn_input,
+				sequence_length=input_lengths,
+				dtype=tf.float32)
+			return tf.concat(outputs, axis=2) #Concat forward and backward outputs
 
 
 class ZoneoutLSTMCell(tf.nn.rnn_cell.RNNCell):
@@ -376,6 +371,20 @@ class Postnet:
 			x = conv1d(x, self.kernel_size, self.channels, lambda _: _, self.is_training, self.drop_rate,
 				'conv_layer_{}_'.format(5)+self.scope)
 		return x
+
+
+def conv1d(inputs, kernel_size, channels, activation, is_training, drop_rate, scope):
+	with tf.variable_scope(scope):
+		conv1d_output = tf.layers.conv1d(
+			inputs,
+			filters=channels,
+			kernel_size=kernel_size,
+			activation=None,
+			padding='same')
+		batched = tf.layers.batch_normalization(conv1d_output, training=is_training)
+		activated = activation(batched)
+		return tf.layers.dropout(activated, rate=drop_rate, training=is_training,
+								name='dropout_{}'.format(scope))
 
 def _round_up_tf(x, multiple):
 	# Tf version of remainder = x % multiple

@@ -20,7 +20,7 @@ class Synthesizer:
 		self.global_conditions = tf.placeholder(tf.int32, shape=(None, 1), name='global_condition_features') if global_cond else None
 		self.synthesis_length = tf.placeholder(tf.int32, shape=(), name='synthesis_length') if not local_cond else None
 
-		with tf.variable_scope('model') as scope:
+		with tf.variable_scope('WaveNet_model') as scope:
 			self.model = create_model(model_name, hparams)
 			self.model.initialize(y=None, c=self.local_conditions, g=self.global_conditions,
 				input_lengths=None, synthesis_length=self.synthesis_length)

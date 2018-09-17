@@ -51,8 +51,8 @@ def train(args, log_dir, hparams):
 		log('###########################################################\n')
 		checkpoint = tacotron_train(args, log_dir, hparams)
 		tf.reset_default_graph()
-		#Sleep 1 second to let previous graph close and avoid error messages while synthesis
-		sleep(1)
+		#Sleep 1/2 second to let previous graph close and avoid error messages while synthesis
+		sleep(0.5)
 		if checkpoint is None:
 			raise('Error occured while training Tacotron, Exiting!')
 		taco_state = 1
@@ -65,6 +65,9 @@ def train(args, log_dir, hparams):
 		log('Tacotron GTA Synthesis\n')
 		log('###########################################################\n')
 		input_path = tacotron_synthesize(args, hparams, checkpoint)
+		tf.reset_default_graph()
+		#Sleep 1/2 second to let previous graph close and avoid error messages while Wavenet is training
+		sleep(0.5)
 		GTA_state = 1
 		save_seq(state_file, [taco_state, GTA_state, wave_state], input_path)
 	else:
@@ -106,8 +109,8 @@ def main():
 		help='Steps between writing checkpoints')
 	parser.add_argument('--eval_interval', type=int, default=10000,
 		help='Steps between eval on test data')
-	parser.add_argument('--tacotron_train_steps', type=int, default=120000, help='total number of tacotron training steps')
-	parser.add_argument('--wavenet_train_steps', type=int, default=1300000, help='total number of wavenet training steps')
+	parser.add_argument('--tacotron_train_steps', type=int, default=100000, help='total number of tacotron training steps')
+	parser.add_argument('--wavenet_train_steps', type=int, default=750000, help='total number of wavenet training steps')
 	parser.add_argument('--tf_log_level', type=int, default=1, help='Tensorflow C++ log level.')
 	parser.add_argument('--slack_url', default=None, help='slack webhook notification destination link')
 	args = parser.parse_args()

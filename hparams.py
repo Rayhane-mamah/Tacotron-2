@@ -15,7 +15,7 @@ hparams = tf.contrib.training.HParams(
 	rescaling_max = 0.999, #Rescaling value
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
 	clip_mels_length = True, #For cases of OOM (Not really recommended, working on a workaround)
-	max_mel_frames = 1300,  #Only relevant when clip_mels_length = True
+	max_mel_frames = 1000,  #Only relevant when clip_mels_length = True
 
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
@@ -25,11 +25,10 @@ hparams = tf.contrib.training.HParams(
 
 	#Mel spectrogram
 	n_fft = 2048, #Extra window size is filled with 0 paddings to match this parameter
-	hop_size = 300, #For 22050Hz, 275 ~= 12.5 ms
-	win_size = 1200, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
-	sample_rate = 24000, #22050 Hz (corresponding to ljspeech dataset)
+	hop_size = 275, #For 22050Hz, 275 ~= 12.5 ms
+	win_size = 1100, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
+	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset)
 	frame_shift_ms = None,
-	preemphasis = 0.97, # preemphasis coefficient
 
 	#M-AILABS (and other datasets) trim params
 	trim_fft_size = 512,
@@ -39,14 +38,19 @@ hparams = tf.contrib.training.HParams(
 	#Mel and Linear spectrograms normalization/scaling and clipping
 	signal_normalization = True,
 	allow_clipping_in_normalization = True, #Only relevant if mel_normalization = True
-	symmetric_mels = False, #Whether to scale the data to be symmetric around 0
+	symmetric_mels = True, #Whether to scale the data to be symmetric around 0
 	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max]
 	normalize_for_wavenet = True, #whether to rescale to [0, 1] for wavenet.
+
+	#Contribution by @begeekmyfriend
+	#Spectrogram Pre-Emphasis (Lfilter: Reduce spectrogram noise and helps model certitude levels. Also allows for better G&L phase reconstruction)
+	preemphasize = True, #whether to apply filter
+	preemphasis = 0.97, #filter coefficient.
 
 	#Limits
 	min_level_db = -100,
 	ref_level_db = 20,
-	fmin = 0, #Set this to 75 if your speaker is male! if female, 125 should help taking off noise. (To test depending on dataset)
+	fmin = 55, #Set this to 55 if your speaker is male! if female, 95 should help taking off noise. (To test depending on dataset. Pitch info: male~[65, 260], female~[100, 525])
 	fmax = 7600,
 
 	#Griffin Lim
@@ -55,7 +59,7 @@ hparams = tf.contrib.training.HParams(
 	###########################################################################################################################################
 
 	#Tacotron
-	outputs_per_step = 2, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
+	outputs_per_step = 1, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them
 
 	embedding_dim = 512, #dimension of embedding space
@@ -74,11 +78,21 @@ hparams = tf.contrib.training.HParams(
 	prenet_layers = [256, 256], #number of layers and number of units of prenet
 	decoder_layers = 2, #number of decoder lstm layers
 	decoder_lstm_units = 1024, #number of decoder lstm units on each layer
-	max_iters = 1000, #Max decoder steps during inference (Just for safety from infinite loop cases)
+	max_iters = 2000, #Max decoder steps during inference (Just for safety from infinite loop cases)
 
 	postnet_num_layers = 5, #number of postnet convolutional layers
 	postnet_kernel_size = (5, ), #size of postnet convolution filters for each layer
 	postnet_channels = 512, #number of postnet convolution filters for each layer
+
+	#CBHG mel->linear postnet
+	cbhg_kernels = 8, #All kernel sizes from 1 to cbhg_kernels will be used in the convolution bank of CBHG to act as "K-grams"
+	cbhg_conv_channels = 128, #Channels of the convolution bank
+	cbhg_pool_size = 2, #pooling size of the CBHG
+	cbhg_projection = 256, #projection channels of the CBHG (1st projection, 2nd is automatically set to num_mels)
+	cbhg_projection_kernel_size = 3, #kernel_size of the CBHG projections
+	cbhg_highwaynet_layers = 4, #Number of HighwayNet layers
+	cbhg_highway_units = 128, #Number of units used in HighwayNet fully connected layers
+	cbhg_rnn_units = 128, #Number of GRU units used in bidirectional RNN of CBHG block. CBHG output is 2x rnn_units in shape
 
 	mask_encoder = False, #whether to mask encoder padding while computing attention
 	mask_decoder = False, #Whether to use loss mask for padded sequences (if False, <stop_token> loss function will not be weighted, else recommended pos_weight = 20)
@@ -100,22 +114,25 @@ hparams = tf.contrib.training.HParams(
 	quantize_channels=2 ** 16,  # 65536 (16-bit) (raw) or 256 (8-bit) (mulaw or mulaw-quantize) // number of classes = 256 <=> mu = 255
 
 	log_scale_min=float(np.log(1e-14)), #Mixture of logistic distributions minimal log scale
-	log_scale_min_gauss = float(np.log(1e-7)), #Gaussian distribution minimal allowed log scale
+	log_scale_min_gauss = -7., #Gaussian distribution minimal allowed log scale
 
 	#To use Gaussian distribution as output distribution instead of mixture of logistics, set "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
 	out_channels = 2, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
-	layers = 30, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
-	stacks = 3, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
-	residual_channels = 512,
-	gate_channels = 512, #split in 2 in gated convolutions
-	skip_out_channels = 256,
-	kernel_size = 3,
+	layers = 20, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
+	stacks = 2, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
+	residual_channels = 128, #Number of residual block input/output channels.
+	gate_channels = 256, #split in 2 in gated convolutions
+	skip_out_channels = 128, #Number of residual block skip convolution channels.
+	kernel_size = 3, #The number of inputs to consider in dilated convolutions.
 
 	cin_channels = 80, #Set this to -1 to disable local conditioning, else it must be equal to num_mels!!
 	upsample_conditional_features = True, #Whether to repeat conditional features or upsample them (The latter is recommended)
-	upsample_scales = [15, 20], #prod(upsample_scales) should be equal to hop_size
-	freq_axis_kernel_size = 3,
-	leaky_alpha = 0.4,
+
+	upsample_type = '1D', #Type of the upsampling deconvolution. Can be ('1D' or '2D'). 1D spans all frequency bands for each frame while 2D spans "freq_axis_kernel_size" bands at a time
+	upsample_activation = 'LeakyRelu', #Activation function used during upsampling. Can be ('LeakyRelu', 'Relu' or None)
+	upsample_scales = [5, 5, 11], #prod(upsample_scales) should be equal to hop_size
+	freq_axis_kernel_size = 3, #Only used for 2D upsampling. This is the number of requency bands that are spanned at a time for each frame.
+	leaky_alpha = 0.4, #slope of the negative portion of LeakyRelu (LeakyRelu: y=x if x>0 else y=alpha * x)
 
 	gin_channels = -1, #Set this to -1 to disable global conditioning, Only used for multi speaker dataset. It defines the depth of the embeddings (Recommended: 16)
 	use_speaker_embedding = True, #whether to make a speaker embedding
@@ -123,8 +140,8 @@ hparams = tf.contrib.training.HParams(
 
 	use_bias = True, #Whether to use bias in convolutional layers of the Wavenet
 
-	max_time_sec = None,
-	max_time_steps = 13000, #Max time steps in audio used to train wavenet (decrease to save memory) (Recommend: 8000 on modest GPUs, 13000 on stronger ones)
+	max_time_sec = None, #Max time of audio for training. If None, we use max_time_steps.
+	max_time_steps = 11000, #Max time steps in audio used to train wavenet (decrease to save memory) (Recommend: 8000 on modest GPUs, 13000 on stronger ones)
 	###########################################################################################################################################
 
 	#Tacotron Training
@@ -133,11 +150,11 @@ hparams = tf.contrib.training.HParams(
 
 	tacotron_batch_size = 32, #number of training samples on each training steps
 	tacotron_reg_weight = 1e-6, #regularization weight (for L2 regularization)
-	tacotron_scale_regularization = True, #Whether to rescale regularization weight to adapt for outputs range (used when reg_weight is high and biasing the model)
+	tacotron_scale_regularization = False, #Whether to rescale regularization weight to adapt for outputs range (used when reg_weight is high and biasing the model)
 
 	tacotron_test_size = None, #% of data to keep as test data, if None, tacotron_test_batches must be not None
 	tacotron_test_batches = 48, #number of test batches (For Ljspeech: 10% ~= 41 batches of 32 samples)
-	tacotron_data_random_state=1234, #random state for train test split repeatability
+	tacotron_data_random_state = 1234, #random state for train test split repeatability
 
 	#Usually your GPU can handle 16x tacotron_batch_size during synthesis for the same memory amount during training (because no gradients to keep and ops to register for backprop)
 	tacotron_synthesis_batch_size = 32 * 16, #This ensures GTA synthesis goes up to 40x faster than one sample at a time and uses 100% of your GPU computation power.
@@ -151,12 +168,12 @@ hparams = tf.contrib.training.HParams(
 
 	tacotron_adam_beta1 = 0.9, #AdamOptimizer beta1 parameter
 	tacotron_adam_beta2 = 0.999, #AdamOptimizer beta2 parameter
-	tacotron_adam_epsilon = 1e-6, #AdamOptimizer beta3 parameter
+	tacotron_adam_epsilon = 1e-6, #AdamOptimizer Epsilon parameter
 
 	tacotron_zoneout_rate = 0.1, #zoneout rate for all LSTM cells in the network
 	tacotron_dropout_rate = 0.5, #dropout rate for all convolutional layers + prenet
 
-	tacotron_clip_gradients = False, #whether to clip gradients
+	tacotron_clip_gradients = True, #whether to clip gradients
 	natural_eval = False, #Whether to use 100% natural eval (to evaluate Curriculum Learning performance) or with same teacher-forcing ratio as in training (just for overfit)
 
 	#Decoder RNN learning can take be done in one of two ways:
@@ -178,21 +195,31 @@ hparams = tf.contrib.training.HParams(
 	wavenet_random_seed = 5339, # S=5, E=3, D=9 :)
 	wavenet_swap_with_cpu = False, #Whether to use cpu as support to gpu for decoder computation (Not recommended: may cause major slowdowns! Only use when critical!)
 
-	wavenet_batch_size = 4, #batch size used to train wavenet.
+	wavenet_batch_size = 8, #batch size used to train wavenet.
 	wavenet_test_size = 0.0441, #% of data to keep as test data, if None, wavenet_test_batches must be not None
 	wavenet_test_batches = None, #number of test batches.
 	wavenet_data_random_state = 1234, #random state for train test split repeatability
 
 	#During synthesis, there is no max_time_steps limitation so the model can sample much longer audio than 8k(or 13k) steps. (Audio can go up to 500k steps, equivalent to ~21sec on 24kHz)
-	#Usually your GPU can handle 1x~2x wavenet_batch_size during synthesis for the same memory amount during training (because no gradients to keep and ops to register for backprop)
-	wavenet_synthesis_batch_size = 4 * 2, #This ensure that wavenet synthesis goes up to 4x~8x faster when synthesizing multiple sentences. Watch out for OOM with long audios.
+	#Usually your GPU can handle ~2x wavenet_batch_size during synthesis for the same memory amount during training (because no gradients to keep and ops to register for backprop)
+	wavenet_synthesis_batch_size = 10 * 2, #This ensure that wavenet synthesis goes up to 4x~8x faster when synthesizing multiple sentences. Watch out for OOM with long audios.
 
-	wavenet_learning_rate = 1e-3,
-	wavenet_adam_beta1 = 0.9,
-	wavenet_adam_beta2 = 0.999,
-	wavenet_adam_epsilon = 1e-8,
+	wavenet_lr_schedule = 'exponential', #learning rate schedule. Can be ('exponential', 'noam')
+	wavenet_learning_rate = 1e-4, #wavenet initial learning rate
+	wavenet_warmup = float(4000), #Only used with 'noam' scheme. Defines the number of ascending learning rate steps.
+	wavenet_decay_rate = 0.5, #Only used with 'exponential' scheme. Defines the decay rate.
+	wavenet_decay_steps = 300000, #Only used with 'exponential' scheme. Defines the decay steps.
+
+	wavenet_adam_beta1 = 0.9, #Adam beta1
+	wavenet_adam_beta2 = 0.999, #Adam beta2
+	wavenet_adam_epsilon = 1e-8, #Adam Epsilon
+
+	wavenet_clip_gradients = False, #Whether the clip the gradients during wavenet training.
 
 	wavenet_ema_decay = 0.9999, #decay rate of exponential moving average
+
+	wavenet_weight_normalization = False, #Whether to Apply Saliman & Kingma Weight Normalization (reparametrization) technique. (NEEDS VERIFICATION)
+	wavenet_init_scale = 1., #Only relevent if weight_normalization=True. Defines the initial scale in data dependent initialization of parameters.
 
 	wavenet_dropout = 0.05, #drop rate of wavenet layers
 	train_with_GTA = True, #Whether to use GTA mels to train WaveNet instead of ground truth mels.

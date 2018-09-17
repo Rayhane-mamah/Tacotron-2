@@ -62,9 +62,9 @@ class Feeder:
 		#explicitely setting the padding to a value that doesn't originally exist in the spectogram
 		#to avoid any possible conflicts, without affecting the output range of the model too much
 		if hparams.symmetric_mels:
-			self._target_pad = -(hparams.max_abs_value + .1)
+			self._target_pad = -hparams.max_abs_value
 		else:
-			self._target_pad = -0.1
+			self._target_pad = 0.
 		#Mark finished sequences with 1s
 		self._token_pad = 1.
 
