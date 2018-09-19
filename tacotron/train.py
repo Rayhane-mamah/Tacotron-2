@@ -30,7 +30,7 @@ def add_train_stats(model, hparams):
 			tf.summary.scalar('linear_loss', model.linear_loss)
 		tf.summary.histogram('linear_outputs', model.linear_outputs)
 		tf.summary.histogram('linear_targets', model.linear_targets)
-		
+
 		tf.summary.scalar('regularization_loss', model.regularization_loss)
 		tf.summary.scalar('stop_token_loss', model.stop_token_loss)
 		tf.summary.scalar('loss', model.loss)
@@ -50,7 +50,7 @@ def add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, s
 	tf.Summary.Value(tag='Tacotron_eval_model/eval_stats/eval_loss', simple_value=loss),
 	]
 	if linear_loss is not None:
-		values.append(tf.Summary.Value(tag='eval_model/eval_stats/eval_linear_loss', simple_value=linear_loss))
+		values.append(tf.Summary.Value(tag='Tacotron_eval_model/eval_stats/eval_linear_loss', simple_value=linear_loss))
 	test_summary = tf.Summary(value=values)
 	summary_writer.add_summary(test_summary, step)
 
@@ -257,7 +257,7 @@ def train(log_dir, args, hparams):
 					add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, stop_token_loss, eval_loss)
 
 
-				if step % args.checkpoint_interval == 0 or step == args.tacotron_train_steps or step == 300:
+				if step % args.checkpoint_interval == 0 or step == args.tacotron_train_steps:
 					#Save model and current global step
 					saver.save(sess, checkpoint_path, global_step=global_step)
 
