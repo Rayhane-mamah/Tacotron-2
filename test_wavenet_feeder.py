@@ -84,7 +84,7 @@ def _ensure_divisible(length, divisible_by=256, lower=True):
 		return length + (divisible_by - length % divisible_by)
 
 def run(args, hparams):
-	with open(args.metadata, 'r') as file:
+	with open(args.metadata, 'r', encoding="utf-8") as file:
 		metadata = [line.strip().split('|') for line in file]
 
 	local_condition = hparams.cin_channels > 0
