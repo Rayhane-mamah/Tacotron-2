@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 from infolog import log
 from tacotron.models.Architecture_wrappers import TacotronDecoderCell, TacotronEncoderCell
@@ -82,9 +83,9 @@ class Tacotron():
 				cumulate_weights=hp.cumulative_weights)
 			#Decoder LSTM Cells
 			decoder_lstm = DecoderRNN(is_training, layers=hp.decoder_layers,
-				size=hp.decoder_lstm_units, zoneout=hp.tacotron_zoneout_rate, scope='decoder_lstm')
+				size=hp.decoder_lstm_units, zoneout=hp.tacotron_zoneout_rate, scope='decoder_LSTM')
 			#Frames Projection layer
-			frame_projection = FrameProjection(hp.num_mels * hp.outputs_per_step, scope='linear_transform')
+			frame_projection = FrameProjection(hp.num_mels * hp.outputs_per_step, scope='linear_transform_projection')
 			#<stop_token> projection layer
 			stop_projection = StopProjection(is_training or is_evaluating, shape=hp.outputs_per_step, scope='stop_token_projection')
 
@@ -142,12 +143,24 @@ class Tacotron():
 
 
 			if post_condition:
-				# Add post-processing CBHG:
-			    post_outputs = post_cbhg(mel_outputs, hp.num_mels, is_training)           # [N, T_out, 256]
-			    linear_outputs = tf.layers.dense(post_outputs, hp.num_freq)
+				# Add post-processing CBHG. This does a great job at extracting features from mels before projection to Linear specs.
+				post_cbhg = CBHG(hp.cbhg_kernels, hp.cbhg_conv_channels, hp.cbhg_pool_size, [hp.cbhg_projection, hp.num_mels],
+					hp.cbhg_projection_kernel_size, hp.cbhg_highwaynet_layers, 
+					hp.cbhg_highway_units, hp.cbhg_rnn_units, is_training, name='CBHG_postnet')
+
+				#[batch_size, decoder_steps(mel_frames), cbhg_channels]
+				post_outputs = post_cbhg(mel_outputs, None)
+
+				#Linear projection of extracted features to make linear spectrogram
+				linear_specs_projection = FrameProjection(hp.num_freq, scope='cbhg_linear_specs_projection')
+
+				#[batch_size, decoder_steps(linear_frames), num_freq]
+				linear_outputs = linear_specs_projection(post_outputs)
 
 			#Grab alignments from the final decoder state
 			alignments = tf.transpose(final_decoder_state.alignment_history.stack(), [1, 2, 0])
+
+			self.all_vars = tf.trainable_variables()
 
 			if is_training:
 				self.ratio = self.helper._ratio
@@ -178,6 +191,7 @@ class Tacotron():
 			if post_condition:
 				log('  linear out:               {}'.format(linear_outputs.shape))
 			log('  <stop_token> out:         {}'.format(stop_token_prediction.shape))
+			log('  Tacotron Parameters       {:.3f} Million.'.format(np.sum([np.prod(v.get_shape().as_list()) for v in self.all_vars]) / 1_000_000))
 
 
 	def add_loss(self):
@@ -230,9 +244,9 @@ class Tacotron():
 				reg_weight = hp.tacotron_reg_weight
 
 			# Get all trainable variables
-			all_vars = tf.trainable_variables()
-			regularization = tf.add_n([tf.nn.l2_loss(v) for v in all_vars
-				if not('bias' in v.name or 'Bias' in v.name)]) * reg_weight
+			regularization = tf.add_n([tf.nn.l2_loss(v) for v in self.all_vars
+				if not('bias' in v.name or 'Bias' in v.name or '_projection' in v.name or 'inputs_embedding' in v.name 
+					or 'LSTM' in v.name or 'RNN' in v.name)]) * reg_weight
 
 			# Compute final loss term
 			self.before_loss = before

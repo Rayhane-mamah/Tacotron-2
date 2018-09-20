@@ -25,8 +25,12 @@ def add_train_stats(model, hparams):
 		tf.summary.histogram('mel_targets', model.mel_targets)
 		tf.summary.scalar('before_loss', model.before_loss)
 		tf.summary.scalar('after_loss', model.after_loss)
+
 		if hparams.predict_linear:
 			tf.summary.scalar('linear_loss', model.linear_loss)
+		tf.summary.histogram('linear_outputs', model.linear_outputs)
+		tf.summary.histogram('linear_targets', model.linear_targets)
+		
 		tf.summary.scalar('regularization_loss', model.regularization_loss)
 		tf.summary.scalar('stop_token_loss', model.stop_token_loss)
 		tf.summary.scalar('loss', model.loss)
@@ -40,10 +44,10 @@ def add_train_stats(model, hparams):
 
 def add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, stop_token_loss, loss):
 	values = [
-	tf.Summary.Value(tag='eval_model/eval_stats/eval_before_loss', simple_value=before_loss),
-	tf.Summary.Value(tag='eval_model/eval_stats/eval_after_loss', simple_value=after_loss),
-	tf.Summary.Value(tag='eval_model/eval_stats/stop_token_loss', simple_value=stop_token_loss),
-	tf.Summary.Value(tag='eval_model/eval_stats/eval_loss', simple_value=loss),
+	tf.Summary.Value(tag='Tacotron_eval_model/eval_stats/eval_before_loss', simple_value=before_loss),
+	tf.Summary.Value(tag='Tacotron_eval_model/eval_stats/eval_after_loss', simple_value=after_loss),
+	tf.Summary.Value(tag='Tacotron_eval_model/eval_stats/stop_token_loss', simple_value=stop_token_loss),
+	tf.Summary.Value(tag='Tacotron_eval_model/eval_stats/eval_loss', simple_value=loss),
 	]
 	if linear_loss is not None:
 		values.append(tf.Summary.Value(tag='eval_model/eval_stats/eval_linear_loss', simple_value=linear_loss))
@@ -54,7 +58,7 @@ def time_string():
 	return datetime.now().strftime('%Y-%m-%d %H:%M')
 
 def model_train_mode(args, feeder, hparams, global_step):
-	with tf.variable_scope('model', reuse=tf.AUTO_REUSE) as scope:
+	with tf.variable_scope('Tacotron_model', reuse=tf.AUTO_REUSE) as scope:
 		model_name = None
 		if args.model == 'Tacotron-2':
 			model_name = 'Tacotron'
@@ -73,7 +77,7 @@ def model_train_mode(args, feeder, hparams, global_step):
 		return model, stats
 
 def model_test_mode(args, feeder, hparams, global_step):
-	with tf.variable_scope('model', reuse=tf.AUTO_REUSE) as scope:
+	with tf.variable_scope('Tacotron_model', reuse=tf.AUTO_REUSE) as scope:
 		model_name = None
 		if args.model == 'Tacotron-2':
 			model_name = 'Tacotron'
@@ -200,11 +204,11 @@ def train(log_dir, args, hparams):
 
 					if hparams.predict_linear:
 						for i in tqdm(range(feeder.test_steps)):
-							eloss, before_loss, after_loss, stop_token_loss, linear_loss, mel_p, mel_t, t_len, align, lin_p = sess.run(
+							eloss, before_loss, after_loss, stop_token_loss, linear_loss, mel_p, mel_t, t_len, align, lin_p, lin_t = sess.run(
 								[eval_model.loss, eval_model.before_loss, eval_model.after_loss,
 								eval_model.stop_token_loss, eval_model.linear_loss, eval_model.mel_outputs[0],
 								eval_model.mel_targets[0], eval_model.targets_lengths[0],
-								eval_model.alignments[0], eval_model.linear_outputs[0]])
+								eval_model.alignments[0], eval_model.linear_outputs[0], eval_model.linear_targets[0]])
 							eval_losses.append(eloss)
 							before_losses.append(before_loss)
 							after_losses.append(after_loss)
@@ -213,7 +217,8 @@ def train(log_dir, args, hparams):
 						linear_loss = sum(linear_losses) / len(linear_losses)
 
 						wav = audio.inv_linear_spectrogram(lin_p.T, hparams)
-						audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-waveform-linear.wav'.format(step)), sr=hparams.sample_rate)
+						audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-wave-from-linear.wav'.format(step)), sr=hparams.sample_rate)
+
 					else:
 						for i in tqdm(range(feeder.test_steps)):
 							eloss, before_loss, after_loss, stop_token_loss, mel_p, mel_t, t_len, align = sess.run(
@@ -233,33 +238,39 @@ def train(log_dir, args, hparams):
 					log('Saving eval log to {}..'.format(eval_dir))
 					#Save some log to monitor model improvement on same unseen sequence
 					wav = audio.inv_mel_spectrogram(mel_p.T, hparams)
-					audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-waveform-mel.wav'.format(step)), sr=hparams.sample_rate)
+					audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-wave-from-mel.wav'.format(step)), sr=hparams.sample_rate)
 
 					plot.plot_alignment(align, os.path.join(eval_plot_dir, 'step-{}-eval-align.png'.format(step)),
-						info='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, eval_loss),
+						title='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, eval_loss),
 						max_len=t_len // hparams.outputs_per_step)
 					plot.plot_spectrogram(mel_p, os.path.join(eval_plot_dir, 'step-{}-eval-mel-spectrogram.png'.format(step)),
-						info='{}, {}, step={}, loss={:.5}'.format(args.model, time_string(), step, eval_loss), target_spectrogram=mel_t,
+						title='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, eval_loss), target_spectrogram=mel_t,
 						max_len=t_len)
+
+					if hparams.predict_linear:
+						plot.plot_spectrogram(lin_p, os.path.join(eval_plot_dir, 'step-{}-eval-linear-spectrogram.png'.format(step)),
+							title='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, eval_loss), target_spectrogram=lin_t,
+							max_len=t_len, auto_aspect=True)
 
 					log('Eval loss for global step {}: {:.3f}'.format(step, eval_loss))
 					log('Writing eval summary!')
 					add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, stop_token_loss, eval_loss)
 
 
-				if step % args.checkpoint_interval == 0 or step == args.tacotron_train_steps:
+				if step % args.checkpoint_interval == 0 or step == args.tacotron_train_steps or step == 300:
 					#Save model and current global step
 					saver.save(sess, checkpoint_path, global_step=global_step)
 
 					log('\nSaving alignment, Mel-Spectrograms and griffin-lim inverted waveform..')
 					if hparams.predict_linear:
-						input_seq, mel_prediction, linear_prediction, alignment, target, target_length = sess.run([
+						input_seq, mel_prediction, linear_prediction, alignment, target, target_length, linear_target = sess.run([
 							model.inputs[0],
 							model.mel_outputs[0],
 							model.linear_outputs[0],
 							model.alignments[0],
 							model.mel_targets[0],
 							model.targets_lengths[0],
+							model.linear_targets[0],
 							])
 
 						#save predicted linear spectrogram to disk (debug)
@@ -269,6 +280,11 @@ def train(log_dir, args, hparams):
 						#save griffin lim inverted wav for debug (linear -> wav)
 						wav = audio.inv_linear_spectrogram(linear_prediction.T, hparams)
 						audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-wave-from-linear.wav'.format(step)), sr=hparams.sample_rate)
+
+						#Save real and predicted linear-spectrogram plot to disk (control purposes)
+						plot.plot_spectrogram(linear_prediction, os.path.join(plot_dir, 'step-{}-linear-spectrogram.png'.format(step)),
+							title='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, loss), target_spectrogram=linear_target,
+							max_len=target_length, auto_aspect=True)
 
 					else:
 						input_seq, mel_prediction, alignment, target, target_length = sess.run([model.inputs[0],
@@ -288,11 +304,11 @@ def train(log_dir, args, hparams):
 
 					#save alignment plot to disk (control purposes)
 					plot.plot_alignment(alignment, os.path.join(plot_dir, 'step-{}-align.png'.format(step)),
-						info='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, loss),
+						title='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, loss),
 						max_len=target_length // hparams.outputs_per_step)
 					#save real and predicted mel-spectrogram plot to disk (control purposes)
 					plot.plot_spectrogram(mel_prediction, os.path.join(plot_dir, 'step-{}-mel-spectrogram.png'.format(step)),
-						info='{}, {}, step={}, loss={:.5}'.format(args.model, time_string(), step, loss), target_spectrogram=target,
+						title='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, loss), target_spectrogram=target,
 						max_len=target_length)
 					log('Input at step {}: {}'.format(step, sequence_to_text(input_seq)))
 

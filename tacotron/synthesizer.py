@@ -20,7 +20,7 @@ class Synthesizer:
 		inputs = tf.placeholder(tf.int32, [None, None], 'inputs')
 		input_lengths = tf.placeholder(tf.int32, [None], 'input_lengths')
 		targets = tf.placeholder(tf.float32, [None, None, hparams.num_mels], 'mel_targets')
-		with tf.variable_scope('model') as scope:
+		with tf.variable_scope('Tacotron_model') as scope:
 			self.model = create_model(model_name, hparams)
 			if gta:
 				self.model.initialize(inputs, input_lengths, targets, gta=gta)
@@ -37,9 +37,9 @@ class Synthesizer:
 		#explicitely setting the padding to a value that doesn't originally exist in the spectogram
 		#to avoid any possible conflicts, without affecting the output range of the model too much
 		if hparams.symmetric_mels:
-			self._target_pad = -(hparams.max_abs_value + .1)
+			self._target_pad = -hparams.max_abs_value
 		else:
-			self._target_pad = -0.1
+			self._target_pad = 0.
 
 		log('Loading checkpoint: %s' % checkpoint_path)
 		#Memory allocation on the GPU as needed
