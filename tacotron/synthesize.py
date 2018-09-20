@@ -95,7 +95,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	log('starting synthesis')
 	mel_dir = os.path.join(args.input_dir, 'mels')
 	wav_dir = os.path.join(args.input_dir, 'audio')
-	with open(os.path.join(synth_dir, 'map.txt'), 'w') as file:
+	with open(os.path.join(synth_dir, 'map.txt'), 'w', encoding='utf-8') as file:
 		for i, meta in enumerate(tqdm(metadata)):
 			texts = [m[5] for m in meta]
 			mel_filenames = [os.path.join(mel_dir, m[1]) for m in meta]
