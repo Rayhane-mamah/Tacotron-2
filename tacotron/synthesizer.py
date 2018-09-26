@@ -128,11 +128,11 @@ class Synthesizer:
 
 				#save alignments
 				plot.plot_alignment(alignments[i], os.path.join(log_dir, 'plots/alignment-{}.png'.format(basenames[i])),
-					info='{}'.format(texts[i]), split_title=True)
+					title='{}'.format(texts[i]), split_title=True)
 
 				#save mel spectrogram plot
 				plot.plot_spectrogram(mel, os.path.join(log_dir, 'plots/mel-{}.png'.format(basenames[i])),
-					info='{}'.format(texts[i]), split_title=True)
+					title='{}'.format(texts[i]), split_title=True)
 
 				if hparams.predict_linear:
 					#save wav (linear -> wav)
@@ -141,7 +141,7 @@ class Synthesizer:
 
 					#save mel spectrogram plot
 					plot.plot_spectrogram(linears[i], os.path.join(log_dir, 'plots/linear-{}.png'.format(basenames[i])),
-						info='{}'.format(texts[i]), split_title=True, auto_aspect=True)
+						title='{}'.format(texts[i]), split_title=True, auto_aspect=True)
 
 
 
