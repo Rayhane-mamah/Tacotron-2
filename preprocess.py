@@ -32,9 +32,6 @@ def write_metadata(metadata, out_dir):
 	print('Max audio timesteps length: {}'.format(max(m[3] for m in metadata)))
 
 def norm_data(args):
-
-	merge_books = (args.merge_books=='True')
-
 	print('Selecting data folders..')
 	supported_datasets = ['LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS']
 	if args.dataset not in supported_datasets:
@@ -65,7 +62,7 @@ def norm_data(args):
 
 		path = os.path.join(path, args.reader)
 		supported_books = [e for e in os.listdir(path) if os.path.isdir(os.path.join(path,e))]
-		if merge_books:
+		if args.merge_books:
 			return [os.path.join(path, book) for book in supported_books]
 
 		else:
@@ -93,15 +90,13 @@ def main():
 	parser.add_argument('--language', default='en_US')
 	parser.add_argument('--voice', default='female')
 	parser.add_argument('--reader', default='mary_ann')
-	parser.add_argument('--merge_books', default='False')
+	parser.add_argument('--merge_books', type=bool, default=False)
 	parser.add_argument('--book', default='northandsouth')
 	parser.add_argument('--output', default='training_data')
 	parser.add_argument('--n_jobs', type=int, default=cpu_count())
 	args = parser.parse_args()
 
 	modified_hp = hparams.parse(args.hparams)
-
-	assert args.merge_books in ('False', 'True')
 
 	run_preprocess(args, modified_hp)
 

@@ -101,7 +101,7 @@ def main():
 	parser.add_argument('--input_dir', default='training_data', help='folder to contain inputs sentences/targets')
 	parser.add_argument('--output_dir', default='output', help='folder to contain synthesized mel spectrograms')
 	parser.add_argument('--mode', default='synthesis', help='mode for synthesis of tacotron after training')
-	parser.add_argument('--GTA', default='True', help='Ground truth aligned synthesis, defaults to True, only considered in Tacotron synthesis mode')
+	parser.add_argument('--GTA', type=bool, default=True, help='Ground truth aligned synthesis, defaults to True, only considered in Tacotron synthesis mode')
 	parser.add_argument('--restore', type=bool, default=True, help='Set this to False to do a fresh training')
 	parser.add_argument('--summary_interval', type=int, default=250,
 		help='Steps between running summary ops')

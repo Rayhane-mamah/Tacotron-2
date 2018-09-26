@@ -1,4 +1,3 @@
-import numpy as np
 import tensorflow as tf
 
 # Default hyperparameters
@@ -113,7 +112,7 @@ hparams = tf.contrib.training.HParams(
 	input_type="raw",
 	quantize_channels=2 ** 16,  # 65536 (16-bit) (raw) or 256 (8-bit) (mulaw or mulaw-quantize) // number of classes = 256 <=> mu = 255
 
-	log_scale_min=float(np.log(1e-14)), #Mixture of logistic distributions minimal log scale
+	log_scale_min= -14., #Mixture of logistic distributions minimal log scale
 	log_scale_min_gauss = -7., #Gaussian distribution minimal allowed log scale
 
 	#To use Gaussian distribution as output distribution instead of mixture of logistics, set "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
@@ -206,7 +205,7 @@ hparams = tf.contrib.training.HParams(
 
 	wavenet_lr_schedule = 'exponential', #learning rate schedule. Can be ('exponential', 'noam')
 	wavenet_learning_rate = 1e-4, #wavenet initial learning rate
-	wavenet_warmup = float(4000), #Only used with 'noam' scheme. Defines the number of ascending learning rate steps.
+	wavenet_warmup = 4000., #Only used with 'noam' scheme. Defines the number of ascending learning rate steps.
 	wavenet_decay_rate = 0.5, #Only used with 'exponential' scheme. Defines the decay rate.
 	wavenet_decay_steps = 300000, #Only used with 'exponential' scheme. Defines the decay steps.
 

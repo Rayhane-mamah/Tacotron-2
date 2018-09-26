@@ -57,7 +57,7 @@ def main():
 	parser.add_argument('--mels_dir', default='tacotron_output/eval/', help='folder to contain mels to synthesize audio from using the Wavenet')
 	parser.add_argument('--output_dir', default='output/', help='folder to contain synthesized mel spectrograms')
 	parser.add_argument('--mode', default='eval', help='mode of run: can be one of {}'.format(accepted_modes))
-	parser.add_argument('--GTA', default='True', help='Ground truth aligned synthesis, defaults to True, only considered in synthesis mode')
+	parser.add_argument('--GTA', type=bool, default=True, help='Ground truth aligned synthesis, defaults to True, only considered in synthesis mode')
 	parser.add_argument('--text_list', default='', help='Text file contains list of texts to be synthesized. Valid if mode=eval')
 	parser.add_argument('--speaker_id', default=None, help='Defines the speakers ids to use when running standalone Wavenet on a folder of mels. this variable must be a comma-separated list of ids')
 	args = parser.parse_args()
@@ -72,9 +72,6 @@ def main():
 
 	if args.mode == 'live' and args.model == 'Wavenet':
 		raise RuntimeError('Wavenet vocoder cannot be tested live due to its slow generation. Live only works with Tacotron!')
-
-	if args.GTA not in ('True', 'False'):
-		raise ValueError('GTA option must be either True or False')
 
 	if args.model == 'Tacotron-2':
 		if args.mode == 'live':

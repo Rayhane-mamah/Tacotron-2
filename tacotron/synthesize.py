@@ -67,8 +67,7 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	return eval_dir
 
 def run_synthesis(args, checkpoint_path, output_dir, hparams):
-	GTA = (args.GTA == 'True')
-	if GTA:
+	if args.GTA:
 		synth_dir = os.path.join(output_dir, 'gta')
 
 		#Create output path if it doesn't exist
@@ -83,7 +82,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	metadata_filename = os.path.join(args.input_dir, 'train.txt')
 	log(hparams_debug_string())
 	synth = Synthesizer()
-	synth.load(checkpoint_path, hparams, gta=GTA)
+	synth.load(checkpoint_path, hparams, gta=args.GTA)
 	with open(metadata_filename, encoding='utf-8') as f:
 		metadata = [line.strip().split('|') for line in f]
 		frame_shift_ms = hparams.hop_size / hparams.sample_rate
