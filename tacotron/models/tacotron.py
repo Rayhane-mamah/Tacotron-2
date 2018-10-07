@@ -52,7 +52,8 @@ class Tacotron():
 		if is_training and is_evaluating:
 			raise RuntimeError('Model can not be in training and evaluation modes at the same time!')
 
-		with tf.device('/cpu:0') :
+		split_device = '/cpu:0' if self._hparams.tacotron_num_gpus > 1 or self._hparams.split_on_cpu else '/gpu:{}'.format(self._hparams.tacotron_gpu_start_idx)
+		with tf.device(split_device):
 			hp = self._hparams
 			lout_int = [tf.int32]*hp.tacotron_num_gpus
 			lout_float = [tf.float32]*hp.tacotron_num_gpus

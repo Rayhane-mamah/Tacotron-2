@@ -36,6 +36,7 @@ hparams = tf.contrib.training.HParams(
     tacotron_num_gpus = 1, #Determines the number of gpus in use for Tacotron training.
     wavenet_gpu_start_idx = 0, #idx of the first GPU to be used for WaveNet training. (WIP)
     wavenet_num_gpus = 1, #Determines the number of gpus in use for WaveNet training. (WIP)
+    split_on_cpu = True, #Determines whether to split data on CPU or on first GPU. This is automatically True when more than 1 GPU is used.
 	###########################################################################################################################################
 
 	#Audio
@@ -112,7 +113,7 @@ hparams = tf.contrib.training.HParams(
 	###########################################################################################################################################
 
 	#Tacotron
-	outputs_per_step = 2, #number of frames to generate at each decoding step (increase to speed up computation and allows for higher batch size, decreases G&L audio quality)
+	outputs_per_step = 1, #number of frames to generate at each decoding step (increase to speed up computation and allows for higher batch size, decreases G&L audio quality)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them (True works pretty well)
 
 	embedding_dim = 512, #dimension of embedding space
