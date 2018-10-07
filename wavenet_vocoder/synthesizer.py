@@ -16,7 +16,7 @@ class Synthesizer:
 		self._hparams = hparams
 		local_cond, global_cond = self._check_conditions()
 
-		self.local_conditions = tf.placeholder(tf.float32, shape=[None, None, hparams.num_mels], name='local_condition_features') if local_cond else None
+		self.local_conditions = tf.placeholder(tf.float32, shape=(None, None, hparams.num_mels), name='local_condition_features') if local_cond else None
 		self.global_conditions = tf.placeholder(tf.int32, shape=(None, 1), name='global_condition_features') if global_cond else None
 		self.synthesis_length = tf.placeholder(tf.int32, shape=(), name='synthesis_length') if not local_cond else None
 
@@ -49,6 +49,9 @@ class Synthesizer:
 		maxlen = max([len(x) for x in mel_spectrograms])
 		#[-max, max] or [0,max]
 		T2_output_range = (-self._hparams.max_abs_value, self._hparams.max_abs_value) if self._hparams.symmetric_mels else (0, self._hparams.max_abs_value)
+
+		if self._hparams.clip_for_wavenet:
+			mel_spectrograms = [np.clip(x, T2_output_range[0], T2_output_range[1]) for x in mel_spectrograms]
 
 		c_batch = np.stack([_pad_inputs(x, maxlen, _pad=T2_output_range[0]) for x in mel_spectrograms]).astype(np.float32)
 

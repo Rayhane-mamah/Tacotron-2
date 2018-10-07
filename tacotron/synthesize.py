@@ -44,7 +44,7 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	log_dir = os.path.join(output_dir, 'logs-eval')
 
 	if args.model == 'Tacotron-2':
-		assert os.path.normpath(eval_dir) == os.path.normpath(args.mels_dir) #mels_dir = wavenet_input_dir
+		assert os.path.normpath(eval_dir) == os.path.normpath(args.mels_dir)
 
 	#Create output path if it doesn't exist
 	os.makedirs(eval_dir, exist_ok=True)
@@ -56,13 +56,18 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	synth = Synthesizer()
 	synth.load(checkpoint_path, hparams)
 
+	#Set inputs batch wise
+	sentences = [sentences[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(sentences), hparams.tacotron_synthesis_batch_size)]
 
+	log('Starting Synthesis')
 	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
-		for i, text in enumerate(tqdm(sentences)):
+		for i, texts in enumerate(tqdm(sentences)):
 			start = time.time()
-			mel_filename, speaker_id = synth.synthesize([text], [i+1], eval_dir, log_dir, None)
+			basenames = ['batch_{}_sentence_{}'.format(i, j) for j in range(len(texts))]
+			mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, None)
 
-			file.write('{}|{}|{}\n'.format(text, mel_filename[0], speaker_id[0]))
+			for elems in zip(texts, mel_filenames, speaker_ids):
+				file.write('|'.join([str(x) for x in elems]) + '\n')
 	log('synthesized mel spectrograms at {}'.format(eval_dir))
 	return eval_dir
 
@@ -90,9 +95,10 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 		hours = sum([int(x[4]) for x in metadata]) * frame_shift_ms / (3600)
 		log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(metadata), hours))
 
+	#Set inputs batch wise
 	metadata = [metadata[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(metadata), hparams.tacotron_synthesis_batch_size)]
 
-	log('starting synthesis')
+	log('Starting Synthesis')
 	mel_dir = os.path.join(args.input_dir, 'mels')
 	wav_dir = os.path.join(args.input_dir, 'audio')
 	with open(os.path.join(synth_dir, 'map.txt'), 'w') as file:
@@ -116,6 +122,14 @@ def tacotron_synthesize(args, hparams, checkpoint, sentences=None):
 		log('loaded model at {}'.format(checkpoint_path))
 	except:
 		raise RuntimeError('Failed to load checkpoint at {}'.format(checkpoint))
+
+	if hparams.tacotron_synthesis_batch_size < hparams.tacotron_num_gpus:
+		raise ValueError('Defined synthesis batch size {} is smaller than minimum required {} (num_gpus)! Please verify your synthesis batch size choice.'.format(
+			hparams.tacotron_synthesis_batch_size, hparams.tacotron_num_gpus))
+
+	if hparams.tacotron_synthesis_batch_size % hparams.tacotron_num_gpus != 0:
+		raise ValueError('Defined synthesis batch size {} is not a multiple of {} (num_gpus)! Please verify your synthesis batch size choice!'.format(
+			hparams.tacotron_synthesis_batch_size, hparams.tacotron_num_gpus))
 
 	if args.mode == 'eval':
 		return run_eval(args, checkpoint_path, output_dir, hparams, sentences)
