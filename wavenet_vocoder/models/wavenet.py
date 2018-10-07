@@ -402,7 +402,9 @@ class WaveNet():
 		self.variables = tf.trainable_variables()
 		n_vars = np.sum([np.prod(v.shape) for v in tf.trainable_variables()])
 		log('  Receptive Field:           ({} samples / {:.1f} ms)'.format(self.receptive_field, self.receptive_field / hparams.sample_rate * 1000.))
-		log('  WaveNet Parameters:        {:.3f} Million.'.format(np.sum([np.prod(v.get_shape().as_list()) for v in self.variables]) / 1_000_000))
+
+		#1_000_000 is causing syntax problems for some people?! Python please :)
+		log('  WaveNet Parameters:        {:.3f} Million.'.format(np.sum([np.prod(v.get_shape().as_list()) for v in self.variables]) / 1000000))
 
 		self.ema = tf.train.ExponentialMovingAverage(decay=hparams.wavenet_ema_decay)
 
