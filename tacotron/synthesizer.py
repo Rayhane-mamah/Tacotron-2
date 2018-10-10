@@ -149,7 +149,7 @@ class Synthesizer:
 
 		if basenames is None:
 			#Generate wav and read it
-			wav = audio.inv_mel_spectrogram(mels.T, hparams)
+			wav = audio.inv_mel_spectrogram(mels[0].T, hparams)
 			audio.save_wav(wav, 'temp.wav', sr=hparams.sample_rate) #Find a better way
 
 			chunk = 512
