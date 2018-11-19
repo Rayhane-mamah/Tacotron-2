@@ -1,9 +1,10 @@
 import argparse
-from multiprocessing import cpu_count
 import os
-from tqdm import tqdm
+from multiprocessing import cpu_count
+
 from datasets import preprocessor
 from hparams import hparams
+from tqdm import tqdm
 
 
 def preprocess(args, input_folders, out_dir, hparams):
@@ -43,9 +44,9 @@ def norm_data(args):
 	if args.dataset.startswith('LJSpeech'):
 		return [os.path.join(args.base_dir, args.dataset)]
 
-	
+
 	if args.dataset == 'M-AILABS':
-		supported_languages = ['en_US', 'en_UK', 'fr_FR', 'it_IT', 'de_DE', 'es_ES', 'ru_RU', 
+		supported_languages = ['en_US', 'en_UK', 'fr_FR', 'it_IT', 'de_DE', 'es_ES', 'ru_RU',
 			'uk_UK', 'pl_PL', 'nl_NL', 'pt_PT', 'fi_FI', 'se_SE', 'tr_TR', 'ar_SA']
 		if args.language not in supported_languages:
 			raise ValueError('Please enter a supported language to use from M-AILABS dataset! \n{}'.format(
@@ -86,7 +87,7 @@ def main():
 	print('initializing preprocessing..')
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--base_dir', default='')
-	parser.add_argument('--hparams', default='', 
+	parser.add_argument('--hparams', default='',
 		help='Hyperparameter overrides as a comma-separated list of name=value pairs')
 	parser.add_argument('--dataset', default='LJSpeech-1.1')
 	parser.add_argument('--language', default='en_US')

@@ -1,7 +1,10 @@
-import numpy as np 
-import tensorflow as tf 
-import librosa.display as dsp
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
+import librosa.display as dsp
+import numpy as np
+import tensorflow as tf
 
 
 def _assert_valid_input_type(s):
@@ -42,7 +45,7 @@ def mulaw(x, mu=256):
 	.. [1] Brokish, Charles W., and Michele Lewis. "A-law and mu-law companding
 		implementations using the tms320c54x." SPRA163 (1997).
 	"""
-	mu -= 1
+	mu = 255
 	return _sign(x) * _log1p(mu * _abs(x)) / _log1p(mu)
 
 
@@ -61,7 +64,7 @@ def inv_mulaw(y, mu=256):
 		:func:`nnmnkwii.preprocessing.mulaw_quantize`
 		:func:`nnmnkwii.preprocessing.inv_mulaw_quantize`
 	"""
-	mu -= 1
+	mu = 255
 	return _sign(y) * (1.0 / mu) * ((1.0 + mu)**_abs(y) - 1.0)
 
 
@@ -93,13 +96,13 @@ def mulaw_quantize(x, mu=256):
 		:func:`nnmnkwii.preprocessing.inv_mulaw`
 		:func:`nnmnkwii.preprocessing.inv_mulaw_quantize`
 	"""
-	mu -= 1
+	mu = 255
 	y = mulaw(x, mu)
 	# scale [-1, 1] to [0, mu]
 	return _asint((y + 1) / 2 * mu)
 
 
-def inv_mulaw_quantize(y, mu=255):
+def inv_mulaw_quantize(y, mu=256):
 	"""Inverse of mu-law companding + quantize
 	Args:
 		y (array-like): Quantized signal (∈ [0, mu]).
@@ -121,7 +124,7 @@ def inv_mulaw_quantize(y, mu=255):
 		:func:`nnmnkwii.preprocessing.mulaw_quantize`
 	"""
 	# [0, m) to [-1, 1]
-	mu -= 1
+	mu = 255
 	y = 2 * _asfloat(y) / mu - 1
 	return inv_mulaw(y, mu)
 

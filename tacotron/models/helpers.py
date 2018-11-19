@@ -39,20 +39,20 @@ class TacoTestHelper(Helper):
 			#A sequence is finished when the output probability is > 0.5
 			finished = tf.cast(tf.round(stop_token_prediction), tf.bool)
 
-			#Since we are predicting r frames at each step, two modes are 
+			#Since we are predicting r frames at each step, two modes are
 			#then possible:
 			#	Stop when the model outputs a p > 0.5 for any frame between r frames (Recommended)
 			#	Stop when the model outputs a p > 0.5 for all r frames (Safer)
 			#Note:
 			#	With enough training steps, the model should be able to predict when to stop correctly
 			#	and the use of stop_at_any = True would be recommended. If however the model didn't
-			#	learn to stop correctly yet, (stops too soon) one could choose to use the safer option 
+			#	learn to stop correctly yet, (stops too soon) one could choose to use the safer option
 			#	to get a correct synthesis
 			if self.stop_at_any:
-				finished = tf.reduce_any(finished) #Recommended
+				finished = tf.reduce_any(tf.reduce_all(finished, axis=0)) #Recommended
 			else:
-				finished = tf.reduce_all(finished) #Safer option
-			
+				finished = tf.reduce_all(tf.reduce_all(finished, axis=0)) #Safer option
+
 			# Feed last output frame as next input. outputs is [N, output_dim * r]
 			next_inputs = outputs[:, -self._output_dim:]
 			next_state = state
@@ -60,7 +60,7 @@ class TacoTestHelper(Helper):
 
 
 class TacoTrainingHelper(Helper):
-	def __init__(self, batch_size, targets, stop_targets, hparams, gta, evaluating, global_step):
+	def __init__(self, batch_size, targets, hparams, gta, evaluating, global_step):
 		# inputs is [N, T_in], targets is [N, T_out, D]
 		with tf.name_scope('TacoTrainingHelper'):
 			self._batch_size = batch_size

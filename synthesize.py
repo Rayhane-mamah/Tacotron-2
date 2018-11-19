@@ -1,10 +1,14 @@
 import argparse
+import os
+from warnings import warn
+from time import sleep
+
+import tensorflow as tf
+
+from hparams import hparams
+from infolog import log
 from tacotron.synthesize import tacotron_synthesize
 from wavenet_vocoder.synthesize import wavenet_synthesize
-from infolog import log
-from hparams import hparams
-from warnings import warn
-import os
 
 
 def prepare_run(args):
@@ -30,6 +34,10 @@ def synthesize(args, hparams, taco_checkpoint, wave_checkpoint, sentences):
 	log('Running End-to-End TTS Evaluation. Model: {}'.format(args.name or args.model))
 	log('Synthesizing mel-spectrograms from text..')
 	wavenet_in_dir = tacotron_synthesize(args, hparams, taco_checkpoint, sentences)
+	#Delete Tacotron model from graph
+	tf.reset_default_graph()
+	#Sleep 1/2 second to let previous graph close and avoid error messages while Wavenet is synthesizing
+	sleep(0.5)
 	log('Synthesizing audio from mel-spectrograms.. (This may take a while)')
 	wavenet_synthesize(args, hparams, wave_checkpoint)
 	log('Tacotron-2 TTS synthesis complete!')
@@ -52,9 +60,10 @@ def main():
 	parser.add_argument('--mode', default='eval', help='mode of run: can be one of {}'.format(accepted_modes))
 	parser.add_argument('--GTA', default='True', help='Ground truth aligned synthesis, defaults to True, only considered in synthesis mode')
 	parser.add_argument('--text_list', default='', help='Text file contains list of texts to be synthesized. Valid if mode=eval')
+	parser.add_argument('--speaker_id', default=None, help='Defines the speakers ids to use when running standalone Wavenet on a folder of mels. this variable must be a comma-separated list of ids')
 	args = parser.parse_args()
-	
-	accepted_models = ['Tacotron', 'WaveNet', 'Both', 'Tacotron-2']
+
+	accepted_models = ['Tacotron', 'WaveNet', 'Tacotron-2']
 
 	if args.model not in accepted_models:
 		raise ValueError('please enter a valid model to synthesize with: {}'.format(accepted_models))
@@ -62,13 +71,13 @@ def main():
 	if args.mode not in accepted_modes:
 		raise ValueError('accepted modes are: {}, found {}'.format(accepted_modes, args.mode))
 
-	if args.mode=='live' and args.model=='Wavenet':
+	if args.mode == 'live' and args.model == 'Wavenet':
 		raise RuntimeError('Wavenet vocoder cannot be tested live due to its slow generation. Live only works with Tacotron!')
 
 	if args.GTA not in ('True', 'False'):
 		raise ValueError('GTA option must be either True or False')
 
-	if args.model in ('Both', 'Tacotron-2'):
+	if args.model == 'Tacotron-2':
 		if args.mode == 'live':
 			warn('Requested a live evaluation with Tacotron-2, Wavenet will not be used!')
 		if args.mode == 'synthesis':
@@ -81,7 +90,7 @@ def main():
 		_ = tacotron_synthesize(args, hparams, taco_checkpoint, sentences)
 	elif args.model == 'WaveNet':
 		wavenet_synthesize(args, hparams, wave_checkpoint)
-	elif args.model in ('Both', 'Tacotron-2'):
+	elif args.model == 'Tacotron-2':
 		synthesize(args, hparams, taco_checkpoint, wave_checkpoint, sentences)
 	else:
 		raise ValueError('Model provided {} unknown! {}'.format(args.model, accepted_models))

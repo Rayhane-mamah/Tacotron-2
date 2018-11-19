@@ -1,7 +1,8 @@
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import numpy as np 
+
+import numpy as np
 
 
 def split_title_line(title_text, max_words=5):
@@ -12,7 +13,7 @@ def split_title_line(title_text, max_words=5):
 	seq = title_text.split()
 	return '\n'.join([' '.join(seq[i:i + max_words]) for i in range(0, len(seq), max_words)])
 
-def plot_alignment(alignment, path, info=None, split_title=False, max_len=None):
+def plot_alignment(alignment, path, title=None, split_title=False, max_len=None):
 	if max_len is not None:
 		alignment = alignment[:, :max_len]
 
@@ -26,11 +27,10 @@ def plot_alignment(alignment, path, info=None, split_title=False, max_len=None):
 		interpolation='none')
 	fig.colorbar(im, ax=ax)
 	xlabel = 'Decoder timestep'
-	if info is not None:
-		if split_title:
-			title = split_title_line(info)
-		else:
-			title = info
+
+	if split_title:
+		title = split_title_line(title)
+
 	plt.xlabel(xlabel)
 	plt.title(title)
 	plt.ylabel('Encoder timestep')
@@ -39,16 +39,13 @@ def plot_alignment(alignment, path, info=None, split_title=False, max_len=None):
 	plt.close()
 
 
-def plot_spectrogram(pred_spectrogram, path, info=None, split_title=False, target_spectrogram=None, max_len=None):
+def plot_spectrogram(pred_spectrogram, path, title=None, split_title=False, target_spectrogram=None, max_len=None, auto_aspect=False):
 	if max_len is not None:
 		target_spectrogram = target_spectrogram[:max_len]
 		pred_spectrogram = pred_spectrogram[:max_len]
 
-	if info is not None:
-		if split_title:
-			title = split_title_line(info)
-		else:
-			title = info
+	if split_title:
+		title = split_title_line(title)
 
 	fig = plt.figure(figsize=(10, 8))
 	# Set common labels
@@ -59,14 +56,20 @@ def plot_spectrogram(pred_spectrogram, path, info=None, split_title=False, targe
 		ax1 = fig.add_subplot(311)
 		ax2 = fig.add_subplot(312)
 
-		im = ax1.imshow(np.rot90(target_spectrogram), interpolation='none')
+		if auto_aspect:
+			im = ax1.imshow(np.rot90(target_spectrogram), aspect='auto', interpolation='none')
+		else:
+			im = ax1.imshow(np.rot90(target_spectrogram), interpolation='none')
 		ax1.set_title('Target Mel-Spectrogram')
 		fig.colorbar(mappable=im, shrink=0.65, orientation='horizontal', ax=ax1)
 		ax2.set_title('Predicted Mel-Spectrogram')
 	else:
 		ax2 = fig.add_subplot(211)
 
-	im = ax2.imshow(np.rot90(pred_spectrogram), interpolation='none')
+	if auto_aspect:
+		im = ax2.imshow(np.rot90(pred_spectrogram), aspect='auto', interpolation='none')
+	else:
+		im = ax2.imshow(np.rot90(pred_spectrogram), interpolation='none')
 	fig.colorbar(mappable=im, shrink=0.65, orientation='horizontal', ax=ax2)
 
 	plt.tight_layout()
