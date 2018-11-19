@@ -358,6 +358,7 @@ class Feeder:
 			return new_batch
 
 	def _assert_ready_for_upsample(self, x, c):
+		print('lenx={} lenc={}, {}'.format(len(x), len(c), audio.get_hop_size(self._hparams)))
 		assert len(x) % len(c) == 0 and len(x) // len(c) == audio.get_hop_size(self._hparams)
 
 
