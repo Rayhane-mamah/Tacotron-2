@@ -52,7 +52,7 @@ class Feeder:
 			test_size=test_size, random_state=hparams.wavenet_data_random_state)
 
 		#Make sure test size is a multiple of batch size else round up
-		len_test_indices = _round_up(len(test_indices), hparams.wavenet_batch_size)
+		len_test_indices = _round_down(len(test_indices), hparams.wavenet_batch_size)
 		extra_test = test_indices[len_test_indices:]
 		test_indices = test_indices[:len_test_indices]
 		train_indices = np.concatenate([train_indices, extra_test])
@@ -315,6 +315,9 @@ class Feeder:
 			#[-max, max] or [0,max]
 			T2_output_range = (-self._hparams.max_abs_value, self._hparams.max_abs_value) if self._hparams.symmetric_mels else (0, self._hparams.max_abs_value)
 
+			if self._hparams.clip_for_wavenet:
+				c_features = [np.clip(x, T2_output_range[0], T2_output_range[1]) for x in c_features]
+				
 			c_batch = np.stack([_pad_inputs(x, maxlen, _pad=T2_output_range[0]) for x in c_features]).astype(np.float32)
 			assert len(c_batch.shape) == 3
 			#[batch_size, c_channels, time_steps]
@@ -392,6 +395,10 @@ def _pad_targets(x, maxlen, _pad=0):
 def _round_up(x, multiple):
 	remainder = x % multiple
 	return x if remainder == 0 else x + multiple - remainder
+
+def _round_down(x, multiple):
+	remainder = x % multiple
+	return x if remainder == 0 else x - remainder
 
 def _ensure_divisible(length, divisible_by=256, lower=True):
 	if length % divisible_by == 0:

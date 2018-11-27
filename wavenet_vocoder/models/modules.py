@@ -292,7 +292,10 @@ class CausalConv1D(tf.keras.layers.Wrapper):
 				output = tf.nn.bias_add(output, self.layer.bias)
 
 			#[batch_size, 1(time_step), channels(filters)]
-			return tf.reshape(output, [batch_size, 1, self.layer.filters]), convolution_queue
+			if convolution_queue is None:
+				return tf.reshape(output, [batch_size, 1, self.layer.filters])
+			else:
+				return [tf.reshape(output, [batch_size, 1, self.layer.filters]), convolution_queue]
 
 		#Normal run
 		#Causal convolutions are only padded on the left side
@@ -322,7 +325,7 @@ class CausalConv1D(tf.keras.layers.Wrapper):
 
 		inputs: [batch_size, time_length, channels] ('NWC')! Channels last!
 		'''
-		return self(inputs, True, convolution_queue)
+		return self(inputs, incremental=True, convolution_queue=convolution_queue)
 
 
 class Conv1D1x1(CausalConv1D):
@@ -370,11 +373,11 @@ class Conv1D1x1(CausalConv1D):
 
 	def call(self, inputs, incremental=False, convolution_queue=None):
 		#Call parent class call function
-		return super(Conv1D1x1, self).call(inputs, incremental, convolution_queue)
+		return super(Conv1D1x1, self).call(inputs, incremental=incremental, convolution_queue=convolution_queue)
 
 	def incremental_step(self, inputs, unused_queue=None):
 		#Call parent class incremental function
-		output, _ = self(inputs, True, unused_queue) #Drop unused queue
+		output = self(inputs, incremental=True, convolution_queue=unused_queue) #Drop unused queue
 		return output
 
 
@@ -449,11 +452,11 @@ class ResidualConv1DGLU(tf.keras.layers.Wrapper):
 
 
 	def call(self, x, c=None, g=None):
-		x, s, _ = self.step(x, c, g, False)
-		return (x, s)
+		x, s, _ = self.step(x, c=c, g=g, is_incremental=False)
+		return [x, s]
 
 	def incremental_step(self, x, c=None, g=None, queue=None):
-		return self.step(x, c, g, True, queue=queue)
+		return self.step(x, c=c, g=g, is_incremental=True, queue=queue)
 
 	def step(self, x, c, g, is_incremental, queue=None):
 		'''
