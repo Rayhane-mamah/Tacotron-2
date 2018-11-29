@@ -4,6 +4,7 @@ from functools import partial
 
 import numpy as np
 from datasets import audio
+from tacotron.utils.text import get_unused_symbols
 from wavenet_vocoder.util import is_mulaw, is_mulaw_quantize, mulaw, mulaw_quantize
 
 
@@ -29,6 +30,7 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
 	executor = ProcessPoolExecutor(max_workers=n_jobs)
 	futures = []
 	index = 1
+	unusedSymbols = set()
 	for input_dir in input_dirs:
 		with open(os.path.join(input_dir, 'metadata.csv'), encoding='utf-8') as f:
 			for line in f:
@@ -36,8 +38,11 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
 				basename = parts[0]
 				wav_path = os.path.join(input_dir, 'wavs', '{}.wav'.format(basename))
 				text = parts[2]
+				unusedSymbols |= get_unused_symbols(text)
 				futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, basename, wav_path, text, hparams)))
 				index += 1
+
+	print('Unused symbols in input data: {}'.format(str(unusedSymbols)))
 
 	return [future.result() for future in tqdm(futures) if future.result() is not None]
 

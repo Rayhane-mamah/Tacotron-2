@@ -53,6 +53,13 @@ def sequence_to_text(sequence):
       result += s
   return result.replace('}{', ' ')
 
+def get_unused_symbols(text):
+  unused = set()
+  for s in text:
+    if not _should_keep_symbol(s):
+      unused.add(s)
+  return unused
+
 
 def _clean_text(text, cleaner_names):
   for name in cleaner_names:
