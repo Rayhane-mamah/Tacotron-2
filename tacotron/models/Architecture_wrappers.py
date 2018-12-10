@@ -2,17 +2,14 @@
 All notations and variable names were used in concordance with originial tensorflow implementation
 """
 import collections
+
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib.rnn import RNNCell
-from tensorflow.python.framework import ops
-from tensorflow.python.ops import rnn_cell_impl
-from tensorflow.python.ops import check_ops
-from tensorflow.python.util import nest
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import tensor_array_ops
-from tensorflow.python.framework import tensor_shape
 from tacotron.models.attention import _compute_attention
+from tensorflow.contrib.rnn import RNNCell
+from tensorflow.python.framework import ops, tensor_shape
+from tensorflow.python.ops import array_ops, check_ops, rnn_cell_impl, tensor_array_ops
+from tensorflow.python.util import nest
 
 _zero_state_tensors = rnn_cell_impl._zero_state_tensors
 
@@ -51,7 +48,7 @@ class TacotronEncoderCell(RNNCell):
 class TacotronDecoderCellState(
 	collections.namedtuple("TacotronDecoderCellState",
 	 ("cell_state", "attention", "time", "alignments",
-	  "alignment_history", "finished"))):
+	  "alignment_history"))):
 	"""`namedtuple` storing the state of a `TacotronDecoderCell`.
 	Contains:
 	  - `cell_state`: The state of the wrapped `RNNCell` at the previous time
@@ -83,20 +80,20 @@ class TacotronDecoderCell(RNNCell):
 
 	* : This is typically taking a vanilla LSTM, wrapping it using tensorflow's attention wrapper,
 	and wrap that with the prenet before doing an input feeding, and with the prediction layer
-	that uses RNN states to project on output space. Actions marked with (*) can be replaced with 
+	that uses RNN states to project on output space. Actions marked with (*) can be replaced with
 	tensorflow's attention wrapper call if it was using cumulative alignments instead of previous alignments only.
 	"""
 
-	def __init__(self, prenet, attention_mechanism, rnn_cell, frame_projection, stop_projection, mask_finished=False):
+	def __init__(self, prenet, attention_mechanism, rnn_cell, frame_projection, stop_projection):
 		"""Initialize decoder parameters
 
 		Args:
 		    prenet: A tensorflow fully connected layer acting as the decoder pre-net
-		    attention_mechanism: A _BaseAttentionMechanism instance, usefull to 
+		    attention_mechanism: A _BaseAttentionMechanism instance, usefull to
 			    learn encoder-decoder alignments
 		    rnn_cell: Instance of RNNCell, main body of the decoder
 		    frame_projection: tensorflow fully connected layer with r * num_mels output units
-		    stop_projection: tensorflow fully connected layer, expected to project to a scalar 
+		    stop_projection: tensorflow fully connected layer, expected to project to a scalar
 			    and through a sigmoid activation
 			mask_finished: Boolean, Whether to mask decoder frames after the <stop_token>
 		"""
@@ -108,7 +105,6 @@ class TacotronDecoderCell(RNNCell):
 		self._frame_projection = frame_projection
 		self._stop_projection = stop_projection
 
-		self._mask_finished = mask_finished
 		self._attention_layer_size = self._attention_mechanism.values.get_shape()[-1].value
 
 	def _batch_size_checks(self, batch_size, error_message):
@@ -132,12 +128,11 @@ class TacotronDecoderCell(RNNCell):
 			time=tensor_shape.TensorShape([]),
 			attention=self._attention_layer_size,
 			alignments=self._attention_mechanism.alignments_size,
-			alignment_history=(),
-			finished=())
+			alignment_history=())
 
 	def zero_state(self, batch_size, dtype):
 		"""Return an initial (zero) state tuple for this `AttentionWrapper`.
-		
+
 		Args:
 		  batch_size: `0D` integer tensor: the batch size.
 		  dtype: The internal state data type.
@@ -167,8 +162,7 @@ class TacotronDecoderCell(RNNCell):
 				  dtype),
 				alignments=self._attention_mechanism.initial_alignments(batch_size, dtype),
 				alignment_history=tensor_array_ops.TensorArray(dtype=dtype, size=0,
-				dynamic_size=True),
-				finished=tf.reshape(tf.tile([0.0], [batch_size]), [-1, 1]))
+				dynamic_size=True))
 
 	def __call__(self, inputs, state):
 		#Information bottleneck (essential for learning attention)
@@ -180,15 +174,16 @@ class TacotronDecoderCell(RNNCell):
 		#Unidirectional LSTM layers
 		LSTM_output, next_cell_state = self._cell(LSTM_input, state.cell_state)
 
+
 		#Compute the attention (context) vector and alignments using
-		#the new decoder cell hidden state as query vector 
+		#the new decoder cell hidden state as query vector
 		#and cumulative alignments to extract location features
 		#The choice of the new cell hidden state (s_{i}) of the last
 		#decoder RNN Cell is based on Luong et Al. (2015):
 		#https://arxiv.org/pdf/1508.04025.pdf
 		previous_alignments = state.alignments
 		previous_alignment_history = state.alignment_history
-		context_vector, alignments, cumulated_alignments = _compute_attention(self._attention_mechanism, 
+		context_vector, alignments, cumulated_alignments = _compute_attention(self._attention_mechanism,
 			LSTM_output,
 			previous_alignments,
 			attention_layer=None)
@@ -200,19 +195,8 @@ class TacotronDecoderCell(RNNCell):
 		cell_outputs = self._frame_projection(projections_input)
 		stop_tokens = self._stop_projection(projections_input)
 
-		#mask attention computed for decoding steps where sequence is already finished
-		#this is purely for visual purposes and will not affect the training of the model
-		#we don't pay much attention to the alignments of the output paddings if we impute
-		#the decoder outputs beyond the end of sequence.
-		if self._mask_finished:
-			finished = tf.cast(state.finished * tf.ones(tf.shape(alignments)), tf.bool)
-			mask = tf.zeros(tf.shape(alignments))
-			masked_alignments = tf.where(finished, mask, alignments)
-		else:
-			masked_alignments = alignments
-
 		#Save alignment history
-		alignment_history = previous_alignment_history.write(state.time, masked_alignments)
+		alignment_history = previous_alignment_history.write(state.time, alignments)
 
 		#Prepare next decoder state
 		next_state = TacotronDecoderCellState(
@@ -220,7 +204,6 @@ class TacotronDecoderCell(RNNCell):
 			cell_state=next_cell_state,
 			attention=context_vector,
 			alignments=cumulated_alignments,
-			alignment_history=alignment_history,
-			finished=state.finished)
+			alignment_history=alignment_history)
 
-		return (cell_outputs, stop_tokens), next_state 
+		return (cell_outputs, stop_tokens), next_state
