@@ -109,13 +109,8 @@ class Synthesizer:
 		speaker_ids = []
 		for i, mel in enumerate(mels):
 			#Get speaker id for global conditioning (only used with GTA generally)
-			if hparams.gin_channels > 0:
-				raise RuntimeError('Please set the speaker_id rule in line 99 of tacotron/synthesizer.py to allow for global condition usage later.')
-				speaker_id = '<no_g>' #set the rule to determine speaker id. By using the file basename maybe? (basenames are inside "basenames" variable)
-				speaker_ids.append(speaker_id) #finish by appending the speaker id. (allows for different speakers per batch if your model is multispeaker)
-			else:
-				speaker_id = '<no_g>'
-				speaker_ids.append(speaker_id)
+			speaker_id = '<no_g>'
+			speaker_ids.append(speaker_id)
 
 			# Write the spectrogram to disk
 			# Note: outputs mel-spectrogram files and target ones have same names, just different folders

@@ -8,7 +8,6 @@ from hparams import hparams
 from infolog import log
 from tacotron.synthesize import tacotron_synthesize
 from tacotron.train import tacotron_train
-from wavenet_vocoder.train import wavenet_train
 
 log = infolog.log
 
@@ -41,52 +40,6 @@ def prepare_run(args):
 	infolog.init(os.path.join(log_dir, 'Terminal_train_log'), run_name, args.slack_url)
 	return log_dir, modified_hp
 
-def train(args, log_dir, hparams):
-	state_file = os.path.join(log_dir, 'state_log')
-	#Get training states
-	(taco_state, GTA_state, wave_state), input_path = read_seq(state_file)
-
-	if not taco_state:
-		log('\n#############################################################\n')
-		log('Tacotron Train\n')
-		log('###########################################################\n')
-		checkpoint = tacotron_train(args, log_dir, hparams)
-		tf.reset_default_graph()
-		#Sleep 1 second to let previous graph close and avoid error messages while synthesis
-		sleep(1)
-		if checkpoint is None:
-			raise('Error occured while training Tacotron, Exiting!')
-		taco_state = 1
-		save_seq(state_file, [taco_state, GTA_state, wave_state], input_path)
-	else:
-		checkpoint = os.path.join(log_dir, 'taco_pretrained/')
-
-	if not GTA_state:
-		log('\n#############################################################\n')
-		log('Tacotron GTA Synthesis\n')
-		log('###########################################################\n')
-		input_path = tacotron_synthesize(args, hparams, checkpoint)
-		GTA_state = 1
-		save_seq(state_file, [taco_state, GTA_state, wave_state], input_path)
-	else:
-		input_path = os.path.join('tacotron_' + args.output_dir, 'gta', 'map.txt')
-
-	if input_path == '' or input_path is None:
-		raise RuntimeError('input_path has an unpleasant value -> {}'.format(input_path))
-
-	if not wave_state:
-		log('\n#############################################################\n')
-		log('Wavenet Train\n')
-		log('###########################################################\n')
-		checkpoint = wavenet_train(args, log_dir, hparams, input_path)
-		if checkpoint is None:
-			raise ('Error occured while training Wavenet, Exiting!')
-		wave_state = 1
-		save_seq(state_file, [taco_state, GTA_state, wave_state], input_path)
-
-	if wave_state and GTA_state and taco_state:
-		log('TRAINING IS ALREADY COMPLETE!!')
-
 def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--base_dir', default='')
@@ -113,22 +66,9 @@ def main():
 	parser.add_argument('--slack_url', default=None, help='slack webhook notification destination link')
 	args = parser.parse_args()
 
-	accepted_models = ['Tacotron', 'WaveNet', 'Tacotron-2']
-
-	if args.model not in accepted_models:
-		raise ValueError('please enter a valid model to train: {}'.format(accepted_models))
-
 	log_dir, hparams = prepare_run(args)
 
-	if args.model == 'Tacotron':
-		tacotron_train(args, log_dir, hparams)
-	elif args.model == 'WaveNet':
-		wavenet_train(args, log_dir, hparams, args.wavenet_input)
-	elif args.model == 'Tacotron-2':
-		train(args, log_dir, hparams)
-	else:
-		raise ValueError('Model provided {} unknown! {}'.format(args.model, accepted_models))
-
+	tacotron_train(args, log_dir, hparams)
 
 if __name__ == '__main__':
 	main()
