@@ -28,7 +28,7 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
 	futures = []
 	index = 1
 	for input_dir in input_dirs:
-		trn_files = glob.glob(os.path.join(input_dir, 'xmly_yangchenghao_22050', 'A*', '*.trn'))
+		trn_files = glob.glob(os.path.join(input_dir, 'biaobei_48000', '*.trn'))
 		for trn in trn_files:
 			with open(trn) as f:
 				basename = trn[:-4]

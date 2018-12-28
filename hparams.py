@@ -14,7 +14,7 @@ hparams = tf.contrib.training.HParams(
 
 	#Audio
 	num_mels = 160, #Number of mel-spectrogram channels and local conditioning dimensionality
-	num_freq = 1025, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
+	num_freq = 2049, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
 	rescale = True, #Whether to rescale audio prior to preprocessing
 	rescaling_max = 0.999, #Rescaling value
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
@@ -28,10 +28,10 @@ hparams = tf.contrib.training.HParams(
 	silence_threshold=2, #silence threshold used for sound trimming for wavenet preprocessing
 
 	#Mel spectrogram
-	n_fft = 2048, #Extra window size is filled with 0 paddings to match this parameter
-	hop_size = 275, #For 22050Hz, 275 ~= 12.5 ms
-	win_size = 1100, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
-	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset)
+	n_fft = 4096, #Extra window size is filled with 0 paddings to match this parameter
+	hop_size = 600, #For 22050Hz, 275 ~= 12.5 ms
+	win_size = 2400, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
+	sample_rate = 48000, #22050 Hz (corresponding to ljspeech dataset)
 	frame_shift_ms = None,
 	preemphasis = 0.97, # preemphasis coefficient
 
@@ -50,7 +50,7 @@ hparams = tf.contrib.training.HParams(
 	#Limits
 	min_level_db = -120,
 	ref_level_db = 20,
-	fmin = 55, #Set this to 75 if your speaker is male! if female, 125 should help taking off noise. (To test depending on dataset)
+	fmin = 125, #Set this to 75 if your speaker is male! if female, 125 should help taking off noise. (To test depending on dataset)
 	fmax = 7600,
 
 	#Griffin Lim
