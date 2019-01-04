@@ -1,6 +1,12 @@
 # Tacotron-2:
 Tensorflow implementation of DeepMind's Tacotron-2. A deep neural network architecture described in this paper: [Natural TTS synthesis by conditioning Wavenet on MEL spectogram predictions](https://arxiv.org/pdf/1712.05884.pdf)
 
+This Repository contains additional improvements and attempts over the paper, we thus propose **paper_hparams.py** file which holds the exact hyperparameters to reproduce the paper results without any additional extras.
+
+Suggested **hparams.py** file which is default in use, contains the hyperparameters with extras that proved to provide better results in most cases. Feel free to toy with the parameters as needed.
+
+DIFFERENCES WILL BE HIGHLIGHTED IN DOCUMENTATION SHORTLY.
+
 
 # Repository Structure:
 	Tacotron-2
@@ -20,14 +26,25 @@ Tensorflow implementation of DeepMind's Tacotron-2. A deep neural network archit
 	│ 	│ 	└── wavs
 	│   ├── mel-spectrograms
 	│   ├── plots
-	│   ├── pretrained
+	│   ├── taco_pretrained
+	│   ├── metas
 	│   └── wavs
 	├── logs-Wavenet	(4)
 	│   ├── eval-dir
 	│   │ 	├── plots
 	│ 	│ 	└── wavs
 	│   ├── plots
-	│   ├── pretrained
+	│   ├── wave_pretrained
+	│   ├── metas
+	│   └── wavs
+	├── logs-Tacotron-2	( * )
+	│   ├── eval-dir
+	│   │ 	├── plots
+	│ 	│ 	└── wavs
+	│   ├── plots
+	│   ├── taco_pretrained
+	│   ├── wave_pretrained
+	│   ├── metas
 	│   └── wavs
 	├── papers
 	├── tacotron
@@ -60,6 +77,8 @@ The previous tree shows the current state of the repository (separate training, 
 - Step **(4)**: Train your Wavenet model. Yield the **logs-Wavenet** folder.
 - Step **(5)**: Synthesize audio using the Wavenet model. Gives the **wavenet_output** folder.
 
+- Note: Steps 2, 3, and 4 can be made with a simple run for both Tacotron and WaveNet (Tacotron-2, step ( * )).
+
 
 Note:
 - **Our preprocessing only supports Ljspeech and Ljspeech-like datasets (M-AILABS speech data)!** If running on datasets stored differently, you will probably need to make your own preprocessing script.
@@ -87,11 +106,32 @@ To have an overview of our advance on this project, please refer to [this discus
 since the two parts of the global model are trained separately, we can start by training the feature prediction model to use his predictions later during the wavenet training.
 
 # How to start
-first, you need to have python 3 installed along with [Tensorflow](https://www.tensorflow.org/install/).
+- **Machine Setup:**
 
-next you can install the requirements. If you are an Anaconda user: (else replace **pip** with **pip3** and **python** with **python3**)
+First, you need to have python 3 installed along with [Tensorflow](https://www.tensorflow.org/install/).
+
+Next, you need to install some Linux dependencies to ensure audio libraries work properly:
+
+> apt-get install -y libasound-dev portaudio19-dev libportaudio2 libportaudiocpp0 ffmpeg libav-tools
+
+Finally, you can install the requirements. If you are an Anaconda user: (else replace **pip** with **pip3** and **python** with **python3**)
 
 > pip install -r requirements.txt
+
+- **Docker:**
+
+Alternatively, one can build the **docker image** to ensure everything is setup automatically and use the project inside the docker containers.
+**Dockerfile is insider "docker" folder**
+
+docker image can be built with:
+
+> docker build -t tacotron-2_image docker/
+
+Then containers are runnable with:
+
+> docker run -i --name new_container tacotron-2_image
+
+Please report any issues with the Docker usage with our models, I'll get to it. Thanks!
 
 # Dataset:
 We tested the code above on the [ljspeech dataset](https://keithito.com/LJ-Speech-Dataset/), which has almost 24 hours of labeled single actress voice recording. (further info on the dataset are available in the README file when you download it)
@@ -104,6 +144,8 @@ After **downloading** the dataset, **extract** the compressed file, and **place 
 Before proceeding, you must pick the hyperparameters that suit best your needs. While it is possible to change the hyper parameters from command line during preprocessing/training, I still recommend making the changes once and for all on the **hparams.py** file directly.
 
 To pick optimal fft parameters, I have made a **griffin_lim_synthesis_tool** notebook that you can use to invert real extracted mel/linear spectrograms and choose how good your preprocessing is. All other options are well explained in the **hparams.py** and have meaningful names so that you can try multiple things with them.
+
+AWAIT DOCUMENTATION ON HPARAMS SHORTLY!!
 
 # Preprocessing
 Before running the following steps, please make sure you are inside **Tacotron-2 folder**

@@ -22,7 +22,7 @@ class Synthesizer:
 		input_lengths = tf.placeholder(tf.int32, (None), name='input_lengths')
 		targets = tf.placeholder(tf.float32, (None, None, hparams.num_mels), name='mel_targets')
 		split_infos = tf.placeholder(tf.int32, shape=(hparams.tacotron_num_gpus, None), name='split_infos')
-		with tf.variable_scope('Tacotron_model') as scope:
+		with tf.variable_scope('Tacotron_model', reuse=tf.AUTO_REUSE) as scope:
 			self.model = create_model(model_name, hparams)
 			if gta:
 				self.model.initialize(inputs, input_lengths, targets, gta=gta, split_infos=split_infos)
@@ -114,7 +114,8 @@ class Synthesizer:
 
 		if self.gta or not hparams.predict_linear:
 			mels, alignments, stop_tokens = self.session.run([self.mel_outputs, self.alignments, self.stop_token_prediction], feed_dict=feed_dict)
-			#Linearize outputs (1D arrays)
+
+			#Linearize outputs (n_gpus -> 1D)
 			mels = [mel for gpu_mels in mels for mel in gpu_mels]
 			alignments = [align for gpu_aligns in alignments for align in gpu_aligns]
 			stop_tokens = [token for gpu_token in stop_tokens for token in gpu_token]
@@ -130,6 +131,7 @@ class Synthesizer:
 
 		else:
 			linears, mels, alignments, stop_tokens = self.session.run([self.linear_outputs, self.mel_outputs, self.alignments, self.stop_token_prediction], feed_dict=feed_dict)
+			
 			#Linearize outputs (1D arrays)
 			linears = [linear for gpu_linear in linears for linear in gpu_linear]
 			mels = [mel for gpu_mels in mels for mel in gpu_mels]
@@ -138,8 +140,7 @@ class Synthesizer:
 
 			#Natural batch synthesis
 			#Get Mel/Linear lengths for the entire batch from stop_tokens predictions
-			# target_lengths = self._get_output_lengths(stop_tokens)
-			target_lengths = [9999]
+			target_lengths = self._get_output_lengths(stop_tokens)
 
 			#Take off the batch wise padding
 			mels = [mel[:target_length, :] for mel, target_length in zip(mels, target_lengths)]
@@ -149,25 +150,20 @@ class Synthesizer:
 
 		if basenames is None:
 			#Generate wav and read it
-			wav = audio.inv_mel_spectrogram(mels.T, hparams)
+			wav = audio.inv_mel_spectrogram(mels[0].T, hparams)
 			audio.save_wav(wav, 'temp.wav', sr=hparams.sample_rate) #Find a better way
 
-			chunk = 512
-			f = wave.open('temp.wav', 'rb')
-			p = pyaudio.PyAudio()
-			stream = p.open(format=p.get_format_from_width(f.getsampwidth()),
-				channels=f.getnchannels(),
-				rate=f.getframerate(),
-				output=True)
-			data = f.readframes(chunk)
-			while data:
-				stream.write(data)
-				data=f.readframes(chunk)
+			if platform.system() == 'Linux':
+				#Linux wav reader
+				os.system('aplay temp.wav')
 
-			stream.stop_stream()
-			stream.close()
+			elif platform.system() == 'Windows':
+				#windows wav reader
+				os.system('start /min mplay32 /play /close temp.wav')
 
-			p.terminate()
+			else:
+				raise RuntimeError('Your OS type is not supported yet, please add it to "tacotron/synthesizer.py, line-165" and feel free to make a Pull Request ;) Thanks!')
+
 			return
 
 
@@ -236,5 +232,5 @@ class Synthesizer:
 
 	def _get_output_lengths(self, stop_tokens):
 		#Determine each mel length by the stop token predictions. (len = first occurence of 1 in stop_tokens row wise)
-		output_lengths = [row.index(1) for row in np.round(stop_tokens).tolist()]
+		output_lengths = [row.index(1) if 1 in row else len(row) for row in np.round(stop_tokens).tolist()]
 		return output_lengths

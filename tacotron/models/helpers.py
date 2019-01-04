@@ -100,7 +100,7 @@ class TacoTrainingHelper(Helper):
 		#In GTA mode, override teacher forcing scheme to work with full teacher forcing
 		if self.gta:
 			self._ratio = tf.convert_to_tensor(1.) #Force GTA model to always feed ground-truth
-		elif self.eval and self._hparams.natural_eval:
+		elif self.eval and self._hparams.tacotron_natural_eval:
 			self._ratio = tf.convert_to_tensor(0.) #Force eval model to always feed predictions
 		else:
 			if self._hparams.tacotron_teacher_forcing_mode == 'scheduled':
@@ -136,20 +136,28 @@ def _teacher_forcing_ratio_decay(init_tfr, global_step, hparams):
 		#################################################################
 		# Narrow Cosine Decay:
 
-		# Phase 1: tfr = 1
+		# Phase 1: tfr = init
 		# We only start learning rate decay after 10k steps
 
-		# Phase 2: tfr in ]0, 1[
-		# decay reach minimal value at step ~280k
+		# Phase 2: tfr in ]init, final[
+		# decay reach minimal value at step ~40k
 
-		# Phase 3: tfr = 0
-		# clip by minimal teacher forcing ratio value (step >~ 280k)
+		# Phase 3: tfr = final
+		# clip by minimal teacher forcing ratio value (step >~ 40k)
 		#################################################################
+		#Pick final teacher forcing rate value
+		if hparams.tacotron_teacher_forcing_final_ratio is not None:
+			alpha = float(hparams.tacotron_teacher_forcing_final_ratio / hparams.tacotron_teacher_forcing_init_ratio)
+
+		else:
+			assert hparams.tacotron_teacher_forcing_decay_alpha is not None
+			alpha = hparams.tacotron_teacher_forcing_decay_alpha
+
 		#Compute natural cosine decay
 		tfr = tf.train.cosine_decay(init_tfr,
-			global_step=global_step - hparams.tacotron_teacher_forcing_start_decay, #tfr = 1 at step 10k
-			decay_steps=hparams.tacotron_teacher_forcing_decay_steps, #tfr = 0 at step ~280k
-			alpha=hparams.tacotron_teacher_forcing_decay_alpha, #tfr = 0% of init_tfr as final value
+			global_step=global_step - hparams.tacotron_teacher_forcing_start_decay, #tfr ~= init at step 10k
+			decay_steps=hparams.tacotron_teacher_forcing_decay_steps, #tfr ~= final at step ~40k
+			alpha=alpha, #tfr = alpha% of init_tfr as final value
 			name='tfr_cosine_decay')
 
 		#force teacher forcing ratio to take initial value when global step < start decay step.

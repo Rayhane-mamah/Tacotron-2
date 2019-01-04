@@ -43,7 +43,7 @@ class Feeder:
 		train_indices, test_indices = train_test_split(indices,
 			test_size=test_size, random_state=hparams.tacotron_data_random_state)
 
-		#Make sure test_indices is a multiple of batch_size else round up
+		#Make sure test_indices is a multiple of batch_size else round down
 		len_test_indices = self._round_down(len(test_indices), hparams.tacotron_batch_size)
 		extra_test = test_indices[len_test_indices:]
 		test_indices = test_indices[:len_test_indices]
@@ -210,8 +210,9 @@ class Feeder:
 		targets_lengths = np.asarray([x[-1] for x in batches], dtype=np.int32) #Used to mask loss
 		input_lengths = np.asarray([len(x[0]) for x in batches], dtype=np.int32)
 
+		#Produce inputs/targets of variables lengths for different GPUs
 		for i in range(self._hparams.tacotron_num_gpus):
-			batch = batches[size_per_device*i:size_per_device*(i+1)]
+			batch = batches[size_per_device * i: size_per_device * (i + 1)]
 			input_cur_device, input_max_len = self._prepare_inputs([x[0] for x in batch])
 			inputs = np.concatenate((inputs, input_cur_device), axis=1) if inputs is not None else input_cur_device
 			mel_target_cur_device, mel_target_max_len = self._prepare_targets([x[1] for x in batch], outputs_per_step)

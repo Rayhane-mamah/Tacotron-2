@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 
 def generate_fast(model, text):
-	model.synthesize(text, None, None, None, None)
+	model.synthesize([text], None, None, None, None)
 
 
 def run_live(args, checkpoint_path, hparams):

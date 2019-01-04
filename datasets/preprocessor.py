@@ -69,9 +69,16 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 			wav_path))
 		return None
 
+	#Pre-emphasize
+	wav = audio.preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
+
 	#rescale wav
 	if hparams.rescale:
 		wav = wav / np.abs(wav).max() * hparams.rescaling_max
+
+	#Assert all audio is in [-1, 1]
+	if (wav > 1.).any() or (wav < -1.).any():
+		raise RuntimeError('wav has invalid value: {}'.format(wav))
 
 	#M-AILABS extra silence specific
 	if hparams.trim_silence:
@@ -125,10 +132,10 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 		out = np.pad(out, (l, r), mode='constant', constant_values=constant_values)
 	else:
 		#Ensure time resolution adjustement between audio and mel-spectrogram
-		pad = audio.librosa_pad_lr(wav, hparams.n_fft, audio.get_hop_size(hparams))
+		l_pad, r_pad = audio.librosa_pad_lr(wav, hparams.n_fft, audio.get_hop_size(hparams), hparams.wavenet_pad_sides)
 
-		#Reflect pad audio signal (Just like it's done in Librosa to avoid frame inconsistency)
-		out = np.pad(out, pad, mode='reflect')
+		#Reflect pad audio signal on the right (Just like it's done in Librosa to avoid frame inconsistency)
+		out = np.pad(out, (l_pad, r_pad), mode='constant', constant_values=constant_values)
 
 	assert len(out) >= mel_frames * audio.get_hop_size(hparams)
 

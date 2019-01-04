@@ -52,7 +52,7 @@ class Tacotron():
 		if is_training and is_evaluating:
 			raise RuntimeError('Model can not be in training and evaluation modes at the same time!')
 
-		split_device = '/cpu:0' if self._hparams.tacotron_num_gpus > 1 or self._hparams.split_on_cpu else '/gpu:{}'.format(self._hparams.tacotron_gpu_start_idx)
+		split_device = '/cpu:0' if self._hparams.tacotron_num_gpus > 1 or self._hparams.split_on_cpu else '/gpu:0'
 		with tf.device(split_device):
 			hp = self._hparams
 			lout_int = [tf.int32]*hp.tacotron_num_gpus
@@ -96,9 +96,9 @@ class Tacotron():
 		tower_projected_residual = []
 		
 		# 1. Declare GPU Devices
-		gpus = ["/gpu:{}".format(i) for i in range(hp.tacotron_gpu_start_idx, hp.tacotron_gpu_start_idx+hp.tacotron_num_gpus)]
+		gpus = ["/gpu:{}".format(i) for i in range(hp.tacotron_num_gpus)]
 		for i in range(hp.tacotron_num_gpus):
-			with tf.device(tf.train.replica_device_setter(ps_tasks=1,ps_device="/cpu:0",worker_device=gpus[i])):
+			with tf.device(tf.train.replica_device_setter(ps_tasks=1, ps_device="/cpu:0", worker_device=gpus[i])):
 				with tf.variable_scope('inference') as scope:
 					assert hp.tacotron_teacher_forcing_mode in ('constant', 'scheduled')
 					if hp.tacotron_teacher_forcing_mode == 'scheduled' and is_training:
@@ -129,7 +129,7 @@ class Tacotron():
 					#Attention Decoder Prenet
 					prenet = Prenet(is_training, layers_sizes=hp.prenet_layers, drop_rate=hp.tacotron_dropout_rate, scope='decoder_prenet')
 					#Attention Mechanism
-					attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs, hparams=hp,
+					attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs, hparams=hp, is_training=is_training,
 						mask_encoder=hp.mask_encoder, memory_sequence_length=tf.reshape(tower_input_lengths[i], [-1]), smoothing=hp.smoothing,
 						cumulate_weights=hp.cumulative_weights)
 					#Decoder LSTM Cells
@@ -196,7 +196,7 @@ class Tacotron():
 						# Add post-processing CBHG. This does a great job at extracting features from mels before projection to Linear specs.
 						post_cbhg = CBHG(hp.cbhg_kernels, hp.cbhg_conv_channels, hp.cbhg_pool_size, [hp.cbhg_projection, hp.num_mels],
 							hp.cbhg_projection_kernel_size, hp.cbhg_highwaynet_layers, 
-							hp.cbhg_highway_units, hp.cbhg_rnn_units, is_training, name='CBHG_postnet')
+							hp.cbhg_highway_units, hp.cbhg_rnn_units, hp.batch_norm_position, is_training, name='CBHG_postnet')
 
 						#[batch_size, decoder_steps(mel_frames), cbhg_channels]
 						post_outputs = post_cbhg(mel_outputs, None)
@@ -242,7 +242,7 @@ class Tacotron():
 		log('  GTA mode:                 {}'.format(gta))
 		log('  Synthesis mode:           {}'.format(not (is_training or is_evaluating)))
 		log('  Input:                    {}'.format(inputs.shape))
-		for i in range(hp.tacotron_num_gpus+hp.tacotron_gpu_start_idx):
+		for i in range(hp.tacotron_num_gpus):
 			log('  device:                   {}'.format(i))
 			log('  embedding:                {}'.format(tower_embedded_inputs[i].shape))
 			log('  enc conv out:             {}'.format(tower_enc_conv_output_shape[i]))
@@ -255,19 +255,14 @@ class Tacotron():
 				log('  linear out:               {}'.format(self.tower_linear_outputs[i].shape))
 			log('  <stop_token> out:         {}'.format(self.tower_stop_token_prediction[i].shape))
 
-			#1_000_000 is causing syntax problems for some people?! Python please :)
-			log('  Tacotron Parameters       {:.3f} Million.'.format(np.sum([np.prod(v.get_shape().as_list()) for v in self.all_vars]) / 1000000))
+		#1_000_000 is causing syntax problems for some people?! Python please :)
+		log('  Tacotron Parameters       {:.3f} Million.'.format(np.sum([np.prod(v.get_shape().as_list()) for v in self.all_vars]) / 1000000))
 
 
 	def add_loss(self):
 		'''Adds loss to the model. Sets "loss" field. initialize must have been called.'''
 		hp = self._hparams
 
-		self.tower_before_loss = []
-		self.tower_after_loss= []
-		self.tower_stop_token_loss = []
-		self.tower_regularization_loss = []
-		self.tower_linear_loss = []
 		self.tower_loss = []
 
 		total_before_loss = 0
@@ -277,10 +272,10 @@ class Tacotron():
 		total_linear_loss = 0
 		total_loss = 0
 
-		gpus = ["/gpu:{}".format(i) for i in range(hp.tacotron_gpu_start_idx, hp.tacotron_gpu_start_idx+hp.tacotron_num_gpus)]
+		gpus = ["/gpu:{}".format(i) for i in range(hp.tacotron_num_gpus)]
 
 		for i in range(hp.tacotron_num_gpus):
-			with tf.device(tf.train.replica_device_setter(ps_tasks=1,ps_device="/cpu:0",worker_device=gpus[i])):
+			with tf.device(tf.train.replica_device_setter(ps_tasks=1, ps_device="/cpu:0", worker_device=gpus[i])):
 				with tf.variable_scope('loss') as scope:
 					if hp.mask_decoder:
 						# Compute loss of predictions before postnet
@@ -334,22 +329,15 @@ class Tacotron():
 							or 'RNN' in v.name or 'LSTM' in v.name)]) * reg_weight
 
 					# Compute final loss term
-					self.tower_before_loss.append(before)
-					self.tower_after_loss.append(after)
-					self.tower_stop_token_loss.append(stop_token_loss)
-					self.tower_regularization_loss.append(regularization)
-					self.tower_linear_loss.append(linear_loss)
+					tower_loss = before + after + stop_token_loss + regularization + linear_loss
+					self.tower_loss.append(tower_loss)
 
-					loss = before + after + stop_token_loss + regularization + linear_loss
-					self.tower_loss.append(loss)
-
-		for i in range(hp.tacotron_num_gpus):
-			total_before_loss += self.tower_before_loss[i] 
-			total_after_loss += self.tower_after_loss[i]
-			total_stop_token_loss += self.tower_stop_token_loss[i]
-			total_regularization_loss += self.tower_regularization_loss[i]
-			total_linear_loss += self.tower_linear_loss[i]
-			total_loss += self.tower_loss[i]
+			total_before_loss += before
+			total_after_loss += after
+			total_stop_token_loss += stop_token_loss
+			total_regularization_loss += regularization
+			total_linear_loss += linear_loss
+			total_loss += tower_loss
 
 		self.before_loss = total_before_loss / hp.tacotron_num_gpus
 		self.after_loss = total_after_loss / hp.tacotron_num_gpus
@@ -367,7 +355,7 @@ class Tacotron():
 		tower_gradients = []
 
 		# 1. Declare GPU Devices
-		gpus = ["/gpu:{}".format(i) for i in range(hp.tacotron_gpu_start_idx, hp.tacotron_gpu_start_idx + hp.tacotron_num_gpus)]
+		gpus = ["/gpu:{}".format(i) for i in range(hp.tacotron_num_gpus)]
 
 		grad_device = '/cpu:0' if hp.tacotron_num_gpus > 1 else gpus[0]
 
@@ -386,33 +374,34 @@ class Tacotron():
 		# 2. Compute Gradient
 		for i in range(hp.tacotron_num_gpus):
 			#  Device placement
-			with tf.device(tf.train.replica_device_setter(ps_tasks=1,ps_device="/cpu:0",worker_device=gpus[i])) :
-				#agg_loss += self.tower_loss[i]
+			with tf.device(tf.train.replica_device_setter(ps_tasks=1, ps_device="/cpu:0", worker_device=gpus[i])):
 				with tf.variable_scope('optimizer') as scope:
-					gradients = optimizer.compute_gradients(self.tower_loss[i])
+					update_vars = [v for v in self.all_vars if not ('inputs_embedding' in v or 'encoder_' in v)] if hp.tacotron_fine_tuning else None
+					gradients = optimizer.compute_gradients(self.tower_loss[i], list_var=update_vars)
 					tower_gradients.append(gradients)
 
 		# 3. Average Gradient
-		with tf.device(grad_device) :
+		with tf.device(grad_device):
 			avg_grads = []
-			vars = []
+			variables = []
 			for grad_and_vars in zip(*tower_gradients):
-				# grads_vars = [(grad1, var), (grad2, var), ...]
+				# each_grads_vars = ((grad0_gpu0, var0_gpu0), ... , (grad0_gpuN, var0_gpuN))
 				grads = []
 				for g,_ in grad_and_vars:
 					expanded_g = tf.expand_dims(g, 0)
 					# Append on a 'tower' dimension which we will average over below.
 					grads.append(expanded_g)
 					# Average over the 'tower' dimension.
+
 				grad = tf.concat(axis=0, values=grads)
 				grad = tf.reduce_mean(grad, 0)
 
 				v = grad_and_vars[0][1]
 				avg_grads.append(grad)
-				vars.append(v)
+				variables.append(v)
 
 			self.gradients = avg_grads
-			#Just for causion
+			#Just for caution
 			#https://github.com/Rayhane-mamah/Tacotron-2/issues/11
 			if hp.tacotron_clip_gradients:
 				clipped_gradients, _ = tf.clip_by_global_norm(avg_grads, 1.) # __mark 0.5 refer
@@ -422,7 +411,7 @@ class Tacotron():
 			# Add dependency on UPDATE_OPS; otherwise batchnorm won't work correctly. See:
 			# https://github.com/tensorflow/tensorflow/issues/1122
 			with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-				self.optimize = optimizer.apply_gradients(zip(clipped_gradients, vars),
+				self.optimize = optimizer.apply_gradients(zip(clipped_gradients, variables),
 					global_step=global_step)
 
 	def _learning_rate_decay(self, init_lr, global_step):

@@ -20,6 +20,9 @@ from tqdm import tqdm
 log = infolog.log
 
 
+def time_string():
+	return datetime.now().strftime('%Y-%m-%d %H:%M')
+
 def add_embedding_stats(summary_writer, embedding_names, paths_to_meta, checkpoint_path):
 	#Create tensorboard projector
 	config = tf.contrib.tensorboard.plugins.projector.ProjectorConfig()
@@ -46,8 +49,8 @@ def add_train_stats(model, hparams):
 		if hparams.predict_linear:
 			tf.summary.scalar('linear_loss', model.linear_loss)
 			for i in range(hparams.tacotron_num_gpus):
-				tf.summary.histogram('mel_outputs %d' % i, model.tower_linear_outputs[i])
-				tf.summary.histogram('mel_targets %d' % i, model.tower_linear_targets[i])
+				tf.summary.histogram('linear_outputs %d' % i, model.tower_linear_outputs[i])
+				tf.summary.histogram('linear_targets %d' % i, model.tower_linear_targets[i])
 		
 		tf.summary.scalar('regularization_loss', model.regularization_loss)
 		tf.summary.scalar('stop_token_loss', model.stop_token_loss)
@@ -71,9 +74,6 @@ def add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, s
 		values.append(tf.Summary.Value(tag='Tacotron_eval_model/eval_stats/eval_linear_loss', simple_value=linear_loss))
 	test_summary = tf.Summary(value=values)
 	summary_writer.add_summary(test_summary, step)
-
-def time_string():
-	return datetime.now().strftime('%Y-%m-%d %H:%M')
 
 def model_train_mode(args, feeder, hparams, global_step):
 	with tf.variable_scope('Tacotron_model', reuse=tf.AUTO_REUSE) as scope:
@@ -172,7 +172,7 @@ def train(log_dir, args, hparams):
 	step = 0
 	time_window = ValueWindow(100)
 	loss_window = ValueWindow(100)
-	saver = tf.train.Saver(max_to_keep=5)
+	saver = tf.train.Saver(max_to_keep=20)
 
 	log('Tacotron training set to a maximum of {} steps'.format(args.tacotron_train_steps))
 
@@ -221,7 +221,7 @@ def train(log_dir, args, hparams):
 					step, time_window.average, loss, loss_window.average)
 				log(message, end='\r', slack=(step % args.checkpoint_interval == 0))
 
-				if loss > 100 or np.isnan(loss):
+				if np.isnan(loss) or loss > 100.:
 					log('Loss exploded to {:.5f} at step {}'.format(loss, step))
 					raise Exception('Loss exploded')
 
@@ -356,7 +356,6 @@ def train(log_dir, args, hparams):
 
 				if step % args.embedding_interval == 0 or step == args.tacotron_train_steps or step == 1:
 					#Get current checkpoint state
-					checkpoint_state = tf.train.get_checkpoint_state(save_dir)
 					checkpoint_state = tf.train.get_checkpoint_state(save_dir)
 
 					#Update Projector

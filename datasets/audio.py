@@ -14,8 +14,10 @@ def save_wav(wav, path, sr):
 	#proposed by @dsmiller
 	wavfile.write(path, sr, wav.astype(np.int16))
 
-def save_wavenet_wav(wav, path, sr):
-	librosa.output.write_wav(path, wav, sr=sr)
+def save_wavenet_wav(wav, path, sr, inv_preemphasize, k):
+	wav = inv_preemphasis(wav, k, inv_preemphasize)
+	wav *= 32767 / max(0.01, np.max(np.abs(wav)))
+	wavfile.write(path, sr, wav.astype(np.int16))
 
 def preemphasis(wav, k, preemphasize=True):
 	if preemphasize:
@@ -57,16 +59,18 @@ def get_hop_size(hparams):
 	return hop_size
 
 def linearspectrogram(wav, hparams):
-	D = _stft(preemphasis(wav, hparams.preemphasis, hparams.preemphasize), hparams)
-	S = _amp_to_db(np.abs(D), hparams) - hparams.ref_level_db
+	# D = _stft(preemphasis(wav, hparams.preemphasis, hparams.preemphasize), hparams)
+	D = _stft(wav, hparams)
+	S = _amp_to_db(np.abs(D)**hparams.magnitude_power, hparams) - hparams.ref_level_db
 
 	if hparams.signal_normalization:
 		return _normalize(S, hparams)
 	return S
 
 def melspectrogram(wav, hparams):
-	D = _stft(preemphasis(wav, hparams.preemphasis, hparams.preemphasize), hparams)
-	S = _amp_to_db(_linear_to_mel(np.abs(D), hparams), hparams) - hparams.ref_level_db
+	# D = _stft(preemphasis(wav, hparams.preemphasis, hparams.preemphasize), hparams)
+	D = _stft(wav, hparams)
+	S = _amp_to_db(_linear_to_mel(np.abs(D)**hparams.magnitude_power, hparams), hparams) - hparams.ref_level_db
 
 	if hparams.signal_normalization:
 		return _normalize(S, hparams)
@@ -79,7 +83,7 @@ def inv_linear_spectrogram(linear_spectrogram, hparams):
 	else:
 		D = linear_spectrogram
 
-	S = _db_to_amp(D + hparams.ref_level_db) #Convert back to linear
+	S = _db_to_amp(D + hparams.ref_level_db)**(1/hparams.magnitude_power) #Convert back to linear
 
 	if hparams.use_lws:
 		processor = _lws_processor(hparams)
@@ -97,7 +101,7 @@ def inv_mel_spectrogram(mel_spectrogram, hparams):
 	else:
 		D = mel_spectrogram
 
-	S = _mel_to_linear(_db_to_amp(D + hparams.ref_level_db), hparams)  # Convert back to linear
+	S = _mel_to_linear(_db_to_amp(D + hparams.ref_level_db)**(1/hparams.magnitude_power), hparams)  # Convert back to linear
 
 	if hparams.use_lws:
 		processor = _lws_processor(hparams)
@@ -127,7 +131,7 @@ def _stft(y, hparams):
 	if hparams.use_lws:
 		return _lws_processor(hparams).stft(y).T
 	else:
-		return librosa.stft(y=y, n_fft=hparams.n_fft, hop_length=get_hop_size(hparams), win_length=hparams.win_size)
+		return librosa.stft(y=y, n_fft=hparams.n_fft, hop_length=get_hop_size(hparams), win_length=hparams.win_size, pad_mode='constant')
 
 def _istft(y, hparams):
 	return librosa.istft(y, hop_length=get_hop_size(hparams), win_length=hparams.win_size)
@@ -155,11 +159,16 @@ def pad_lr(x, fsize, fshift):
 	return pad, pad + r
 ##########################################################
 #Librosa correct padding
-def librosa_pad_lr(x, fsize, fshift):
+def librosa_pad_lr(x, fsize, fshift, pad_sides=1):
 	'''compute right padding (final frame)
 	'''
-	return int(fsize // 2)
-
+	assert pad_sides in (1, 2)
+	# return int(fsize // 2)
+	pad = (x.shape[0] // fshift + 1) * fshift - x.shape[0]
+	if pad_sides == 1:
+		return 0, pad
+	else:
+		return pad // 2, pad // 2 + pad % 2
 
 # Conversions
 _mel_basis = None
@@ -216,3 +225,27 @@ def _denormalize(D, hparams):
 		return (((D + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value)) + hparams.min_level_db)
 	else:
 		return ((D * -hparams.min_level_db / hparams.max_abs_value) + hparams.min_level_db)
+
+def normalize_tf(S, hparams):
+	#[0, 1]
+	if hparams.normalize_for_wavenet:
+		if hparams.allow_clipping_in_normalization:
+			return tf.minimum(tf.maximum((S - hparams.min_level_db) / (-hparams.min_level_db),
+			 -hparams.max_abs_value), hparams.max_abs_value)
+
+		else:
+			return (S - hparams.min_level_db) / (-hparams.min_level_db)
+	
+	#[-max, max] or [0, max]
+	if hparams.allow_clipping_in_normalization:
+		if hparams.symmetric_mels:
+			return tf.minimum(tf.maximum((2 * hparams.max_abs_value) * ((S - hparams.min_level_db) / (-hparams.min_level_db)) - hparams.max_abs_value,
+			 -hparams.max_abs_value), hparams.max_abs_value)
+		else:
+			return tf.minimum(tf.maximum(hparams.max_abs_value * ((S - hparams.min_level_db) / (-hparams.min_level_db)), 0), hparams.max_abs_value)
+
+	assert S.max() <= 0 and S.min() - hparams.min_level_db >= 0
+	if hparams.symmetric_mels:
+		return (2 * hparams.max_abs_value) * ((S - hparams.min_level_db) / (-hparams.min_level_db)) - hparams.max_abs_value
+	else:
+		return hparams.max_abs_value * ((S - hparams.min_level_db) / (-hparams.min_level_db))
