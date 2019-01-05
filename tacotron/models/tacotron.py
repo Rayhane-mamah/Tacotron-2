@@ -263,6 +263,11 @@ class Tacotron():
 		'''Adds loss to the model. Sets "loss" field. initialize must have been called.'''
 		hp = self._hparams
 
+		self.tower_before_loss = []
+		self.tower_after_loss= []
+		self.tower_stop_token_loss = []
+		self.tower_regularization_loss = []
+		self.tower_linear_loss = []
 		self.tower_loss = []
 
 		total_before_loss = 0
@@ -329,6 +334,12 @@ class Tacotron():
 							or 'RNN' in v.name or 'LSTM' in v.name)]) * reg_weight
 
 					# Compute final loss term
+					self.tower_before_loss.append(before)
+					self.tower_after_loss.append(after)
+					self.tower_stop_token_loss.append(stop_token_loss)
+					self.tower_regularization_loss.append(regularization)
+					self.tower_linear_loss.append(linear_loss)
+
 					tower_loss = before + after + stop_token_loss + regularization + linear_loss
 					self.tower_loss.append(tower_loss)
 
