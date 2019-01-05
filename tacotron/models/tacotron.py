@@ -377,7 +377,7 @@ class Tacotron():
 			with tf.device(tf.train.replica_device_setter(ps_tasks=1, ps_device="/cpu:0", worker_device=gpus[i])):
 				with tf.variable_scope('optimizer') as scope:
 					update_vars = [v for v in self.all_vars if not ('inputs_embedding' in v or 'encoder_' in v)] if hp.tacotron_fine_tuning else None
-					gradients = optimizer.compute_gradients(self.tower_loss[i], list_var=update_vars)
+					gradients = optimizer.compute_gradients(self.tower_loss[i], var_list=update_vars)
 					tower_gradients.append(gradients)
 
 		# 3. Average Gradient
