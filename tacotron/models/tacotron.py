@@ -83,6 +83,8 @@ class Tacotron():
 				if p_linear_targets is not None:
 					tower_linear_targets.append(tf.reshape(p_linear_targets[i], [batch_size, -1, linear_channels]))
 
+		T2_output_range = (-hp.max_abs_value, hp.max_abs_value) if hp.symmetric_mels else (0, hp.max_abs_value)
+
 		self.tower_decoder_output = []
 		self.tower_alignments = []
 		self.tower_stop_token_prediction = []
@@ -176,6 +178,9 @@ class Tacotron():
 					decoder_output = tf.reshape(frames_prediction, [batch_size, -1, hp.num_mels])
 					stop_token_prediction = tf.reshape(stop_token_prediction, [batch_size, -1])
 
+					if hp.clip_outputs:
+							decoder_output = tf.minimum(tf.maximum(decoder_output, T2_output_range[0]), T2_output_range[1])
+
 					#Postnet
 					postnet = Postnet(is_training, hparams=hp, scope='postnet_convolutions')
 
@@ -190,6 +195,9 @@ class Tacotron():
 
 					#Compute the mel spectrogram
 					mel_outputs = decoder_output + projected_residual
+					
+					if hp.clip_outputs:
+							mel_outputs = tf.minimum(tf.maximum(mel_outputs, T2_output_range[0]), T2_output_range[1])
 
 
 					if post_condition:
@@ -206,6 +214,9 @@ class Tacotron():
 
 						#[batch_size, decoder_steps(linear_frames), num_freq]
 						linear_outputs = linear_specs_projection(post_outputs)
+
+						if hp.clip_outputs:
+							linear_outputs = tf.minimum(tf.maximum(linear_outputs, T2_output_range[0]), T2_output_range[1])
 
 					#Grab alignments from the final decoder state
 					alignments = tf.transpose(final_decoder_state.alignment_history.stack(), [1, 2, 0])
@@ -387,7 +398,7 @@ class Tacotron():
 			#  Device placement
 			with tf.device(tf.train.replica_device_setter(ps_tasks=1, ps_device="/cpu:0", worker_device=gpus[i])):
 				with tf.variable_scope('optimizer') as scope:
-					update_vars = [v for v in self.all_vars if not ('inputs_embedding' in v or 'encoder_' in v)] if hp.tacotron_fine_tuning else None
+					update_vars = [v for v in self.all_vars if not ('inputs_embedding' in v.name or 'encoder_' in v.name)] if hp.tacotron_fine_tuning else None
 					gradients = optimizer.compute_gradients(self.tower_loss[i], var_list=update_vars)
 					tower_gradients.append(gradients)
 

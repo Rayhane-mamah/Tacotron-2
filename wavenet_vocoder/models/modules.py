@@ -526,12 +526,13 @@ class SubPixelConvolution(tf.layers.Conv2D):
 	They serve the purpose of upsampling (like deconvolutions) but are faster and less prone to checkerboard artifact with the right initialization.
 	In contrast to ResizeConvolutions, SubPixel have the same computation speed (when using same n° of params), but a larger receptive fields as they operate on low resolution.
 	'''
-	def __init__(self, filters, kernel_size, padding, strides, NN_init, NN_scaler, name=None, **kwargs):
+	def __init__(self, filters, kernel_size, padding, strides, NN_init, NN_scaler, up_layers, name=None, **kwargs):
 		#Output channels = filters * H_upsample * W_upsample
 		conv_filters = filters * strides[0] * strides[1]
 
 		#Create initial kernel
 		self.NN_init = NN_init
+		self.up_layers = up_layers
 		self.NN_scaler = NN_scaler
 		init_kernel = tf.constant_initializer(self._init_kernel(kernel_size, strides, conv_filters), dtype=tf.float32) if NN_init else None
 
@@ -634,12 +635,13 @@ class SubPixelConvolution(tf.layers.Conv2D):
 
 		init_kernel = np.tile(np.expand_dims(init_kernel, 3), [1, 1, 1, filters])
 
-		return init_kernel * (self.NN_scaler)**(1/3)
+		return init_kernel * (self.NN_scaler)**(1/self.up_layers)
 
 
 class ResizeConvolution(tf.layers.Conv2D):
-	def __init__(self, filters, kernel_size, padding, strides, NN_init, NN_scaler, name=None, **kwargs):
+	def __init__(self, filters, kernel_size, padding, strides, NN_init, NN_scaler, up_layers, name=None, **kwargs):
 		#Create initial kernel
+		self.up_layers = up_layers
 		self.NN_scaler = NN_scaler
 		init_kernel = tf.constant_initializer(self._init_kernel(kernel_size, strides), dtype=tf.float32) if NN_init else None
 
@@ -677,15 +679,16 @@ class ResizeConvolution(tf.layers.Conv2D):
 		for j_i in j:
 			init_kernel[i, j_i] = 1. / overlap if kernel_size[1] % 2 == 0 else 1.
 
-		return init_kernel * (self.NN_scaler)**(1/3)
+		return init_kernel * (self.NN_scaler)**(1/self.up_layers)
 
 class ConvTranspose1D(tf.layers.Conv2DTranspose):
-	def __init__(self, filters, kernel_size, padding, strides, NN_init, NN_scaler, name=None, **kwargs):
+	def __init__(self, filters, kernel_size, padding, strides, NN_init, NN_scaler, up_layers, name=None, **kwargs):
 		#convert 1D filters to 2D.
 		kernel_size = (1, ) + kernel_size #(ks, ) -> (1, ks). Inputs supposed [batch_size, channels, freq, time_steps].
 		strides = (1, ) + strides #(s, ) -> (1, s).
 
 		#Create initial kernel
+		self.up_layers = up_layers
 		self.NN_scaler = NN_scaler
 		init_kernel = tf.constant_initializer(self._init_kernel(kernel_size, strides, filters), dtype=tf.float32) if NN_init else None
 
@@ -714,14 +717,15 @@ class ConvTranspose1D(tf.layers.Conv2DTranspose):
 		init_kernel = np.tile(init_kernel, [kernel_size[0], kernel_size[1], 1, 1])
 		init_kernel = init_kernel / overlap if kernel_size[1] % 2 == 0 else init_kernel
 
-		return init_kernel * (self.NN_scaler)**(1/3)
+		return init_kernel * (self.NN_scaler)**(1/self.up_layers)
 
 
 class ConvTranspose2D(tf.layers.Conv2DTranspose):
-	def __init__(self, filters, kernel_size, padding, strides, NN_init, NN_scaler, name=None, **kwargs):
+	def __init__(self, filters, kernel_size, padding, strides, NN_init, NN_scaler, up_layers, name=None, **kwargs):
 		freq_axis_kernel_size = kernel_size[0]
 
 		#Create initial kernel
+		self.up_layers = up_layers
 		self.NN_scaler = NN_scaler
 		init_kernel = tf.constant_initializer(self._init_kernel(kernel_size, strides), dtype=tf.float32) if NN_init else None
 
@@ -750,7 +754,7 @@ class ConvTranspose2D(tf.layers.Conv2DTranspose):
 		for j_i in range(kernel_size[1]):
 			init_kernel[i, j_i] = 1. / overlap if kernel_size[1] % 2 == 0 else 1.
 
-		return init_kernel * (self.NN_scaler)**(1/3)
+		return init_kernel * (self.NN_scaler)**(1/self.up_layers)
 
 
 def _conv1x1_forward(conv, x, is_incremental):

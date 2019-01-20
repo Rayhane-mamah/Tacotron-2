@@ -15,7 +15,7 @@ def save_wav(wav, path, sr):
 	wavfile.write(path, sr, wav.astype(np.int16))
 
 def save_wavenet_wav(wav, path, sr, inv_preemphasize, k):
-	wav = inv_preemphasis(wav, k, inv_preemphasize)
+	# wav = inv_preemphasis(wav, k, inv_preemphasize)
 	wav *= 32767 / max(0.01, np.max(np.abs(wav)))
 	wavfile.write(path, sr, wav.astype(np.int16))
 
@@ -160,7 +160,7 @@ def pad_lr(x, fsize, fshift):
 ##########################################################
 #Librosa correct padding
 def librosa_pad_lr(x, fsize, fshift, pad_sides=1):
-	'''compute right padding (final frame)
+	'''compute right padding (final frame) or both sides padding (first and final frames)
 	'''
 	assert pad_sides in (1, 2)
 	# return int(fsize // 2)

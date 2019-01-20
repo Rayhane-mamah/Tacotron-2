@@ -87,7 +87,7 @@ hparams = tf.contrib.training.HParams(
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
 	trim_fft_size = 2048, #Trimming window size
 	trim_hop_size = 512, #Trimmin hop length
-	trim_top_db = 45, #Trimming db difference from reference db (smaller==harder trim.)
+	trim_top_db = 40, #Trimming db difference from reference db (smaller==harder trim.)
 
 	#Mel and Linear spectrograms normalization/scaling and clipping
 	signal_normalization = True, #Whether to normalize mel spectrograms to some predefined range (following below parameters)
@@ -120,6 +120,7 @@ hparams = tf.contrib.training.HParams(
 	outputs_per_step = 1, #number of frames to generate at each decoding step (increase to speed up computation and allows for higher batch size, decreases G&L audio quality)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them (True works pretty well)
 	batch_norm_position = 'after', #Can be in ('before', 'after'). Determines whether we use batch norm before or after the activation function (relu). Matter for debate.
+	clip_outputs = True, #Whether to clip spectrograms to T2_output_range (even in loss computation). ie: Don't penalize model for exceeding output range and bring back to borders.
 
 	#Input parameters
 	embedding_dim = 512, #dimension of embedding space
@@ -190,7 +191,7 @@ hparams = tf.contrib.training.HParams(
 	#Model Losses parmeters
 	#Minimal scales ranges for MoL and Gaussian modeling
 	log_scale_min=float(np.log(1e-14)), #Mixture of logistic distributions minimal log scale
-	log_scale_min_gauss = float(np.log(9.1188196 * 1e-4)), #Gaussian distribution minimal allowed log scale
+	log_scale_min_gauss = float(np.log(1e-7)), #Gaussian distribution minimal allowed log scale
 	#Loss type
 	cdf_loss = True, #Whether to use CDF loss in Gaussian modeling. Advantages: non-negative loss term and more training stability. (Automatically True for MoL)
 
@@ -216,10 +217,10 @@ hparams = tf.contrib.training.HParams(
 	upsample_type = 'SubPixel', #Type of the upsampling deconvolution. Can be ('1D' or '2D', 'Resize', 'SubPixel').
 	upsample_activation = 'Relu', #Activation function used during upsampling. Can be ('LeakyRelu', 'Relu' or None)
 	upsample_scales = [5, 5, 11], #prod(upsample_scales) should be equal to hop_size
-	freq_axis_kernel_size = 5, #Only used for 2D upsampling types. This is the number of requency bands that are spanned at a time for each frame.
+	freq_axis_kernel_size = 2, #Only used for 2D upsampling types. This is the number of requency bands that are spanned at a time for each frame.
 	leaky_alpha = 0.4, #slope of the negative portion of LeakyRelu (LeakyRelu: y=x if x>0 else y=alpha * x)
 	NN_init = True, #Determines whether we want to initialize upsampling kernels/biases in a way to ensure upsample is initialize to Nearest neighbor upsampling. (Mostly for debug)
-	NN_scaler = 0.1, #Determines the initial Nearest Neighbor upsample values scale. i.e: upscaled_input_values = input_values * NN_scaler (1. to disable)
+	NN_scaler = 0.3, #Determines the initial Nearest Neighbor upsample values scale. i.e: upscaled_input_values = input_values * NN_scaler (1. to disable)
 
 	#global conditioning
 	gin_channels = -1, #Set this to -1 to disable global conditioning, Only used for multi speaker dataset. It defines the depth of the embeddings (Recommended: 16)
@@ -249,10 +250,10 @@ hparams = tf.contrib.training.HParams(
 	#Learning rate schedule
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	tacotron_start_decay = 40000, #Step at which learning decay starts
-	tacotron_decay_steps = 24500, #Determines the learning rate decay slope (UNDER TEST)
+	tacotron_decay_steps = 48000, #Determines the learning rate decay slope (UNDER TEST)
 	tacotron_decay_rate = 0.5, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
-	tacotron_final_learning_rate = 1e-5, #minimal learning rate
+	tacotron_final_learning_rate = 1e-4, #minimal learning rate
 
 	#Optimization parameters
 	tacotron_adam_beta1 = 0.9, #AdamOptimizer beta1 parameter
@@ -304,7 +305,7 @@ hparams = tf.contrib.training.HParams(
 
 	#Learning rate schedule
 	wavenet_lr_schedule = 'exponential', #learning rate schedule. Can be ('exponential', 'noam')
-	wavenet_learning_rate = 1e-4, #wavenet initial learning rate
+	wavenet_learning_rate = 1e-3, #wavenet initial learning rate
 	wavenet_warmup = float(4000), #Only used with 'noam' scheme. Defines the number of ascending learning rate steps.
 	wavenet_decay_rate = 0.5, #Only used with 'exponential' scheme. Defines the decay rate.
 	wavenet_decay_steps = 200000, #Only used with 'exponential' scheme. Defines the decay steps.

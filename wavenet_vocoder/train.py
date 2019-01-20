@@ -308,7 +308,7 @@ def train(log_dir, args, hparams, input_path):
 					step, time_window.average, loss, loss_window.average)
 				log(message, end='\r', slack=(step % args.checkpoint_interval == 0))
 
-				if np.isnan(loss): #or loss > 1000.:
+				if np.isnan(loss) or loss > 100:
 					log('Loss exploded to {:.5f} at step {}'.format(loss, step))
 					raise Exception('Loss exploded')
 

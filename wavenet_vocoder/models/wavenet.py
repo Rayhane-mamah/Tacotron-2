@@ -165,25 +165,25 @@ class WaveNet():
 			for i, s in enumerate(hparams.upsample_scales):
 				with tf.variable_scope('local_conditioning_upsampling_{}'.format(i+1)):
 					if hparams.upsample_type == '2D':
-						convt = ConvTranspose2D(1, (hparams.freq_axis_kernel_size, 2*s),
+						convt = ConvTranspose2D(1, (hparams.freq_axis_kernel_size, s),
 							padding='same', strides=(1, s), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
-							name='ConvTranspose2D_layer_{}'.format(i))
+							up_layers=len(hparams.upsample_scales), name='ConvTranspose2D_layer_{}'.format(i))
 
 					elif hparams.upsample_type == '1D':
-						convt = ConvTranspose1D(hparams.cin_channels, (2*s, ),
+						convt = ConvTranspose1D(hparams.cin_channels, (s, ),
 							padding='same', strides=(s, ), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
-							name='ConvTranspose1D_layer_{}'.format(i))
+							up_layers=len(hparams.upsample_scales), name='ConvTranspose1D_layer_{}'.format(i))
 
 					elif hparams.upsample_type == 'Resize':
-						convt = ResizeConvolution(1, (hparams.freq_axis_kernel_size, 2*s),
+						convt = ResizeConvolution(1, (hparams.freq_axis_kernel_size, s),
 							padding='same', strides=(1, s), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
-							name='ResizeConvolution_layer_{}'.format(i))
+							up_layers=len(hparams.upsample_scales), name='ResizeConvolution_layer_{}'.format(i))
 
 					else:
 						assert hparams.upsample_type == 'SubPixel'
-						convt = SubPixelConvolution(1, (hparams.freq_axis_kernel_size, 2*s),
+						convt = SubPixelConvolution(1, (hparams.freq_axis_kernel_size, 2),
 							padding='same', strides=(1, s), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
-							name='SubPixelConvolution_layer_{}'.format(i))
+							up_layers=len(hparams.upsample_scales), name='SubPixelConvolution_layer_{}'.format(i))
 
 					self.upsample_conv.append(maybe_Normalize_weights(convt, 
 						hparams.wavenet_weight_normalization, init, hparams.wavenet_init_scale))

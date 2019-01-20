@@ -67,6 +67,8 @@ class Synthesizer:
 	def synthesize(self, texts, basenames, out_dir, log_dir, mel_filenames):
 		hparams = self._hparams
 		cleaner_names = [x.strip() for x in hparams.cleaners.split(',')]
+		#[-max, max] or [0,max]
+		T2_output_range = (-hparams.max_abs_value, hparams.max_abs_value) if hparams.symmetric_mels else (0, hparams.max_abs_value)
 
 		#Repeat last sample until number of samples is dividable by the number of GPUs (last run scenario)
 		while len(texts) % hparams.tacotron_synthesis_batch_size != 0:
@@ -145,8 +147,10 @@ class Synthesizer:
 			#Take off the batch wise padding
 			mels = [mel[:target_length, :] for mel, target_length in zip(mels, target_lengths)]
 			linears = [linear[:target_length, :] for linear, target_length in zip(linears, target_lengths)]
+			linears = np.clip(linears, T2_output_range[0], T2_output_range[1])
 			assert len(mels) == len(linears) == len(texts)
 
+		mels = np.clip(mels, T2_output_range[0], T2_output_range[1])
 
 		if basenames is None:
 			#Generate wav and read it
@@ -206,8 +210,6 @@ class Synthesizer:
 					#save linear spectrogram plot
 					plot.plot_spectrogram(linears[i], os.path.join(log_dir, 'plots/linear-{}.png'.format(basenames[i])),
 						title='{}'.format(texts[i]), split_title=True, auto_aspect=True)
-
-
 
 		return saved_mels_paths, speaker_ids
 
