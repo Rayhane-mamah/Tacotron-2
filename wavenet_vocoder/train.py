@@ -104,10 +104,6 @@ def eval_step(sess, global_step, model, plot_dir, wav_dir, summary_writer, hpara
 	mel_path = os.path.join(plot_dir, 'step-{}-reconstruction-mel-spectrogram.png'.format(global_step))
 	upsampled_path = os.path.join(plot_dir, 'step-{}-upsampled-features.png'.format(global_step))
 
-	#Save Audio
-	save_wavenet_wav(y_hat, pred_wav_path, sr=hparams.sample_rate, inv_preemphasize=hparams.preemphasize, k=hparams.preemphasis)
-	save_wavenet_wav(y_target, target_wav_path, sr=hparams.sample_rate, inv_preemphasize=hparams.preemphasize, k=hparams.preemphasis)
-
 	#Save figure
 	util.waveplot(plot_path, y_hat, y_target, model._hparams, title='{}, {}, step={}, loss={:.5f}'.format(model_name, time_string(), global_step, loss))
 	log('Eval loss for global step {}: {:.3f}'.format(global_step, loss))
@@ -120,6 +116,10 @@ def eval_step(sess, global_step, model, plot_dir, wav_dir, summary_writer, hpara
 		global_step, loss), target_spectrogram=input_mel.T)
 	util.plot_spectrogram(upsampled_features.T, upsampled_path, title='Upsampled Local Condition features, step={}, loss={:.5f}'.format(
 		global_step, loss), auto_aspect=True)
+
+	#Save Audio
+	save_wavenet_wav(y_hat, pred_wav_path, sr=hparams.sample_rate, inv_preemphasize=hparams.preemphasize, k=hparams.preemphasis)
+	save_wavenet_wav(y_target, target_wav_path, sr=hparams.sample_rate, inv_preemphasize=hparams.preemphasize, k=hparams.preemphasis)
 
 	#Write eval summary to tensorboard
 	log('Writing eval summary!')
@@ -145,10 +145,6 @@ def save_log(sess, global_step, model, plot_dir, wav_dir, hparams, model_name):
 	mel_path = os.path.join(plot_dir, 'step-{}-reconstruction-mel-spectrogram.png'.format(global_step))
 	upsampled_path = os.path.join(plot_dir, 'step-{}-upsampled-features.png'.format(global_step))
 
-	#Save audio
-	save_wavenet_wav(y_hat, pred_wav_path, sr=hparams.sample_rate, inv_preemphasize=hparams.preemphasize, k=hparams.preemphasis)
-	save_wavenet_wav(y, target_wav_path, sr=hparams.sample_rate, inv_preemphasize=hparams.preemphasize, k=hparams.preemphasis)
-
 	#Save figure
 	util.waveplot(plot_path, y_hat, y, hparams, title='{}, {}, step={}, loss={:.5f}'.format(model_name, time_string(), global_step, loss))
 
@@ -160,6 +156,10 @@ def save_log(sess, global_step, model, plot_dir, wav_dir, hparams, model_name):
 		global_step, loss), target_spectrogram=input_mel.T)
 	util.plot_spectrogram(upsampled_features.T, upsampled_path, title='Upsampled Local Condition features, step={}, loss={:.5f}'.format(
 		global_step, loss), auto_aspect=True)
+
+	#Save audio
+	save_wavenet_wav(y_hat, pred_wav_path, sr=hparams.sample_rate, inv_preemphasize=hparams.preemphasize, k=hparams.preemphasis)
+	save_wavenet_wav(y, target_wav_path, sr=hparams.sample_rate, inv_preemphasize=hparams.preemphasize, k=hparams.preemphasis)
 
 def save_checkpoint(sess, saver, checkpoint_path, global_step):
 	saver.save(sess, checkpoint_path, global_step=global_step)
