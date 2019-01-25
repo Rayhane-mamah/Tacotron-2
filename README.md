@@ -200,16 +200,16 @@ For the spectrogram prediction network (separately), there are **three types** o
 
 - **Evaluation** (synthesis on custom sentences). This is what we'll usually use after having a full end to end model.
 
-> python synthesize.py --model='Tacotron' --mode='eval'
+> python synthesize.py --model='Tacotron'
 
 - **Natural synthesis** (let the model make predictions alone by feeding last decoder output to the next time step).
 
-> python synthesize.py --model='Tacotron' --GTA=False
+> python synthesize.py --model='Tacotron' --mode='synthesis' --GTA=False
 
 
 - **Ground Truth Aligned synthesis** (DEFAULT: the model is assisted by true labels in a teacher forcing manner). This synthesis method is used when predicting mel spectrograms used to train the wavenet vocoder. (yields better results as stated in the paper)
 
-> python synthesize.py --model='Tacotron' --GTA=True
+> python synthesize.py --model='Tacotron' --mode='synthesis' --GTA=True
 
 Synthesizing the **waveforms** conditionned on previously synthesized Mel-spectrograms (separately) can be done with:
 

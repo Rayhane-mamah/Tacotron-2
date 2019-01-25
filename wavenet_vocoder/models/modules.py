@@ -631,7 +631,7 @@ class SubPixelConvolution(tf.layers.Conv2D):
 		i = kernel_size[0] // 2
 		j = [kernel_size[1] // 2 - 1, kernel_size[1] // 2] if kernel_size[1] % 2 == 0 else [kernel_size[1] // 2]
 		for j_i in j:
-			init_kernel[i, j_i] = 1. / overlap if kernel_size[1] % 2 == 0 else 1.
+			init_kernel[i, j_i] = 1. / max(overlap, 1.) if kernel_size[1] % 2 == 0 else 1.
 
 		init_kernel = np.tile(np.expand_dims(init_kernel, 3), [1, 1, 1, filters])
 
@@ -677,7 +677,7 @@ class ResizeConvolution(tf.layers.Conv2D):
 		i = kernel_size[0] // 2
 		j = [kernel_size[1] // 2 - 1, kernel_size[1] // 2] if kernel_size[1] % 2 == 0 else [kernel_size[1] // 2]
 		for j_i in j:
-			init_kernel[i, j_i] = 1. / overlap if kernel_size[1] % 2 == 0 else 1.
+			init_kernel[i, j_i] = 1. / max(overlap, 1.) if kernel_size[1] % 2 == 0 else 1.
 
 		return init_kernel * (self.NN_scaler)**(1/self.up_layers)
 
@@ -715,7 +715,7 @@ class ConvTranspose1D(tf.layers.Conv2DTranspose):
 		init_kernel = np.arange(filters)
 		init_kernel = np_utils.to_categorical(init_kernel, num_classes=len(init_kernel)).reshape(1, 1, -1, filters).astype(np.float32)
 		init_kernel = np.tile(init_kernel, [kernel_size[0], kernel_size[1], 1, 1])
-		init_kernel = init_kernel / overlap if kernel_size[1] % 2 == 0 else init_kernel
+		init_kernel = init_kernel / max(overlap, 1.) if kernel_size[1] % 2 == 0 else init_kernel
 
 		return init_kernel * (self.NN_scaler)**(1/self.up_layers)
 
@@ -752,7 +752,7 @@ class ConvTranspose2D(tf.layers.Conv2DTranspose):
 		init_kernel = np.zeros(kernel_size, dtype=np.float32)
 		i = kernel_size[0] // 2
 		for j_i in range(kernel_size[1]):
-			init_kernel[i, j_i] = 1. / overlap if kernel_size[1] % 2 == 0 else 1.
+			init_kernel[i, j_i] = 1. / max(overlap, 1.) if kernel_size[1] % 2 == 0 else 1.
 
 		return init_kernel * (self.NN_scaler)**(1/self.up_layers)
 

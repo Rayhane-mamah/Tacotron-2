@@ -179,7 +179,7 @@ class Tacotron():
 					stop_token_prediction = tf.reshape(stop_token_prediction, [batch_size, -1])
 
 					if hp.clip_outputs:
-							decoder_output = tf.minimum(tf.maximum(decoder_output, T2_output_range[0]), T2_output_range[1])
+							decoder_output = tf.minimum(tf.maximum(decoder_output, T2_output_range[0] - hp.lower_bound_decay), T2_output_range[1])
 
 					#Postnet
 					postnet = Postnet(is_training, hparams=hp, scope='postnet_convolutions')
@@ -195,9 +195,9 @@ class Tacotron():
 
 					#Compute the mel spectrogram
 					mel_outputs = decoder_output + projected_residual
-					
+
 					if hp.clip_outputs:
-							mel_outputs = tf.minimum(tf.maximum(mel_outputs, T2_output_range[0]), T2_output_range[1])
+							mel_outputs = tf.minimum(tf.maximum(mel_outputs, T2_output_range[0] - hp.lower_bound_decay), T2_output_range[1])
 
 
 					if post_condition:
@@ -216,7 +216,7 @@ class Tacotron():
 						linear_outputs = linear_specs_projection(post_outputs)
 
 						if hp.clip_outputs:
-							linear_outputs = tf.minimum(tf.maximum(linear_outputs, T2_output_range[0]), T2_output_range[1])
+							linear_outputs = tf.minimum(tf.maximum(linear_outputs, T2_output_range[0] - hp.lower_bound_decay), T2_output_range[1])
 
 					#Grab alignments from the final decoder state
 					alignments = tf.transpose(final_decoder_state.alignment_history.stack(), [1, 2, 0])

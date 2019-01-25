@@ -67,7 +67,7 @@ hparams = tf.contrib.training.HParams(
 
 	#train samples of lengths between 3sec and 14sec are more than enough to make a model capable of generating consistent speech.
 	clip_mels_length = True, #For cases of OOM (Not really recommended, only use if facing unsolvable OOM errors, also consider clipping your samples to smaller chunks)
-	max_mel_frames = 1000,  #Only relevant when clip_mels_length = True, please only use after trying output_per_steps=3 and still getting OOM errors.
+	max_mel_frames = 900,  #Only relevant when clip_mels_length = True, please only use after trying output_per_steps=3 and still getting OOM errors.
 
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
@@ -121,6 +121,7 @@ hparams = tf.contrib.training.HParams(
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them (True works pretty well)
 	batch_norm_position = 'after', #Can be in ('before', 'after'). Determines whether we use batch norm before or after the activation function (relu). Matter for debate.
 	clip_outputs = True, #Whether to clip spectrograms to T2_output_range (even in loss computation). ie: Don't penalize model for exceeding output range and bring back to borders.
+	lower_bound_decay = 0.1, #Small regularizer for noise synthesis by adding small range of penalty for silence regions. Set to 0 to clip in Tacotron range.
 
 	#Input parameters
 	embedding_dim = 512, #dimension of embedding space
@@ -216,7 +217,7 @@ hparams = tf.contrib.training.HParams(
 	#Finally, SubPixel (2D) is the ICNR version (initialized to be equivalent to "convolution->NN resize") of Sub-Pixel convolutions. also called "checkered artifact free sub-pixel conv".
 	upsample_type = 'SubPixel', #Type of the upsampling deconvolution. Can be ('1D' or '2D', 'Resize', 'SubPixel').
 	upsample_activation = 'Relu', #Activation function used during upsampling. Can be ('LeakyRelu', 'Relu' or None)
-	upsample_scales = [5, 5, 11], #prod(upsample_scales) should be equal to hop_size
+	upsample_scales = [11, 25], #prod(upsample_scales) should be equal to hop_size
 	freq_axis_kernel_size = 2, #Only used for 2D upsampling types. This is the number of requency bands that are spanned at a time for each frame.
 	leaky_alpha = 0.4, #slope of the negative portion of LeakyRelu (LeakyRelu: y=x if x>0 else y=alpha * x)
 	NN_init = True, #Determines whether we want to initialize upsampling kernels/biases in a way to ensure upsample is initialize to Nearest neighbor upsampling. (Mostly for debug)
@@ -250,7 +251,7 @@ hparams = tf.contrib.training.HParams(
 	#Learning rate schedule
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	tacotron_start_decay = 40000, #Step at which learning decay starts
-	tacotron_decay_steps = 48000, #Determines the learning rate decay slope (UNDER TEST)
+	tacotron_decay_steps = 18000, #Determines the learning rate decay slope (UNDER TEST)
 	tacotron_decay_rate = 0.5, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
 	tacotron_final_learning_rate = 1e-4, #minimal learning rate
@@ -261,7 +262,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_adam_epsilon = 1e-6, #AdamOptimizer Epsilon parameter
 
 	#Regularization parameters
-	tacotron_reg_weight = 1e-7, #regularization weight (for L2 regularization)
+	tacotron_reg_weight = 1e-6, #regularization weight (for L2 regularization)
 	tacotron_scale_regularization = False, #Whether to rescale regularization weight to adapt for outputs range (used when reg_weight is high and biasing the model)
 	tacotron_zoneout_rate = 0.1, #zoneout rate for all LSTM cells in the network
 	tacotron_dropout_rate = 0.5, #dropout rate for all convolutional layers + prenet
@@ -350,8 +351,8 @@ hparams = tf.contrib.training.HParams(
 	'He reads books.',
 	'He thought it was time to present the present.',
 	'Thisss isrealy awhsome.',
-	'Punctuation sensitivity, is working.',
-	'Punctuation sensitivity is working.',
+	'The big brown fox jumped over the lazy dog.',
+	'Did the big brown fox jump over the lazy dog?',
 	"Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?",
 	"She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.",
 	"Tajima Airport serves Toyooka.",
