@@ -7,7 +7,7 @@ from wavenet_vocoder.util import *
 
 from .gaussian import sample_from_gaussian
 from .mixture import sample_from_discretized_mix_logistic
-from .modules import (Conv1D1x1, ConvTranspose2D, ConvTranspose1D, ResizeConvolution, SubPixelConvolution, DiscretizedMixtureLogisticLoss, 
+from .modules import (Conv1D1x1, ConvTranspose2D, ConvTranspose1D, ResizeConvolution, SubPixelConvolution, NearestNeighborUpsample, DiscretizedMixtureLogisticLoss, 
 	GaussianMaximumLikelihoodEstimation, MaskedMeanSquaredError, LeakyReluActivation, MaskedCrossEntropyLoss, ReluActivation, ResidualConv1DGLU, WeightNorm, Embedding)
 
 
@@ -160,45 +160,49 @@ class WaveNet():
 		self.all_convs = [self.first_conv] + self.residual_layers + self.last_conv_layers
 
 		#Upsample conv net
-		if hparams.upsample_conditional_features:
+		if self.local_conditioning_enabled():
 			self.upsample_conv = []
-			for i, s in enumerate(hparams.upsample_scales):
-				with tf.variable_scope('local_conditioning_upsampling_{}'.format(i+1)):
-					if hparams.upsample_type == '2D':
-						convt = ConvTranspose2D(1, (hparams.freq_axis_kernel_size, s),
-							padding='same', strides=(1, s), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
-							up_layers=len(hparams.upsample_scales), name='ConvTranspose2D_layer_{}'.format(i))
+			if hparams.upsample_type == 'NearestNeighbor':
+				#Nearest neighbor upsampling (non-learnable)
+				self.upsample_conv.append(NearestNeighborUpsample(strides=(1, audio.get_hop_size(hparams))))
 
-					elif hparams.upsample_type == '1D':
-						convt = ConvTranspose1D(hparams.cin_channels, (s, ),
-							padding='same', strides=(s, ), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
-							up_layers=len(hparams.upsample_scales), name='ConvTranspose1D_layer_{}'.format(i))
+			else:
+				#Learnable upsampling layers
+				for i, s in enumerate(hparams.upsample_scales):
+					with tf.variable_scope('local_conditioning_upsampling_{}'.format(i+1)):
+						if hparams.upsample_type == '2D':
+							convt = ConvTranspose2D(1, (hparams.freq_axis_kernel_size, s),
+								padding='same', strides=(1, s), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
+								up_layers=len(hparams.upsample_scales), name='ConvTranspose2D_layer_{}'.format(i))
 
-					elif hparams.upsample_type == 'Resize':
-						convt = ResizeConvolution(1, (hparams.freq_axis_kernel_size, s),
-							padding='same', strides=(1, s), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
-							up_layers=len(hparams.upsample_scales), name='ResizeConvolution_layer_{}'.format(i))
+						elif hparams.upsample_type == '1D':
+							convt = ConvTranspose1D(hparams.cin_channels, (s, ),
+								padding='same', strides=(s, ), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
+								up_layers=len(hparams.upsample_scales), name='ConvTranspose1D_layer_{}'.format(i))
 
-					else:
-						assert hparams.upsample_type == 'SubPixel'
-						convt = SubPixelConvolution(1, (hparams.freq_axis_kernel_size, 2),
-							padding='same', strides=(1, s), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
-							up_layers=len(hparams.upsample_scales), name='SubPixelConvolution_layer_{}'.format(i))
+						elif hparams.upsample_type == 'Resize':
+							convt = ResizeConvolution(1, (hparams.freq_axis_kernel_size, s),
+								padding='same', strides=(1, s), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
+								up_layers=len(hparams.upsample_scales), name='ResizeConvolution_layer_{}'.format(i))
 
-					self.upsample_conv.append(maybe_Normalize_weights(convt, 
-						hparams.wavenet_weight_normalization, init, hparams.wavenet_init_scale))
+						else:
+							assert hparams.upsample_type == 'SubPixel'
+							convt = SubPixelConvolution(1, (hparams.freq_axis_kernel_size, 3),
+								padding='same', strides=(1, s), NN_init=hparams.NN_init, NN_scaler=hparams.NN_scaler,
+								up_layers=len(hparams.upsample_scales), name='SubPixelConvolution_layer_{}'.format(i))
 
-					if hparams.upsample_activation == 'LeakyRelu':
-						self.upsample_conv.append(LeakyReluActivation(alpha=hparams.leaky_alpha,
-							name='upsample_leaky_relu_{}'.format(i+1)))
-					elif hparams.upsample_activation == 'Relu':
-						self.upsample_conv.append(ReluActivation(name='upsample_relu_{}'.format(i+1)))
-					else:
-						assert hparams.upsample_activation == None
+						self.upsample_conv.append(maybe_Normalize_weights(convt, 
+							hparams.wavenet_weight_normalization, init, hparams.wavenet_init_scale))
+
+						if hparams.upsample_activation == 'LeakyRelu':
+							self.upsample_conv.append(LeakyReluActivation(alpha=hparams.leaky_alpha,
+								name='upsample_leaky_relu_{}'.format(i+1)))
+						elif hparams.upsample_activation == 'Relu':
+							self.upsample_conv.append(ReluActivation(name='upsample_relu_{}'.format(i+1)))
+						else:
+							assert hparams.upsample_activation == None
 
 			self.all_convs += self.upsample_conv
-		else:
-			self.upsample_conv = None
 
 		self.receptive_field = receptive_field_size(hparams.layers,
 			hparams.stacks, hparams.kernel_size)
@@ -673,7 +677,7 @@ class WaveNet():
 		#Expand global conditioning features to all time steps
 		g_bct = _expand_global_features(batch_size, time_length, g, data_format='BCT')
 
-		if c is not None and self.upsample_conv is not None:
+		if c is not None:
 			if self._hparams.upsample_type == '2D':
 				#[batch_size, 1, cin_channels, time_length]
 				expand_dim = 1
@@ -681,7 +685,7 @@ class WaveNet():
 				#[batch_size, cin_channels, 1, time_length]
 				expand_dim = 2
 			else:
-				assert self._hparams.upsample_type in ('Resize', 'SubPixel')
+				assert self._hparams.upsample_type in ('Resize', 'SubPixel', 'NearestNeighbor')
 				#[batch_size, cin_channels, time_length, 1]
 				expand_dim = 3
 
@@ -774,7 +778,7 @@ class WaveNet():
 		self.g_btc = _expand_global_features(batch_size, time_length, g, data_format='BTC')
 
 		#Local conditioning
-		if c is not None and self.upsample_conv is not None:
+		if c is not None:
 			if self._hparams.upsample_type == '2D':
 				#[batch_size, 1, cin_channels, time_length]
 				expand_dim = 1
@@ -782,7 +786,7 @@ class WaveNet():
 				#[batch_size, cin_channels, 1, time_length]
 				expand_dim = 2
 			else:
-				assert self._hparams.upsample_type in ('Resize', 'SubPixel')
+				assert self._hparams.upsample_type in ('Resize', 'SubPixel', 'NearestNeighbor')
 				#[batch_size, cin_channels, time_length, 1]
 				expand_dim = 3
 

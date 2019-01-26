@@ -113,6 +113,7 @@ hparams = tf.contrib.training.HParams(
 	#Griffin Lim
 	power = 1.5, #Only used in G&L inversion, usually values between 1.2 and 1.5 are a good choice.
 	griffin_lim_iters = 60, #Number of G&L iterations, typically 30 is enough but we use 60 to ensure convergence.
+	GL_on_GPU = True, #Whether to use G&L GPU version as part of tensorflow graph. (Usually much faster than CPU but slightly worse quality too).
 	###########################################################################################################################################
 
 	#Tacotron
@@ -194,7 +195,7 @@ hparams = tf.contrib.training.HParams(
 	log_scale_min=float(np.log(1e-14)), #Mixture of logistic distributions minimal log scale
 	log_scale_min_gauss = float(np.log(1e-7)), #Gaussian distribution minimal allowed log scale
 	#Loss type
-	cdf_loss = True, #Whether to use CDF loss in Gaussian modeling. Advantages: non-negative loss term and more training stability. (Automatically True for MoL)
+	cdf_loss = False, #Whether to use CDF loss in Gaussian modeling. Advantages: non-negative loss term and more training stability. (Automatically True for MoL)
 
 	#model parameters
 	#To use Gaussian distribution as output distribution instead of mixture of logistics, set "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
@@ -208,17 +209,17 @@ hparams = tf.contrib.training.HParams(
 
 	#Upsampling parameters (local conditioning)
 	cin_channels = 80, #Set this to -1 to disable local conditioning, else it must be equal to num_mels!!
-	upsample_conditional_features = True, #Whether to repeat conditional features or upsample them (The latter is recommended)
-	#Upsample types: ('1D', '2D', 'Resize', 'SubPixel')
+	#Upsample types: ('1D', '2D', 'Resize', 'SubPixel', 'NearestNeighbor')
 	#All upsampling initialization/kernel_size are chosen to omit checkerboard artifacts as much as possible. (Resize is designed to omit that by nature).
 	#To be specific, all initial upsample weights/biases (when NN_init=True) ensure that the upsampling layers act as a "Nearest neighbor upsample" of size "hop_size" (checkerboard free).
 	#1D spans all frequency bands for each frame (channel-wise) while 2D spans "freq_axis_kernel_size" bands at a time. Both are vanilla transpose convolutions.
 	#Resize is a 2D convolution that follows a Nearest Neighbor (NN) resize. For reference, this is: "NN resize->convolution".
-	#Finally, SubPixel (2D) is the ICNR version (initialized to be equivalent to "convolution->NN resize") of Sub-Pixel convolutions. also called "checkered artifact free sub-pixel conv".
-	upsample_type = 'SubPixel', #Type of the upsampling deconvolution. Can be ('1D' or '2D', 'Resize', 'SubPixel').
+	#SubPixel (2D) is the ICNR version (initialized to be equivalent to "convolution->NN resize") of Sub-Pixel convolutions. also called "checkered artifact free sub-pixel conv".
+	#Finally, NearestNeighbor is a non-trainable upsampling layer that just expands each frame (or "pixel") to the equivalent hop size. Ignores all upsampling parameters.
+	upsample_type = 'SubPixel', #Type of the upsampling deconvolution. Can be ('1D' or '2D', 'Resize', 'SubPixel' or simple 'NearestNeighbor').
 	upsample_activation = 'Relu', #Activation function used during upsampling. Can be ('LeakyRelu', 'Relu' or None)
 	upsample_scales = [11, 25], #prod(upsample_scales) should be equal to hop_size
-	freq_axis_kernel_size = 2, #Only used for 2D upsampling types. This is the number of requency bands that are spanned at a time for each frame.
+	freq_axis_kernel_size = 3, #Only used for 2D upsampling types. This is the number of requency bands that are spanned at a time for each frame.
 	leaky_alpha = 0.4, #slope of the negative portion of LeakyRelu (LeakyRelu: y=x if x>0 else y=alpha * x)
 	NN_init = True, #Determines whether we want to initialize upsampling kernels/biases in a way to ensure upsample is initialize to Nearest neighbor upsampling. (Mostly for debug)
 	NN_scaler = 0.3, #Determines the initial Nearest Neighbor upsample values scale. i.e: upscaled_input_values = input_values * NN_scaler (1. to disable)
@@ -351,7 +352,7 @@ hparams = tf.contrib.training.HParams(
 	'He reads books.',
 	'He thought it was time to present the present.',
 	'Thisss isrealy awhsome.',
-	'The big brown fox jumped over the lazy dog.',
+	'The big brown fox jumps over the lazy dog.',
 	'Did the big brown fox jump over the lazy dog?',
 	"Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?",
 	"She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.",

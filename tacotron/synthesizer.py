@@ -35,6 +35,13 @@ class Synthesizer:
 			self.stop_token_prediction = self.model.tower_stop_token_prediction
 			self.targets = targets
 
+		if hparams.GL_on_GPU:
+			self.GLGPU_mel_inputs = tf.placeholder(tf.float32, (None, hparams.num_mels), name='GLGPU_mel_inputs')
+			self.GLGPU_lin_inputs = tf.placeholder(tf.float32, (None, hparams.num_freq), name='GLGPU_lin_inputs')
+
+			self.GLGPU_mel_outputs = audio.inv_mel_spectrogram_tensorflow(self.GLGPU_mel_inputs, hparams)
+			self.GLGPU_lin_outputs = audio.inv_linear_spectrogram_tensorflow(self.GLGPU_lin_inputs, hparams)
+
 		self.gta = gta
 		self._hparams = hparams
 		#pad input sequences with the <pad_token> 0 ( _ )
@@ -154,7 +161,11 @@ class Synthesizer:
 
 		if basenames is None:
 			#Generate wav and read it
-			wav = audio.inv_mel_spectrogram(mels[0].T, hparams)
+			if hparams.GL_on_GPU:
+				wav = self.session.run(self.GLGPU_mel_outputs, feed_dict={self.GLGPU_mel_inputs: mels[0]})
+				wav = audio.inv_preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
+			else:
+				wav = audio.inv_mel_spectrogram(mels[0].T, hparams)
 			audio.save_wav(wav, 'temp.wav', sr=hparams.sample_rate) #Find a better way
 
 			if platform.system() == 'Linux':
@@ -191,7 +202,11 @@ class Synthesizer:
 
 			if log_dir is not None:
 				#save wav (mel -> wav)
-				wav = audio.inv_mel_spectrogram(mel.T, hparams)
+				if hparams.GL_on_GPU:
+					wav = self.session.run(self.GLGPU_mel_outputs, feed_dict={self.GLGPU_mel_inputs: mel})
+					wav = audio.inv_preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
+				else:
+					wav = audio.inv_mel_spectrogram(mel.T, hparams)
 				audio.save_wav(wav, os.path.join(log_dir, 'wavs/wav-{}-mel.wav'.format(basenames[i])), sr=hparams.sample_rate)
 
 				#save alignments
@@ -204,7 +219,11 @@ class Synthesizer:
 
 				if hparams.predict_linear:
 					#save wav (linear -> wav)
-					wav = audio.inv_linear_spectrogram(linears[i].T, hparams)
+					if hparams.GL_on_GPU:
+						wav = self.session.run(self.GLGPU_lin_outputs, feed_dict={self.GLGPU_lin_inputs: linears[i]})
+						wav = audio.inv_preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
+					else:
+						wav = audio.inv_linear_spectrogram(linears[i].T, hparams)
 					audio.save_wav(wav, os.path.join(log_dir, 'wavs/wav-{}-linear.wav'.format(basenames[i])), sr=hparams.sample_rate)
 
 					#save linear spectrogram plot

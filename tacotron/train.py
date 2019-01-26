@@ -168,6 +168,14 @@ def train(log_dir, args, hparams):
 
 	char_embedding_meta = char_embedding_meta.replace(log_dir, '..')
 
+	#Potential Griffin-Lim GPU setup
+	if hparams.GL_on_GPU:
+		GLGPU_mel_inputs = tf.placeholder(tf.float32, (None, hparams.num_mels), name='GLGPU_mel_inputs')
+		GLGPU_lin_inputs = tf.placeholder(tf.float32, (None, hparams.num_freq), name='GLGPU_lin_inputs')
+
+		GLGPU_mel_outputs = audio.inv_mel_spectrogram_tensorflow(GLGPU_mel_inputs, hparams)
+		GLGPU_lin_outputs = audio.inv_linear_spectrogram_tensorflow(GLGPU_lin_inputs, hparams)
+
 	#Book keeping
 	step = 0
 	time_window = ValueWindow(100)
@@ -256,7 +264,11 @@ def train(log_dir, args, hparams):
 							linear_losses.append(linear_loss)
 						linear_loss = sum(linear_losses) / len(linear_losses)
 
-						wav = audio.inv_linear_spectrogram(lin_p.T, hparams)
+						if hparams.GL_on_GPU:
+							wav = sess.run(GLGPU_lin_outputs, feed_dict={GLGPU_lin_inputs: lin_p})
+							wav = audio.inv_preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
+						else:
+							wav = audio.inv_linear_spectrogram(lin_p.T, hparams)
 						audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-wave-from-linear.wav'.format(step)), sr=hparams.sample_rate)
 
 					else:
@@ -278,7 +290,11 @@ def train(log_dir, args, hparams):
 
 					log('Saving eval log to {}..'.format(eval_dir))
 					#Save some log to monitor model improvement on same unseen sequence
-					wav = audio.inv_mel_spectrogram(mel_p.T, hparams)
+					if hparams.GL_on_GPU:
+						wav = sess.run(GLGPU_mel_outputs, feed_dict={GLGPU_mel_inputs: mel_p})
+						wav = audio.inv_preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
+					else:
+						wav = audio.inv_mel_spectrogram(mel_p.T, hparams)
 					audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-wave-from-mel.wav'.format(step)), sr=hparams.sample_rate)
 
 					plot.plot_alignment(align, os.path.join(eval_plot_dir, 'step-{}-eval-align.png'.format(step)),
@@ -319,7 +335,11 @@ def train(log_dir, args, hparams):
 						np.save(os.path.join(linear_dir, linear_filename), linear_prediction.T, allow_pickle=False)
 
 						#save griffin lim inverted wav for debug (linear -> wav)
-						wav = audio.inv_linear_spectrogram(linear_prediction.T, hparams)
+						if hparams.GL_on_GPU:
+							wav = sess.run(GLGPU_lin_outputs, feed_dict={GLGPU_lin_inputs: linear_prediction})
+							wav = audio.inv_preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
+						else:
+							wav = audio.inv_linear_spectrogram(linear_prediction.T, hparams)
 						audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-wave-from-linear.wav'.format(step)), sr=hparams.sample_rate)
 
 						#Save real and predicted linear-spectrogram plot to disk (control purposes)
@@ -341,7 +361,11 @@ def train(log_dir, args, hparams):
 					np.save(os.path.join(mel_dir, mel_filename), mel_prediction.T, allow_pickle=False)
 
 					#save griffin lim inverted wav for debug (mel -> wav)
-					wav = audio.inv_mel_spectrogram(mel_prediction.T, hparams)
+					if hparams.GL_on_GPU:
+						wav = sess.run(GLGPU_mel_outputs, feed_dict={GLGPU_mel_inputs: mel_prediction})
+						wav = audio.inv_preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
+					else:
+						wav = audio.inv_mel_spectrogram(mel_prediction.T, hparams)
 					audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-wave-from-mel.wav'.format(step)), sr=hparams.sample_rate)
 
 					#save alignment plot to disk (control purposes)

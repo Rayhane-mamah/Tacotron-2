@@ -151,4 +151,4 @@ def _process_utterance(mel_dir, wav_dir, index, wav_path, hparams):
 		speaker_id = '<no_g>'
 
 	# Return a tuple describing this training example
-	return (audio_filename, mel_filename, '_', speaker_id, time_steps, mel_frames)
+	return (audio_filename, mel_filename, mel_filename, speaker_id, time_steps, mel_frames)

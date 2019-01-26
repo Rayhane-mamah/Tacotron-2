@@ -520,6 +520,22 @@ class ResidualConv1DGLU(tf.keras.layers.Wrapper):
 				x = (x + residual)
 			return x, s, queue
 
+
+class NearestNeighborUpsample:
+	def __init__(self, strides):
+		#Save upsample params
+		self.resize_strides = strides
+
+	def __call__(self, inputs):
+		#inputs are supposed [batch_size, freq, time_steps, channels]
+		outputs = tf.image.resize_images(
+			inputs,
+			size=[inputs.shape[1] * self.resize_strides[0], tf.shape(inputs)[2] * self.resize_strides[1]],
+			method=1) #BILINEAR = 0, NEAREST_NEIGHBOR = 1, BICUBIC = 2, AREA = 3
+
+		return outputs
+
+
 class SubPixelConvolution(tf.layers.Conv2D):
 	'''Sub-Pixel Convolutions are vanilla convolutions followed by Periodic Shuffle.
 
@@ -656,20 +672,17 @@ class ResizeConvolution(tf.layers.Conv2D):
 			data_format='channels_last',
 			name=name, **kwargs)
 
-		self.resize_strides = strides
+		self.resize_layer = NearestNeighborUpsample(strides=strides)
 		self.scope = 'ResizeConvolution' if None else name
 
 	def call(self, inputs):
 		with tf.variable_scope(self.scope) as scope:
 			#Inputs are supposed [batch_size, freq, time_steps, channels]
-			resized = tf.image.resize_images(
-				inputs,
-				size=[inputs.shape[1] * self.resize_strides[0], tf.shape(inputs)[2] * self.resize_strides[1]],
-				method=1) #BILINEAR = 0, NEAREST_NEIGHBOR = 1, BICUBIC = 2, AREA = 3
+			resized = self.resize_layer(inputs)
 
 			return super(ResizeConvolution, self).call(resized)
 
-	def _init_kernel(kernel_size, strides):
+	def _init_kernel(self, kernel_size, strides):
 		'''Nearest Neighbor Upsample (Checkerboard free) init kernel size
 		'''
 		overlap = kernel_size[1] // strides[1]
