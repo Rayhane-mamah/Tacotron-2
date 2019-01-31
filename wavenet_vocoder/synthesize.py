@@ -46,7 +46,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	speaker_ids = None if speaker_ids is None else [speaker_ids[i: i+hparams.wavenet_synthesis_batch_size] for i in range(0, len(speaker_ids), hparams.wavenet_synthesis_batch_size)]
 	texts = None if texts is None else [texts[i: i+hparams.wavenet_synthesis_batch_size] for i in range(0, len(texts), hparams.wavenet_synthesis_batch_size)]
 
-	with open(os.path.join(wav_dir, 'map.txt'), 'w') as file:
+	with open(os.path.join(wav_dir, 'map.txt'), 'w', encoding='utf-8') as file:
 		for i, mel_batch in enumerate(tqdm(mel_files)):
 			mel_spectros = [np.load(mel_file) for mel_file in mel_batch]
 

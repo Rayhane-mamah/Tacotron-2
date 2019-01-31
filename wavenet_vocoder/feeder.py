@@ -38,7 +38,7 @@ class Feeder:
 
 		#Load metadata
 		self._data_dir = os.path.dirname(metadata_filename)
-		with open(metadata_filename, 'r') as f:
+		with open(metadata_filename, 'r', encoding='utf-8') as f:
 			self._metadata = [line.strip().split('|') for line in f]
 
 		#Train test split

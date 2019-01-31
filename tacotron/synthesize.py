@@ -60,8 +60,8 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	sentences = [sentences[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(sentences), hparams.tacotron_synthesis_batch_size)]
 
 	log('Starting Synthesis')
-	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
-		for i, texts in enumerate(tqdm(sentences)):
+	with open(os.path.join(eval_dir, 'map.txt'), 'w', encoding='utf-8') as file:
+		for i, text in enumerate(tqdm(sentences)):
 			start = time.time()
 			basenames = ['batch_{}_sentence_{}'.format(i, j) for j in range(len(texts))]
 			mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, None)
@@ -101,7 +101,7 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	log('Starting Synthesis')
 	mel_dir = os.path.join(args.input_dir, 'mels')
 	wav_dir = os.path.join(args.input_dir, 'audio')
-	with open(os.path.join(synth_dir, 'map.txt'), 'w') as file:
+	with open(os.path.join(synth_dir, 'map.txt'), 'w', encoding='utf-8') as file:
 		for i, meta in enumerate(tqdm(metadata)):
 			texts = [m[5] for m in meta]
 			mel_filenames = [os.path.join(mel_dir, m[1]) for m in meta]
