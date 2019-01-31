@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from infolog import log
 from sklearn.model_selection import train_test_split
-from tacotron.utils.text import text_to_sequence
+from tacotron.utils.text import text_to_sequence, get_unused_symbols
 
 _batches_per_group = 64
 
@@ -32,6 +32,12 @@ class Feeder:
 			frame_shift_ms = hparams.hop_size / hparams.sample_rate
 			hours = sum([int(x[4]) for x in self._metadata]) * frame_shift_ms / (3600)
 			log('Loaded metadata for {} examples ({:.2f} hours)'.format(len(self._metadata), hours))
+
+		# Check unused chars
+		unusedSymbols = set()
+		for m in self._metadata:
+			unusedSymbols |= get_unused_symbols(m[5])
+		log('Unused symbols in training data: {}'.format(str(unusedSymbols)))
 
 		#Train test split
 		if hparams.tacotron_test_size is None:
