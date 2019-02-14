@@ -221,22 +221,24 @@ class WaveNet():
 		hparams = self._hparams
 		self.is_training = x is not None
 		self.is_evaluating = not self.is_training and y is not None
+		# when eval/test, only use single gpu.
+		self.num_gpus = hparams.wavenet_num_gpus if self.is_training else 1
 		#Set all convolutions to corresponding mode
 		self.set_mode(self.is_training)
 
-		split_device = '/cpu:0' if self._hparams.wavenet_num_gpus > 1 or self._hparams.split_on_cpu else '/gpu:0'
+		split_device = '/cpu:0' if self.num_gpus > 1 or self._hparams.split_on_cpu else '/gpu:0'
 		with tf.device(split_device):
 			hp = self._hparams
-			lout_int = [tf.int32] * hp.wavenet_num_gpus
-			lout_float = [tf.float32] * hp.wavenet_num_gpus
+			lout_int = [tf.int32] * self.num_gpus
+			lout_float = [tf.float32] * self.num_gpus
 
-			tower_input_lengths = tf.split(input_lengths, num_or_size_splits=hp.wavenet_num_gpus, axis=0) if input_lengths is not None else [input_lengths] * hp.wavenet_num_gpus
+			tower_input_lengths = tf.split(input_lengths, num_or_size_splits=self.num_gpus, axis=0) if input_lengths is not None else [input_lengths] * self.num_gpus
 
-			tower_y = tf.split(y, num_or_size_splits=hp.wavenet_num_gpus, axis=0) if y is not None else [y] * hp.wavenet_num_gpus
-			tower_x = tf.split(x, num_or_size_splits=hp.wavenet_num_gpus, axis=0) if x is not None else [x] * hp.wavenet_num_gpus
-			tower_c = tf.split(c, num_or_size_splits=hp.wavenet_num_gpus, axis=0) if self.local_conditioning_enabled() else [None] * hp.wavenet_num_gpus
-			tower_g = tf.split(g, num_or_size_splits=hp.wavenet_num_gpus, axis=0) if self.global_conditioning_enabled() else [None] * hp.wavenet_num_gpus
-			tower_test_inputs = tf.split(test_inputs, num_or_size_splits=hp.wavenet_num_gpus, axis=0) if test_inputs is not None else [test_inputs] * hp.wavenet_num_gpus
+			tower_y = tf.split(y, num_or_size_splits=self.num_gpus, axis=0) if y is not None else [y] * self.num_gpus
+			tower_x = tf.split(x, num_or_size_splits=self.num_gpus, axis=0) if x is not None else [x] * self.num_gpus
+			tower_c = tf.split(c, num_or_size_splits=self.num_gpus, axis=0) if self.local_conditioning_enabled() else [None] * self.num_gpus
+			tower_g = tf.split(g, num_or_size_splits=self.num_gpus, axis=0) if self.global_conditioning_enabled() else [None] * self.num_gpus
+			tower_test_inputs = tf.split(test_inputs, num_or_size_splits=self.num_gpus, axis=0) if test_inputs is not None else [test_inputs] * self.num_gpus
 
 		self.tower_y_hat_q = []
 		self.tower_y_hat_train = []
@@ -263,8 +265,8 @@ class WaveNet():
 		log('  Synthesis mode:            {}'.format(not (self.is_training or self.is_evaluating)))
 
 		#1. Declare GPU devices
-		gpus = ['/gpu:{}'.format(i) for i in range(hp.wavenet_num_gpus)]
-		for i in range(hp.wavenet_num_gpus):
+		gpus = ['/gpu:{}'.format(i) for i in range(self.num_gpus)]
+		for i in range(self.num_gpus):
 			with tf.device(tf.train.replica_device_setter(ps_tasks=1, ps_device='/cpu:0', worker_device=gpus[i])):
 				with tf.variable_scope('inference') as scope:
 					log('  device:                    {}'.format(i))
@@ -293,7 +295,7 @@ class WaveNet():
 
 						#Graph extension for log saving
 						#[batch_size, time_length]
-						shape_control = (batch_size, tf.shape(tower_x[i])[-1], 1)
+						shape_control = (batch_size // self.num_gpus, tf.shape(tower_x[i])[-1], 1)
 						with tf.control_dependencies([tf.assert_equal(tf.shape(tower_y[i]), shape_control)]):
 							y_log = tf.squeeze(tower_y[i], [-1])
 							if is_mulaw_quantize(hparams.input_type):
@@ -478,9 +480,9 @@ class WaveNet():
 		'''
 		self.tower_loss = []
 		total_loss = 0
-		gpus = ['/gpu:{}'.format(i) for i in range(self._hparams.wavenet_num_gpus)]
+		gpus = ['/gpu:{}'.format(i) for i in range(self.num_gpus)]
 
-		for i in range(self._hparams.wavenet_num_gpus):
+		for i in range(self.num_gpus):
 			with tf.device(tf.train.replica_device_setter(ps_tasks=1, ps_device='/cpu:0', worker_device=gpus[i])):
 				with tf.variable_scope('loss') as scope:
 					if self.is_training:
@@ -513,11 +515,10 @@ class WaveNet():
 			total_loss += tower_loss
 
 		if self.is_training:
-			self.loss = total_loss / self._hparams.wavenet_num_gpus
+			self.loss = total_loss / self.num_gpus
 
 		else:
-			self.eval_loss = total_loss / self._hparams.wavenet_num_gpus
-
+			self.eval_loss = total_loss / self.num_gpus
 
 	def add_optimizer(self, global_step):
 		'''Adds optimizer to the graph. Supposes that initialize function has already been called.
@@ -526,7 +527,7 @@ class WaveNet():
 		tower_gradients = []
 
 		# 1. Declare GPU devices
-		gpus = ['/gpu:{}'.format(i) for i in range(hp.wavenet_num_gpus)]
+		gpus = ['/gpu:{}'.format(i) for i in range(self.num_gpus)]
 
 		grad_device = '/cpu:0' if hp.tacotron_num_gpus > 1 else gpus[0]
 
@@ -550,7 +551,7 @@ class WaveNet():
 					hp.wavenet_adam_beta2, hp.wavenet_adam_epsilon)
 
 		# 2. Compute Gradient
-		for i in range(hp.wavenet_num_gpus):
+		for i in range(self.num_gpus):
 			#Device placemenet
 			with tf.device(tf.train.replica_device_setter(ps_tasks=1, ps_device='/cpu:0', worker_device=gpus[i])):
 				with tf.variable_scope('optimizer') as scope:
