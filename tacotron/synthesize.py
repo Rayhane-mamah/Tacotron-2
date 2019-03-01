@@ -3,7 +3,7 @@ import os
 import re
 import time
 from time import sleep
-
+from datasets import audio
 import tensorflow as tf
 from hparams import hparams, hparams_debug_string
 from infolog import log
@@ -56,14 +56,10 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	synth = Synthesizer()
 	synth.load(checkpoint_path, hparams)
 
-
-	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
-		for i, text in enumerate(tqdm(sentences)):
-			start = time.time()
-			mel_filename, speaker_id = synth.synthesize([text], [i+1], eval_dir, log_dir, None)
-
-			file.write('{}|{}|{}\n'.format(text, mel_filename[0], speaker_id[0]))
-	log('synthesized mel spectrograms at {}'.format(eval_dir))
+	delta_size = hparams.tacotron_synthesis_batch_size if hparams.tacotron_synthesis_batch_size < len(sentences) else len(sentences)
+	batch_sentences = [sentences[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(sentences), delta_size)]
+	for i, batch in enumerate(tqdm(batch_sentences)):
+		audio.save_wav(synth.eval(batch), os.path.join(log_dir, 'wavs', 'eval_batch_{:03}.wav'.format(i)), hparams)
 	return eval_dir
 
 def run_synthesis(args, checkpoint_path, output_dir, hparams):
