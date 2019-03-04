@@ -180,11 +180,6 @@ class Synthesizer:
 			wav = audio.inv_preemphasis(linear_wav, hparams.preemphasis)
 			results.append(wav)
 		return np.concatenate(results)
-		# linear_wavs = self.session.run(self.linear_wav_outputs, feed_dict=feed_dict)
-		# wav = audio.inv_preemphasis(linear_wavs, hparams.preemphasis)
-		# out = io.BytesIO()
-		# audio.save_wav(wav, out, hparams)
-		# return out.getvalue()
 
 
 	def _round_up(self, x, multiple):

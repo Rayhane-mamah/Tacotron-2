@@ -60,7 +60,7 @@ hparams = tf.contrib.training.HParams(
 
 	#Tacotron
 	outputs_per_step = 2, #number of frames to generate at each decoding step (speeds up computation and allows for higher batch size)
-	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them
+	stop_at_any = False, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them
 
 	embedding_dim = 512, #dimension of embedding space
 
