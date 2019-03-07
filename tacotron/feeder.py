@@ -205,17 +205,17 @@ class Feeder:
 		return (inputs, input_lengths, mel_targets, token_targets, linear_targets, targets_lengths)
 
 	def _prepare_inputs(self, inputs):
-		assert(max([len(x) for x in inputs]) < self._hparams.max_text_length)
+		assert(max([len(x) for x in inputs]) <= self._hparams.max_text_length)
 		max_len = self._hparams.max_text_length
 		return np.stack([self._pad_input(x, max_len) for x in inputs])
 
 	def _prepare_targets(self, targets, alignment):
-		assert(max([len(t) for t in targets]) < self._hparams.max_mel_frames)
+		assert(max([len(t) for t in targets]) <= self._hparams.max_mel_frames)
 		max_len = self._hparams.max_mel_frames
 		return np.stack([self._pad_target(t, self._round_up(max_len, alignment)) for t in targets])
 
 	def _prepare_token_targets(self, targets, alignment):
-		assert(max([len(t) for t in targets]) + 1 < self._hparams.max_mel_frames)
+		assert(max([len(t) for t in targets]) + 1 <= self._hparams.max_mel_frames)
 		max_len = self._hparams.max_mel_frames
 		return np.stack([self._pad_token_target(t, self._round_up(max_len, alignment)) for t in targets])
 
