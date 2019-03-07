@@ -4,7 +4,6 @@ import subprocess
 import time
 import traceback
 from datetime import datetime
-
 import infolog
 import numpy as np
 import tensorflow as tf
@@ -29,6 +28,7 @@ def add_train_stats(model, hparams):
 			tf.summary.scalar('linear_loss', model.linear_loss)
 		tf.summary.scalar('regularization_loss', model.regularization_loss)
 		tf.summary.scalar('stop_token_loss', model.stop_token_loss)
+		tf.summary.scalar('attention_loss', model.attention_loss)
 		tf.summary.scalar('loss', model.loss)
 		tf.summary.scalar('learning_rate', model.learning_rate) #Control learning rate decay speed
 		if hparams.tacotron_teacher_forcing_mode == 'scheduled':
@@ -38,11 +38,12 @@ def add_train_stats(model, hparams):
 		tf.summary.scalar('max_gradient_norm', tf.reduce_max(gradient_norms)) #visualize gradients (in case of explosion)
 		return tf.summary.merge_all()
 
-def add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, stop_token_loss, loss):
+def add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, stop_token_loss, attention_loss, loss):
 	values = [
 	tf.Summary.Value(tag='eval_model/eval_stats/eval_before_loss', simple_value=before_loss),
 	tf.Summary.Value(tag='eval_model/eval_stats/eval_after_loss', simple_value=after_loss),
 	tf.Summary.Value(tag='eval_model/eval_stats/stop_token_loss', simple_value=stop_token_loss),
+	tf.Summary.Value(tag='eval_model/eval_stats/attention_loss', simple_value=attention_loss),
 	tf.Summary.Value(tag='eval_model/eval_stats/eval_loss', simple_value=loss),
 	]
 	if linear_loss is not None:
@@ -135,7 +136,7 @@ def train(log_dir, args, hparams):
 	step = 0
 	time_window = ValueWindow(100)
 	loss_window = ValueWindow(100)
-	saver = tf.train.Saver(max_to_keep=5)
+	saver = tf.train.Saver(max_to_keep=1)
 
 	log('Tacotron training set to a maximum of {} steps'.format(args.tacotron_train_steps))
 
@@ -154,7 +155,6 @@ def train(log_dir, args, hparams):
 				# Restore saved model if the user requested it, default = True
 				try:
 					checkpoint_state = tf.train.get_checkpoint_state(save_dir)
-
 					if (checkpoint_state and checkpoint_state.model_checkpoint_path):
 						log('Loading checkpoint {}'.format(checkpoint_state.model_checkpoint_path), slack=True)
 						saver.restore(sess, checkpoint_state.model_checkpoint_path)
@@ -195,45 +195,48 @@ def train(log_dir, args, hparams):
 					before_losses = []
 					after_losses = []
 					stop_token_losses = []
+					attention_losses = []
 					linear_losses = []
 					linear_loss = None
 
 					if hparams.predict_linear:
 						for i in tqdm(range(feeder.test_steps)):
-							eloss, before_loss, after_loss, stop_token_loss, linear_loss, mel_p, mel_t, t_len, align, lin_p = sess.run(
-								[eval_model.loss, eval_model.before_loss, eval_model.after_loss,
-								eval_model.stop_token_loss, eval_model.linear_loss, eval_model.mel_outputs[0],
-								eval_model.mel_targets[0], eval_model.targets_lengths[0],
-								eval_model.alignments[0], eval_model.linear_outputs[0]])
+							eloss, before_loss, after_loss, stop_token_loss, linear_loss, attention_loss, mel_p, mel_t, t_len, align, lin_p = sess.run(
+								[eval_model.loss, eval_model.before_loss, eval_model.after_loss, eval_model.stop_token_loss,
+								eval_model.linear_loss, eval_model.attention_loss, eval_model.mel_outputs[0], eval_model.mel_targets[0],
+								eval_model.targets_lengths[0], eval_model.alignments[0], eval_model.linear_outputs[0]])
 							eval_losses.append(eloss)
 							before_losses.append(before_loss)
 							after_losses.append(after_loss)
 							stop_token_losses.append(stop_token_loss)
+							attention_losses.append(attention_loss)
 							linear_losses.append(linear_loss)
 						linear_loss = sum(linear_losses) / len(linear_losses)
 
-						wav = audio.inv_linear_spectrogram(lin_p.T, hparams)
-						audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-waveform-linear.wav'.format(step)), hparams)
+						# wav = audio.inv_linear_spectrogram(lin_p.T, hparams)
+						# audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-waveform-linear.wav'.format(step)), hparams)
 					else:
 						for i in tqdm(range(feeder.test_steps)):
 							eloss, before_loss, after_loss, stop_token_loss, mel_p, mel_t, t_len, align = sess.run(
-								[eval_model.loss, eval_model.before_loss, eval_model.after_loss,
-								eval_model.stop_token_loss, eval_model.mel_outputs[0], eval_model.mel_targets[0],
+								[eval_model.loss, eval_model.before_loss, eval_model.after_loss, eval_model.stop_token_loss,
+								eval_model.attention_loss, eval_model.mel_outputs[0], eval_model.mel_targets[0],
 								eval_model.targets_lengths[0], eval_model.alignments[0]])
 							eval_losses.append(eloss)
 							before_losses.append(before_loss)
 							after_losses.append(after_loss)
 							stop_token_losses.append(stop_token_loss)
+							attention_losses.append(attention_loss)
 
 					eval_loss = sum(eval_losses) / len(eval_losses)
 					before_loss = sum(before_losses) / len(before_losses)
 					after_loss = sum(after_losses) / len(after_losses)
 					stop_token_loss = sum(stop_token_losses) / len(stop_token_losses)
+					attention_loss = sum(attention_losses) / len(attention_losses)
 
 					log('Saving eval log to {}..'.format(eval_dir))
-					#Save some log to monitor model improvement on same unseen sequence
-					wav = audio.inv_mel_spectrogram(mel_p.T, hparams)
-					audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-waveform-mel.wav'.format(step)), hparams)
+					# #Save some log to monitor model improvement on same unseen sequence
+					# wav = audio.inv_mel_spectrogram(mel_p.T, hparams)
+					# audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-waveform-mel.wav'.format(step)), hparams)
 
 					plot.plot_alignment(align, os.path.join(eval_plot_dir, 'step-{}-eval-align.png'.format(step)),
 						info='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, eval_loss),
@@ -244,7 +247,7 @@ def train(log_dir, args, hparams):
 
 					log('Eval loss for global step {}: {:.3f}'.format(step, eval_loss))
 					log('Writing eval summary!')
-					add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, stop_token_loss, eval_loss)
+					add_eval_stats(summary_writer, step, linear_loss, before_loss, after_loss, stop_token_loss, attention_loss, eval_loss)
 
 
 				if step % args.checkpoint_interval == 0 or step == args.tacotron_train_steps:
@@ -263,12 +266,12 @@ def train(log_dir, args, hparams):
 							])
 
 						#save predicted linear spectrogram to disk (debug)
-						linear_filename = 'linear-prediction-step-{}.npy'.format(step)
-						np.save(os.path.join(linear_dir, linear_filename), linear_prediction.T, allow_pickle=False)
+						# linear_filename = 'linear-prediction-step-{}.npy'.format(step)
+						# np.save(os.path.join(linear_dir, linear_filename), linear_prediction.T, allow_pickle=False)
 
 						#save griffin lim inverted wav for debug (linear -> wav)
-						wav = audio.inv_linear_spectrogram(linear_prediction.T, hparams)
-						audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-wave-from-linear.wav'.format(step)), hparams)
+						# wav = audio.inv_linear_spectrogram(linear_prediction.T, hparams)
+						# audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-wave-from-linear.wav'.format(step)), hparams)
 
 					else:
 						input_seq, mel_prediction, alignment, target, target_length = sess.run([model.inputs[0],
@@ -279,14 +282,16 @@ def train(log_dir, args, hparams):
 							])
 
 					#save predicted mel spectrogram to disk (debug)
-					mel_filename = 'mel-prediction-step-{}.npy'.format(step)
-					np.save(os.path.join(mel_dir, mel_filename), mel_prediction.T, allow_pickle=False)
+					# mel_filename = 'mel-prediction-step-{}.npy'.format(step)
+					# np.save(os.path.join(mel_dir, mel_filename), mel_prediction.T, allow_pickle=False)
 
 					#save griffin lim inverted wav for debug (mel -> wav)
-					wav = audio.inv_mel_spectrogram(mel_prediction.T, hparams)
-					audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-wave-from-mel.wav'.format(step)), hparams)
+					# wav = audio.inv_mel_spectrogram(mel_prediction.T, hparams)
+					# audio.save_wav(wav, os.path.join(wav_dir, 'step-{}-wave-from-mel.wav'.format(step)), hparams)
 
 					#save alignment plot to disk (control purposes)
+					# print(model.alignments[0])
+					# print(alignment)
 					plot.plot_alignment(alignment, os.path.join(plot_dir, 'step-{}-align.png'.format(step)),
 						info='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, loss),
 						max_len=target_length // hparams.outputs_per_step)

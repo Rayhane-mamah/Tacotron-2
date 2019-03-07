@@ -143,8 +143,9 @@ class Tacotron():
 
 			if post_condition:
 				# Add post-processing CBHG:
-			    post_outputs = post_cbhg(mel_outputs, hp.num_mels, is_training)           # [N, T_out, 256]
-			    linear_outputs = tf.layers.dense(post_outputs, hp.num_freq)
+				post_outputs = post_cbhg(mel_outputs, hp.num_mels, is_training)           # [N, T_out, 256]
+				linear_outputs = tf.layers.dense(post_outputs, hp.num_freq)
+
 
 			#Grab alignments from the final decoder state
 			alignments = tf.transpose(final_decoder_state.alignment_history.stack(), [1, 2, 0])
@@ -178,6 +179,7 @@ class Tacotron():
 			if post_condition:
 				log('  linear out:               {}'.format(linear_outputs.shape))
 			log('  <stop_token> out:         {}'.format(stop_token_prediction.shape))
+			log('  alignments:               {}'.format(alignments.shape))
 
 
 	def add_loss(self):
@@ -203,6 +205,14 @@ class Tacotron():
 				else:
 					linear_loss=0.
 			else:
+				# guided_attention loss
+				N = self._hparams.max_text_length
+				T = self._hparams.max_mel_frames
+				A = tf.pad(self.alignments, [(0, 0), (0, N), (0, T)], mode="CONSTANT", constant_values=-1.)[:, :N, :T]
+				gts = tf.convert_to_tensor(guided_attention(N, T))
+				attention_masks = tf.to_float(tf.not_equal(A, -1))
+				attention_loss = tf.reduce_sum(tf.abs(A * gts) * attention_masks)
+				attention_loss /= tf.reduce_sum(attention_masks)
 				# Compute loss of predictions before postnet
 				before = tf.reduce_mean(tf.abs(self.mel_targets - self.decoder_output))
 				# Compute loss after postnet
@@ -241,8 +251,9 @@ class Tacotron():
 			self.stop_token_loss = stop_token_loss
 			self.regularization_loss = regularization
 			self.linear_loss = linear_loss
+			self.attention_loss = attention_loss
 
-			self.loss = self.before_loss + self.after_loss + self.stop_token_loss + self.regularization_loss + self.linear_loss
+			self.loss = self.before_loss + self.after_loss + self.stop_token_loss + self.regularization_loss + self.linear_loss + self.attention_loss
 
 	def add_optimizer(self, global_step):
 		'''Adds optimizer. Sets "gradients" and "optimize" fields. add_loss must have been called.
