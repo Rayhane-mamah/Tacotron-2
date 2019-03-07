@@ -32,22 +32,10 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
 		for trn in trn_files:
 			with open(trn) as f:
 				basename = trn[:-4]
-				if basename.endswith('.wav'):
-					# THCHS30
-					f.readline()
-					wav_file = basename
-				else:
-					wav_file = basename + '.wav'
+				wav_file = basename + '.wav'
 				wav_path = wav_file
 				basename = basename.split('/')[-1]
 				text = f.readline().strip()
-		# with open(os.path.join(input_dir, 'metadata.csv'), encoding='utf-8') as f:
-
-		# 	for line in f:
-		# 		parts = line.strip().split('|')
-		# 		basename = parts[0]
-		# 		wav_path = os.path.join(input_dir, 'wavs', '{}.wav'.format(basename))
-		# 		text = parts[2]
 				futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, basename, wav_path, text, hparams)))
 				index += 1
 
@@ -98,7 +86,7 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 	mel_spectrogram = audio.melspectrogram(wav, hparams).astype(np.float32)
 	mel_frames = mel_spectrogram.shape[1]
 
-	if mel_frames > hparams.max_mel_frames and hparams.clip_mels_length:
+	if mel_frames > hparams.max_mel_frames or len(text) > hparams.max_text_length:
 		return None
 
 	#Compute the linear scale spectrogram from the wav
