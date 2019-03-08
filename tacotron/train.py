@@ -217,7 +217,7 @@ def train(log_dir, args, hparams):
 						# audio.save_wav(wav, os.path.join(eval_wav_dir, 'step-{}-eval-waveform-linear.wav'.format(step)), hparams)
 					else:
 						for i in tqdm(range(feeder.test_steps)):
-							eloss, before_loss, after_loss, stop_token_loss, mel_p, mel_t, t_len, align = sess.run(
+							eloss, before_loss, after_loss, stop_token_loss, attention_loss, mel_p, mel_t, t_len, align = sess.run(
 								[eval_model.loss, eval_model.before_loss, eval_model.after_loss, eval_model.stop_token_loss,
 								eval_model.attention_loss, eval_model.mel_outputs[0], eval_model.mel_targets[0],
 								eval_model.targets_lengths[0], eval_model.alignments[0]])
