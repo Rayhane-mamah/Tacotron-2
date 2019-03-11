@@ -8,10 +8,10 @@ from tensorflow.python.ops import array_ops, math_ops, nn_ops, variable_scope
 
 #From https://github.com/tensorflow/tensorflow/blob/r1.7/tensorflow/contrib/seq2seq/python/ops/attention_wrapper.py
 def _compute_attention(attention_mechanism, cell_output, attention_state,
-					   attention_layer):
+					   attention_layer, prev_max_attentions):
 	"""Computes the attention and alignments for a given attention_mechanism."""
-	alignments, next_attention_state = attention_mechanism(
-		cell_output, state=attention_state)
+	alignments, next_attention_state, max_attentions = attention_mechanism(
+		cell_output, state=attention_state, prev_max_attentions=prev_max_attentions)
 
 	# Reshape from [batch_size, memory_time] to [batch_size, 1, memory_time]
 	expanded_alignments = array_ops.expand_dims(alignments, 1)
@@ -32,7 +32,7 @@ def _compute_attention(attention_mechanism, cell_output, attention_state,
 	else:
 		attention = context
 
-	return attention, alignments, next_attention_state
+	return attention, alignments, next_attention_state, max_attentions
 
 
 def _location_sensitive_score(W_query, W_fil, W_keys):
@@ -61,7 +61,7 @@ def _location_sensitive_score(W_query, W_fil, W_keys):
 	num_units = W_keys.shape[-1].value or array_ops.shape(W_keys)[-1]
 
 	v_a = tf.get_variable(
-		'attention_variable', shape=[num_units], dtype=dtype,
+		'attention_variable_projection', shape=[num_units], dtype=dtype,
 		initializer=tf.contrib.layers.xavier_initializer())
 	b_a = tf.get_variable(
 		'attention_bias', shape=[num_units], dtype=dtype,
@@ -112,6 +112,7 @@ class LocationSensitiveAttention(BahdanauAttention):
 				 num_units,
 				 memory,
 				 hparams,
+				 is_training,
 				 mask_encoder=True,
 				 memory_sequence_length=None,
 				 smoothing=False,
@@ -135,9 +136,9 @@ class LocationSensitiveAttention(BahdanauAttention):
 				  gio, “Attention-based models for speech recognition,” in Ad-
 				  vances in Neural Information Processing Systems, 2015, pp.
 				  577–585.
-				This is mainly used if the model wants to attend to multiple inputs parts
+				This is mainly used if the model wants to attend to multiple input parts
 				at the same decoding step. We probably won't be using it since multiple sound
-				frames may depend from the same character, probably not the way around.
+				frames may depend on the same character/phone, probably not the way around.
 				Note:
 					We still keep it implemented in case we want to test it. They used it in the
 					paper in the context of speech recognition, where one phoneme may depend on
@@ -161,8 +162,11 @@ class LocationSensitiveAttention(BahdanauAttention):
 		self.location_layer = tf.layers.Dense(units=num_units, use_bias=False,
 			dtype=tf.float32, name='location_features_layer')
 		self._cumulate = cumulate_weights
+		self.synthesis_constraint = hparams.synthesis_constraint and not is_training
+		self.attention_win_size = tf.convert_to_tensor(hparams.attention_win_size, dtype=tf.int32)
+		self.constraint_type = hparams.synthesis_constraint_type
 
-	def __call__(self, query, state):
+	def __call__(self, query, state, prev_max_attentions):
 		"""Score the query based on the keys and values.
 		Args:
 			query: Tensor of dtype matching `self.values` and shape
@@ -194,9 +198,24 @@ class LocationSensitiveAttention(BahdanauAttention):
 			# energy shape [batch_size, max_time]
 			energy = _location_sensitive_score(processed_query, processed_location_features, self.keys)
 
+		if self.synthesis_constraint:
+			Tx = tf.shape(energy)[-1]
+			# prev_max_attentions = tf.squeeze(prev_max_attentions, [-1])
+			if self.constraint_type == 'monotonic':
+				key_masks = tf.sequence_mask(prev_max_attentions, Tx)
+				reverse_masks = tf.sequence_mask(Tx - self.attention_win_size - prev_max_attentions, Tx)[:, ::-1]
+			else:
+				assert self.constraint_type == 'window'
+				key_masks = tf.sequence_mask(prev_max_attentions - (self.attention_win_size // 2 + (self.attention_win_size % 2 != 0)), Tx)
+				reverse_masks = tf.sequence_mask(Tx - (self.attention_win_size // 2) - prev_max_attentions, Tx)[:, ::-1]
+			
+			masks = tf.logical_or(key_masks, reverse_masks)
+			paddings = tf.ones_like(energy) * (-2 ** 32 + 1)  # (N, Ty/r, Tx)
+			energy = tf.where(tf.equal(masks, False), energy, paddings)
 
 		# alignments shape = energy shape = [batch_size, max_time]
 		alignments = self._probability_fn(energy, previous_alignments)
+		max_attentions = tf.argmax(alignments, -1, output_type=tf.int32) # (N, Ty/r)
 
 		# Cumulate alignments
 		if self._cumulate:
@@ -204,4 +223,4 @@ class LocationSensitiveAttention(BahdanauAttention):
 		else:
 			next_state = alignments
 
-		return alignments, next_state
+		return alignments, next_state, max_attentions
