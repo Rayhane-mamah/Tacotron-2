@@ -115,7 +115,7 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 	audio_filename = 'audio-{}.npy'.format(index)
 	mel_filename = 'mel-{}.npy'.format(index)
 	linear_filename = 'linear-{}.npy'.format(index)
-	np.save(os.path.join(wav_dir, audio_filename), out.astype(out_dtype), allow_pickle=False)
+	# np.save(os.path.join(wav_dir, audio_filename), out.astype(out_dtype), allow_pickle=False)
 	np.save(os.path.join(mel_dir, mel_filename), mel_spectrogram.T, allow_pickle=False)
 	np.save(os.path.join(linear_dir, linear_filename), linear_spectrogram.T, allow_pickle=False)
 
