@@ -15,7 +15,7 @@ hparams = tf.contrib.training.HParams(
 	#Audio
 	num_mels = 160, #Number of mel-spectrogram channels and local conditioning dimensionality
 	num_freq = 2049, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
-	rescale = True, #Whether to rescale audio prior to preprocessing
+	rescale = False, #Whether to rescale audio prior to preprocessing
 	rescaling_max = 0.999, #Rescaling value
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
 	clip_mels_length = True, #For cases of OOM (Not really recommended, working on a workaround)
@@ -104,7 +104,7 @@ hparams = tf.contrib.training.HParams(
         cbhg_rnn_units = 128, #Number of GRU units used in bidirectional RNN of CBHG block. CBHG output is 2x rnn_units in shape
 
         #Loss params
-        mask_encoder = True, #whether to mask encoder padding while computing attention. Set to True for better prosody but slower convergence.
+        mask_encoder = False, #whether to mask encoder padding while computing attention. Set to True for better prosody but slower convergence.
         mask_decoder = False, #Whether to use loss mask for padded sequences (if False, <stop_token> loss function will not be weighted, else recommended pos_weight = 20)
         cross_entropy_pos_weight = 1, #Use class weights to reduce the stop token classes imbalance (by adding more penalty on False Negatives (FN)) (1 = disabled)
         predict_linear = True, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
@@ -129,10 +129,10 @@ hparams = tf.contrib.training.HParams(
         #Learning rate schedule
         tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
         tacotron_start_decay = 40000, #Step at which learning decay starts
-        tacotron_decay_steps = 18000, #Determines the learning rate decay slope (UNDER TEST)
-        tacotron_decay_rate = 0.5, #learning rate decay rate (UNDER TEST)
+        tacotron_decay_steps = 40000, #Determines the learning rate decay slope (UNDER TEST)
+        tacotron_decay_rate = 0.4, #learning rate decay rate (UNDER TEST)
         tacotron_initial_learning_rate = 1e-3, #starting learning rate
-        tacotron_final_learning_rate = 1e-4, #minimal learning rate
+        tacotron_final_learning_rate = 1e-5, #minimal learning rate
 
         #Optimization parameters
         tacotron_adam_beta1 = 0.9, #AdamOptimizer beta1 parameter
