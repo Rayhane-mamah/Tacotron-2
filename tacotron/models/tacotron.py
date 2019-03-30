@@ -175,20 +175,20 @@ class Tacotron():
 			self.mel_targets = mel_targets
 			self.targets_lengths = targets_lengths
 			log('Initialized Tacotron model. Dimensions (? = dynamic shape): ')
-			log('  Train mode:	       {}'.format(is_training))
-			log('  Eval mode:		{}'.format(is_evaluating))
-			log('  GTA mode:		 {}'.format(gta))
-			log('  Synthesis mode:	   {}'.format(not (is_training or is_evaluating)))
-			log('  embedding:		{}'.format(embedded_inputs.shape))
-			log('  enc conv out:	     {}'.format(enc_conv_output_shape))
-			log('  encoder out:	      {}'.format(encoder_outputs.shape))
-			log('  decoder out:	      {}'.format(decoder_output.shape))
-			log('  residual out:	     {}'.format(residual.shape))
+			log('  Train mode:               {}'.format(is_training))
+			log('  Eval mode:                {}'.format(is_evaluating))
+			log('  GTA mode:                 {}'.format(gta))
+			log('  Synthesis mode:           {}'.format(not (is_training or is_evaluating)))
+			log('  embedding:                {}'.format(embedded_inputs.shape))
+			log('  enc conv out:             {}'.format(enc_conv_output_shape))
+			log('  encoder out:              {}'.format(encoder_outputs.shape))
+			log('  decoder out:              {}'.format(decoder_output.shape))
+			log('  residual out:             {}'.format(residual.shape))
 			log('  projected residual out:   {}'.format(projected_residual.shape))
-			log('  mel out:		  {}'.format(mel_outputs.shape))
+			log('  mel out:                  {}'.format(mel_outputs.shape))
 			if post_condition:
-				log('  linear out:	       {}'.format(linear_outputs.shape))
-			log('  <stop_token> out:	 {}'.format(stop_token_prediction.shape))
+				log('  linear out:               {}'.format(linear_outputs.shape))
+			log('  <stop_token> out:         {}'.format(stop_token_prediction.shape))
 
 
 	def add_loss(self):
@@ -223,9 +223,9 @@ class Tacotron():
 				attention_loss = tf.reduce_sum(tf.abs(A * gts) * attention_masks)
 				attention_loss /= tf.reduce_sum(attention_masks)
 				# Compute loss of predictions before postnet
-				before = tf.reduce_mean(tf.abs(self.mel_targets - self.decoder_output))
+				before = tf.losses.mean_squared_error(self.mel_targets, self.decoder_output)
 				# Compute loss after postnet
-				after = tf.reduce_mean(tf.abs(self.mel_targets - self.mel_outputs))
+				after = tf.losses.mean_squared_error(self.mel_targets, self.mel_outputs)
 				#Compute <stop_token> loss (for learning dynamic generation stop)
 				stop_token_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
 					labels=self.stop_token_targets,
@@ -238,7 +238,7 @@ class Tacotron():
 					# l1 = tf.abs(self.linear_targets - self.linear_outputs)
 					# n_priority_freq = int(4000 / (hp.sample_rate * 0.5) * hp.num_freq)
 					# linear_loss = 0.5 * tf.reduce_mean(l1) + 0.5 * tf.reduce_mean(l1[:,:,0:n_priority_freq])
-					linear_loss = tf.reduce_mean(tf.abs(self.linear_targets - self.linear_outputs))
+					linear_loss = tf.losses.mean_squared_error(self.linear_targets, self.linear_outputs)
 				else:
 					linear_loss = 0.
 
