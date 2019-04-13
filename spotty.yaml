@@ -1,33 +1,47 @@
 project:
-  name: Tacotron2
-  remoteDir: /workspace/project
+  name: tacotron
   syncFilters:
     - exclude:
         - .idea/*
         - .git/*
         - '*/__pycache__/*'
         - training_data/*
-instance:
-  region: us-east-2
-  instanceType: p2.xlarge
-  volumes:
-    - name: Tacotron2
-      directory: /workspace
-      size: 50
-  docker:
-    file: Dockerfile
-    dataRoot: /workspace/docker
-    workingDir: /workspace/project
-  ports: [6006, 8888] # TensorBoard and Jupyter Notebook
+
+container:
+  projectDir: /workspace/project
+  file: docker/Dockerfile.spotty
+  ports: [6006, 8888]
+  volumeMounts:
+    - name: workspace
+      mountPath: /workspace
+
+instances:
+  - name: i1
+    provider: aws
+    parameters:
+      region: us-east-2
+      instanceType: p2.xlarge
+      dockerDataRoot: /docker
+      volumes:
+        - name: workspace
+          parameters:
+            size: 50
+            deletionPolicy: retain
+        - name: docker
+          parameters:
+            size: 10
+            mountDir: /docker
+            deletionPolicy: retain
+
 scripts:
   preprocess: |
     curl -O http://data.keithito.com/data/speech/LJSpeech-1.1.tar.bz2
     tar xvjf LJSpeech-1.1.tar.bz2
     rm LJSpeech-1.1.tar.bz2
-    python3 preprocess.py
+    python preprocess.py
   train: |
     python train.py --model='Tacotron-2'
   tensorboard: |
     tensorboard --logdir /workspace/project/logs-Tacotron-2
   jupyter: |
-    /run_jupyter.sh --allow-root
+    jupyter notebook --allow-root --ip 0.0.0.0 --notebook-dir=/workspace/project

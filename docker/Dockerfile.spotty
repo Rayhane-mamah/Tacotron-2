@@ -1,0 +1,11 @@
+FROM tensorflow/tensorflow:1.13.1-gpu-py3-jupyter
+
+# install a pyaudio dependency
+RUN apt-get update \
+    && apt-get install -y portaudio19-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# install requirements
+COPY requirements-spotty.txt requirements-spotty.txt
+RUN pip3 install -r requirements-spotty.txt
