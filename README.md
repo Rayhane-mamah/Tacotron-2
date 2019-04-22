@@ -3,7 +3,7 @@ Tensorflow implementation of DeepMind's Tacotron-2. A deep neural network archit
 
 Note:   
 1. You can check modification at the end of the webpage.  
-2. The implementation of tacotron2 with multi-cpus has merged by Rayhane-mamah manually. You can check the commit log to get it.
+2. The implementation of tacotron2 with multi-gpus has merged by Rayhane-mamah manually. You can check the commit log to get it.
 
 # Repository Structure:
 	Tacotron-2
