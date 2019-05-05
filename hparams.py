@@ -19,8 +19,8 @@ hparams = tf.contrib.training.HParams(
 	rescaling_max = 0.999, #Rescaling value
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
 	clip_mels_length = True, #For cases of OOM (Not really recommended, working on a workaround)
-	max_mel_frames = 700,  #Only relevant when clip_mels_length = True
-	max_text_length = 300,  #Only relevant when clip_mels_length = True
+	max_mel_frames = 600,  #Only relevant when clip_mels_length = True
+	max_text_length = 150,  #Only relevant when clip_mels_length = True
 
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
@@ -122,7 +122,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_batch_size = 48, #number of training samples on each training steps
 	#Tacotron Batch synthesis supports ~16x the training batch size (no gradients during testing).
 	#Training Tacotron with unmasked paddings makes it aware of them, which makes synthesis times different from training. We thus recommend masking the encoder.
-	tacotron_synthesis_batch_size = 32 * 16, #DO NOT MAKE THIS BIGGER THAN 1 IF YOU DIDN'T TRAIN TACOTRON WITH "mask_encoder=True"!!
+	tacotron_synthesis_batch_size = 1, #DO NOT MAKE THIS BIGGER THAN 1 IF YOU DIDN'T TRAIN TACOTRON WITH "mask_encoder=True"!!
 	tacotron_test_size = 0.05, #% of data to keep as test data, if None, tacotron_test_batches must be not None. (5% is enough to have a good idea about overfit)
 	tacotron_test_batches = None, #number of test batches.
 
