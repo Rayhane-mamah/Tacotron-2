@@ -233,8 +233,8 @@ hparams = tf.contrib.training.HParams(
 	# "er4 ling2 yi1 wu3 nian2 , yang1 shi4 ceng2 jing1 bo1 chu1 guo4 yi2 bu4 gao1 fen1 ji4 lu4 pian4 ,",
 	# "di4 san1 ji2",
 	# "pian4 zhong1 , tian1 gao1 di4 kuo4 de feng1 jing3 ,",
-	# "rang4 wu2 shu4 ren2 dui4 xi1 zang4 qing2 gen1 shen1 zhong4 ."
-	# "shi2 ge2 liang3 nian2 , you2 yuan2 ban1 ren2 ma3 da3 zao4 de jie3 mei4 pian1 ,"
+	# "rang4 wu2 shu4 ren2 dui4 xi1 zang4 qing2 gen1 shen1 zhong4 .",
+	# "shi2 ge2 liang3 nian2 , you2 yuan2 ban1 ren2 ma3 da3 zao4 de jie3 mei4 pian1 ,",
 	# "ji2 di4 , qiao1 ran2 shang4 xian4 !",
 	# "mei3 yi4 zheng4 dou1 shi4 bi4 zhi3 , mei3 yi2 mu4 dou1 shi4 ren2 jian1 xian1 jing4 .",
 	# "zi4 ying3 pian1 bo1 chu1 zhi1 lai2 , hao3 ping2 ru2 chao2 ,",
