@@ -176,7 +176,7 @@ class Synthesizer:
 		for i, linear in enumerate(linears):
 			linear_wav = self.session.run(self.linear_wav_outputs, feed_dict={self.linear_spectrograms: linear})
 			wav = audio.inv_preemphasis(linear_wav, hparams.preemphasis)
-			if target_lengths[i] >= self._hparams.max_iters * self._hparams.outputs_per_step:
+			if target_lengths[i] >= 500:
 				wav = wav[:self._find_endpoint(wav)]
 			results.append(wav)
 		return np.concatenate(results)
@@ -204,10 +204,10 @@ class Synthesizer:
 		output_lengths = [row.index(1) + 1 if 1 in row else len(row) for row in np.round(stop_tokens).tolist()]
 		return output_lengths
 
-	def _find_endpoint(self, wav, threshold_db=-45, min_silence_sec=0.5):
+	def _find_endpoint(self, wav, threshold_db=-40, min_silence_sec=0.1):
 		win_len = int(self._hparams.sample_rate * min_silence_sec)
 		threshold = audio._db_to_amp(threshold_db)
 		for x in range(self._hparams.hop_size, len(wav) - win_len, self._hparams.hop_size):
-			if np.max(wav[x : x + win_len]) < threshold:
-				return x + self._hparams.hop_size
+			if np.mean(np.abs(wav[x : x + win_len])) < threshold:
+				return x + win_len
 		return len(wav)
