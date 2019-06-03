@@ -169,16 +169,35 @@ class Synthesizer:
 				wav = audio.inv_mel_spectrogram(mels[0].T, hparams)
 			audio.save_wav(wav, 'temp.wav', sr=hparams.sample_rate) #Find a better way
 
-			if platform.system() == 'Linux':
-				#Linux wav reader
-				os.system('aplay temp.wav')
+			#define stream chunk   
+			chunk = 1024  
 
-			elif platform.system() == 'Windows':
-				#windows wav reader
-				os.system('start /min mplay32 /play /close temp.wav')
+			#open a wav format music  
+			f = wave.open(r"temp.wav","rb")  
 
-			else:
-				raise RuntimeError('Your OS type is not supported yet, please add it to "tacotron/synthesizer.py, line-165" and feel free to make a Pull Request ;) Thanks!')
+			#instantiate PyAudio  
+			p = pyaudio.PyAudio()  
+
+			#open stream  
+			stream = p.open(format = p.get_format_from_width(f.getsampwidth()),  
+			                channels = f.getnchannels(),  
+			                rate = f.getframerate(),  
+			                output = True)  
+
+			#read data  
+			data = f.readframes(chunk)  
+
+			#play stream  
+			while data:  
+			    stream.write(data)  
+			    data = f.readframes(chunk)  
+
+			#stop stream  
+			stream.stop_stream()  
+			stream.close()  
+			
+			#close PyAudio  
+			p.terminate()  
 
 			return
 
