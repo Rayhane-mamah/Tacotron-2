@@ -3,9 +3,12 @@ import chardet
 import thriftpy
 import falcon
 import tensorflow as tf
+import numpy as np
 import io
 import re
 import os
+import json
+import urllib
 from datasets import audio
 from mainstay import Mainstay
 from hparams import hparams
@@ -95,12 +98,13 @@ class Syn:
 	def on_get(self,req,res):
 		if not req.params.get('text'):
 			raise falcon.HTTPBadRequest()
-		chs = req.params.get('text')
-		print(chs.encode("utf-8").decode("utf-8"))
-		pys = chs_pinyin(chs)
+		orig_chs = req.params.get('text')
+		norm_chs = chs_norm(orig_chs)
+		print(norm_chs.encode("utf-8").decode("utf-8"))
+		pys = chs_pinyin(norm_chs)
 		out = io.BytesIO()
-		evals = synth.eval(pys)
-		audio.save_wav(evals, out, hparams)
+		wav = synth.eval(pys)
+		audio.save_wav(wav, out, hparams)
 		res.data = out.getvalue()
 		res.content_type = "audio/wav"
 
@@ -109,27 +113,23 @@ def chs_pinyin(text):
 	results = []
 	sentence = []
 	for i in range(len(pys)):
-		if pys[i][0][0] == "，" or pys[i][0][0] == "、" or pys[i][0][0] == '·':
+		if pys[i][0][0] in "，、·,":
 			pys[i][0] = ','
-		elif pys[i][0][0] == '。' or pys[i][0][0] == "…":
+		elif pys[i][0][0] in ".。…":
 			pys[i][0] = '.'
-		elif pys[i][0][0] == '―' or pys[i][0][0] == "――" or pys[i][0][0] == '—' or pys[i][0][0] == '——':
+		elif pys[i][0][0] in "―――———":
 			pys[i][0] = ','
-		elif pys[i][0][0] == "；":
-			pys[i][0] = ';'
-		elif pys[i][0][0] == "：":
-			pys[i][0] = ':'
-		elif pys[i][0][0] == "？":
+		elif pys[i][0][0] in "；：:;":
+			pys[i][0] = ','
+		elif pys[i][0][0] in "?？":
 			pys[i][0] = '?'
-		elif pys[i][0][0] == "！":
+		elif pys[i][0][0] in "!！":
 			pys[i][0] = '!'
-		elif pys[i][0][0] == "《" or pys[i][0][0] == '》' or pys[i][0][0] == '（' or pys[i][0][0] == '）':
+		elif pys[i][0][0] in "《》（）()":
 			continue
-		elif pys[i][0][0] == '“' or pys[i][0][0] == '”' or pys[i][0][0] == '‘' or pys[i][0][0] == '’' or pys[i][0][0] == '＂':
+		elif pys[i][0][0] in "“”‘’＂\"\'":
 			continue
-		elif pys[i][0][0] == '(' or pys[i][0][0] == ')' or pys[i][0][0] == '"' or pys[i][0][0] == '\'':
-			continue
-		elif pys[i][0][0] == ' ' or pys[i][0][0] == '/' or pys[i][0][0] == '<' or pys[i][0][0] == '>' or pys[i][0][0] == '「' or pys[i][0][0] == '」':
+		elif pys[i][0][0] in " /<>「」":
 			continue
 
 		sentence.append(pys[i][0])
@@ -141,9 +141,20 @@ def chs_pinyin(text):
 		results.append(' '.join(sentence))
 
 	for i, res in enumerate(results):
+		if results[i][-1] not in ",.":
+			results[i] += ' .'
 		print(res)
 
 	return results
+
+
+def chs_norm(text):
+	url = 'http://search.ximalaya.com/text-format/numberFormat/convert'
+	payload = json.dumps(list(text)).encode()
+	request = urllib.request.Request(url, payload)
+	request.add_header("Content-Type",'application/json')
+	responese = urllib.request.urlopen(request)
+	return ''.join(json.loads(responese.read().decode()))
 
 
 api = falcon.API()
