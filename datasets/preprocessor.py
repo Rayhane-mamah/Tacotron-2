@@ -29,16 +29,23 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
 	executor = ProcessPoolExecutor(max_workers=n_jobs)
 	futures = []
 	index = 1
-	for input_dir in input_dirs:
-		with open(os.path.join(input_dir, 'metadata.csv'), encoding='utf-8') as f:
-			for line in f:
-				parts = line.strip().split('|')
-				basename = parts[0]
-				wav_path = os.path.join(input_dir, 'wavs', '{}.wav'.format(basename))
-				text = parts[2]
-				futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, basename, wav_path, text, hparams)))
-				index += 1
 
+	for input_dir in input_dirs:
+		with open(os.path.join(input_dir, 'ProsodyLabeling', '000001-010000.txt'), encoding='utf-8') as f:
+			lines = f.readlines()
+			index = 1
+
+			sentence_index = ''
+			sentence_pinyin = ''
+
+			for line in lines:
+				if line[0].isdigit():
+					sentence_index = line[:6]
+				else:
+					sentence_pinyin = line.strip()
+					wav_path = os.path.join(input_dir, 'Wave', '%s.wav' % sentence_index)
+					futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, sentence_index, wav_path, sentence_pinyin, hparams)))
+					index = index + 1
 	return [future.result() for future in tqdm(futures) if future.result() is not None]
 
 
