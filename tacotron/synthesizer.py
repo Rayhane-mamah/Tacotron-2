@@ -157,7 +157,7 @@ class Synthesizer:
 			linears = np.clip(linears, T2_output_range[0], T2_output_range[1])
 			assert len(mels) == len(linears) == len(texts)
 
-		mels = np.clip(mels, T2_output_range[0], T2_output_range[1])
+		mels = [np.clip(m, T2_output_range[0], T2_output_range[1]) for m in mels]
 
 		if basenames is None:
 			#Generate wav and read it
