@@ -61,7 +61,7 @@ hparams = tf.contrib.training.HParams(
 	#		it will also give you an idea about trimming. If silences persist, try reducing trim_top_db slowly. If samples are trimmed mid words, try increasing it.
 	#	6- If audio quality is too metallic or fragmented (or if linear spectrogram plots are showing black silent regions on top), then restart from step 2.
 	num_mels = 80, #Number of mel-spectrogram channels and local conditioning dimensionality
-	num_freq = 1201, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
+	num_freq = 1025, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
 	rescale = True, #Whether to rescale audio prior to preprocessing
 	rescaling_max = 0.999, #Rescaling value
 
@@ -76,10 +76,10 @@ hparams = tf.contrib.training.HParams(
 	silence_threshold=2, #silence threshold used for sound trimming for wavenet preprocessing
 
 	#Mel spectrogram
-	n_fft = 2400, #Extra window size is filled with 0 paddings to match this parameter
-	hop_size = 600, #For 22050Hz, 275 ~= 12.5 ms (0.0125 * sample_rate)
-	win_size = 2400, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft) (0.05 * sample_rate)
-	sample_rate = 48000, #22050 Hz (corresponding to ljspeech dataset) (sox --i <filename>)
+	n_fft = 2048, #Extra window size is filled with 0 paddings to match this parameter
+	hop_size = 450, #For 22050Hz, 275 ~= 12.5 ms (0.0125 * sample_rate)
+	win_size = 1800, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft) (0.05 * sample_rate)
+	sample_rate = 36000, #22050 Hz (corresponding to ljspeech dataset) (sox --i <filename>)
 	frame_shift_ms = None, #Can replace hop_size parameter. (Recommended: 12.5)
 	magnitude_power = 2., #The power of the spectrogram magnitude (1. for energy, 2. for power)
 
@@ -105,13 +105,13 @@ hparams = tf.contrib.training.HParams(
 	preemphasis = 0.97, #filter coefficient.
 
 	#Limits
-	min_level_db = -100,
+	min_level_db = -120,
 	ref_level_db = 20,
-	fmin = 55, #Set this to 55 if your speaker is male! if female, 95 should help taking off noise. (To test depending on dataset. Pitch info: male~[65, 260], female~[100, 525])
+	fmin = 125, #Set this to 55 if your speaker is male! if female, 95 should help taking off noise. (To test depending on dataset. Pitch info: male~[65, 260], female~[100, 525])
 	fmax = 7600, #To be increased/reduced depending on data.
 
 	#Griffin Lim
-	power = 1.5, #Only used in G&L inversion, usually values between 1.2 and 1.5 are a good choice.
+	power = 1.3, #Only used in G&L inversion, usually values between 1.2 and 1.5 are a good choice.
 	griffin_lim_iters = 60, #Number of G&L iterations, typically 30 is enough but we use 60 to ensure convergence.
 	GL_on_GPU = True, #Whether to use G&L GPU version as part of tensorflow graph. (Usually much faster than CPU but slightly worse quality too).
 	###########################################################################################################################################
@@ -218,7 +218,7 @@ hparams = tf.contrib.training.HParams(
 	#Finally, NearestNeighbor is a non-trainable upsampling layer that just expands each frame (or "pixel") to the equivalent hop size. Ignores all upsampling parameters.
 	upsample_type = 'SubPixel', #Type of the upsampling deconvolution. Can be ('1D' or '2D', 'Resize', 'SubPixel' or simple 'NearestNeighbor').
 	upsample_activation = 'Relu', #Activation function used during upsampling. Can be ('LeakyRelu', 'Relu' or None)
-	upsample_scales = [6, 10, 10], #prod(upsample_scales) should be equal to hop_size
+	upsample_scales = [5, 9, 10], #prod(upsample_scales) should be equal to hop_size
 	freq_axis_kernel_size = 3, #Only used for 2D upsampling types. This is the number of requency bands that are spanned at a time for each frame.
 	leaky_alpha = 0.4, #slope of the negative portion of LeakyRelu (LeakyRelu: y=x if x>0 else y=alpha * x)
 	NN_init = True, #Determines whether we want to initialize upsampling kernels/biases in a way to ensure upsample is initialize to Nearest neighbor upsampling. (Mostly for debug)
@@ -255,7 +255,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_decay_steps = 18000, #Determines the learning rate decay slope (UNDER TEST)
 	tacotron_decay_rate = 0.5, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
-	tacotron_final_learning_rate = 1e-4, #minimal learning rate
+	tacotron_final_learning_rate = 1e-5, #minimal learning rate
 
 	#Optimization parameters
 	tacotron_adam_beta1 = 0.9, #AdamOptimizer beta1 parameter
