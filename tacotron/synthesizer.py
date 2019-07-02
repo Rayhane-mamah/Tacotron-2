@@ -176,7 +176,7 @@ class Synthesizer:
 		for i, linear in enumerate(linears):
 			linear_wav = self.session.run(self.linear_wav_outputs, feed_dict={self.linear_spectrograms: linear})
 			wav = audio.inv_preemphasis(linear_wav, hparams.preemphasis)
-			results.append(wav)
+			results.append(np.concatenate((wav, np.zeros(self._hparams.hop_size * 40))))
 		return np.concatenate(results)
 
 	def _round_up(self, x, multiple):
