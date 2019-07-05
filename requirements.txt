@@ -9,5 +9,5 @@ tqdm==4.11.2
 Unidecode==0.4.20
 pyaudio==0.2.11
 sounddevice==0.3.10
-lws
+lws==1.2.0
 keras
