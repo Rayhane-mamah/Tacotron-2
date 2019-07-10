@@ -89,7 +89,7 @@ class WeightNorm(tf.keras.layers.Wrapper):
 			self.use_bias = layer.use_bias
 
 		super(WeightNorm, self).__init__(layer, name=name, **kwargs)
-		self._track_checkpointable(layer, name='layer')
+		#self._track_checkpointable(layer, name='layer')
 
 	def set_mode(self, is_training):
 		self.layer.set_mode(is_training)
@@ -227,7 +227,7 @@ class CausalConv1D(tf.keras.layers.Wrapper):
 			layer = WeightNorm(layer, weight_normalization_init, weight_normalization_init_scale)
 
 		super(CausalConv1D, self).__init__(layer, name=name, **kwargs)
-		self._track_checkpointable(layer, name='layer')
+		#self._track_checkpointable(layer, name='layer')
 		self.kw = kernel_size
 		self.dilation_rate = self.layer.dilation_rate
 		self.scope = 'CausalConv1D' if name is None else name
