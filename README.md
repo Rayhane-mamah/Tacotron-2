@@ -1,3 +1,67 @@
+# Tacotron-2-Chinese
+
+## 预训练模型
+
+[标贝数据集100K步模型](https://github.com/JasonWei512/Tacotron-2-Original/releases/download/Biaobei-100K-Taoctron/logs-Tacotron-2.zip)
+
+仅Tacotron，无WaveNet（训练WaveNet时loss总爆炸）
+
+使用标贝数据集，为避免爆显存用了ffmpeg把语料的采样率从48KHz降到了36KHz
+
+## 安装依赖
+
+1. 安装 Python 3 和 Tensorflow
+
+2. 安装依赖：
+   ```
+   apt-get install -y libasound-dev portaudio19-dev libportaudio2 libportaudiocpp0 ffmpeg libav-tools
+   ```
+
+3. 安装 requirements：
+   ```
+   pip install -r requirements.txt
+   ```
+
+## 训练
+
+1. **下载[标贝数据集](https://weixinxcxdb.oss-cn-beijing.aliyuncs.com/gwYinPinKu/BZNSYP.rar)，解压至 `Tacotron-2`**
+   
+   目录结构如下：
+
+   ```
+   Tacotron-2
+     |- BZNSYP
+         |- PhoneLabeling
+         |- ProsodyLabeling
+         |- Wave
+   ```
+
+2. **ffmpeg降语音采样率**
+   ```
+   ffmpeg.exe -i 输入.wav -ar 22050 输出.wav
+   ```
+
+3. **预处理数据**
+   ```
+   python preprocess.py --dataset='Biaobei'
+   ```
+
+4. **训练模型（自动从最新 Checkpoint 继续）**
+   ```
+   python train.py --model='Tacotron-2'
+   ```
+
+5. **从最新 Checkpoint 合成语音** 
+
+   ```
+   python synthesize.py --model='Tacotron-2' --text_list='path_to_text_file.txt'
+   ```
+   无WaveNet时，Tacotron输出mel谱，后处理得线性谱，由Griffin-Lim生成波形
+
+&nbsp;
+
+&nbsp;
+
 # Tacotron-2:
 Tensorflow implementation of DeepMind's Tacotron-2. A deep neural network architecture described in this paper: [Natural TTS synthesis by conditioning Wavenet on MEL spectogram predictions](https://arxiv.org/pdf/1712.05884.pdf)
 
