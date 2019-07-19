@@ -2,7 +2,9 @@
 
 ## 预训练模型
 
-[标贝数据集100K步模型](https://github.com/JasonWei512/Tacotron-2-Original/releases/download/Biaobei-100K-Taoctron/logs-Tacotron-2.zip)
+[标贝数据集100K步模型](https://github.com/JasonWei512/Tacotron-2-Chinese/releases/download/Biaobei_Tacotron-100K/logs-Tacotron-2.zip)
+
+[生成语音样本](https://github.com/JasonWei512/Tacotron-2-Chinese/releases/download/Biaobei_Tacotron-100K/generated_sample.wav)
 
 仅Tacotron，无WaveNet（训练WaveNet时loss总爆炸）
 
