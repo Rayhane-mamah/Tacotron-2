@@ -26,12 +26,12 @@
 
 ## 训练
 
-1. **下载[标贝数据集](https://weixinxcxdb.oss-cn-beijing.aliyuncs.com/gwYinPinKu/BZNSYP.rar)，解压至 `Tacotron-2`**
+1. **下载[标贝数据集](https://weixinxcxdb.oss-cn-beijing.aliyuncs.com/gwYinPinKu/BZNSYP.rar)，解压至 `Tacotron-2-Chinese`**
    
    目录结构如下：
 
    ```
-   Tacotron-2
+   Tacotron-2-Chinese
      |- BZNSYP
          |- PhoneLabeling
          |- ProsodyLabeling
