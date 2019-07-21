@@ -38,9 +38,9 @@
          |- Wave
    ```
 
-2. **ffmpeg降语音采样率**
+2. **用ffmpeg把BZNSYP/Wave中的wav的采样率降到36KHz**
    ```
-   ffmpeg.exe -i 输入.wav -ar 22050 输出.wav
+   ffmpeg.exe -i 输入.wav -ar 36000 输出.wav
    ```
 
 3. **预处理数据**
