@@ -56,7 +56,7 @@
 5. **从最新 Checkpoint 合成语音** 
 
    ```
-   python synthesize.py --model='Tacotron-2' --text_list='path_to_text_file.txt'
+   python synthesize.py --model='Tacotron-2' --text_list='sentences.txt'
    ```
    无WaveNet时，Tacotron输出mel谱，后处理得线性谱，由Griffin-Lim生成波形
 
