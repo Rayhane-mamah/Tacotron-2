@@ -6,13 +6,13 @@
 
 [生成语音样本](https://github.com/JasonWei512/Tacotron-2-Chinese/releases/download/Biaobei_Tacotron-100K/generated_sample.wav)
 
-仅Tacotron，无WaveNet（训练WaveNet时loss总爆炸）
+仅Tacotron，无WaveNet（正在尝试 mulaw-quantize）
 
 使用标贝数据集，为避免爆显存用了ffmpeg把语料的采样率从48KHz降到了36KHz
 
 ## 安装依赖
 
-1. 安装 Python 3 和 Tensorflow
+1. 安装 Python 3 和 Tensorflow（在 Tensorflow 1.14 上用 WaveNet 会有Bug，在 1.10 上正常）
 
 2. 安装依赖：
    ```
