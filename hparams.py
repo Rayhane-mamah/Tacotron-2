@@ -13,7 +13,7 @@ hparams = tf.contrib.training.HParams(
 	###########################################################################################################################################
 
 	#Audio
-	num_mels = 160, #Number of mel-spectrogram channels and local conditioning dimensionality
+	num_mels = 80, #Number of mel-spectrogram channels and local conditioning dimensionality
 	num_freq = 2049, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
 	rescale = False, #Whether to rescale audio prior to preprocessing
 	rescaling_max = 0.999, #Rescaling value
@@ -274,7 +274,6 @@ hparams = tf.contrib.training.HParams(
 	"dao4 tang3 jin4 yi2 ju4 bao2 ban3 guan1 cai tai2 chu1 zhe4 ge4 men2 lou2 ,",
 	"shi2 jian1 shang4 bu4 zu2 yi1 nian2 , shi4 hai4 lao2 bing4 si3 de .",
 	]
-
 	)
 
 def hparams_debug_string():
