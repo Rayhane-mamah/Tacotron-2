@@ -199,12 +199,12 @@ hparams = tf.contrib.training.HParams(
 
 	#model parameters
 	#To use Gaussian distribution as output distribution instead of mixture of logistics, set "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
-	out_channels = 2, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
-	layers = 20, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
-	stacks = 2, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
-	residual_channels = 128, #Number of residual block input/output channels.
-	gate_channels = 256, #split in 2 in gated convolutions
-	skip_out_channels = 128, #Number of residual block skip convolution channels.
+	out_channels = 30, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
+	layers = 24, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
+	stacks = 4, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
+	residual_channels = 256, #Number of residual block input/output channels.
+	gate_channels = 512, #split in 2 in gated convolutions
+	skip_out_channels = 256, #Number of residual block skip convolution channels.
 	kernel_size = 3, #The number of inputs to consider in dilated convolutions.
 
 	#Upsampling parameters (local conditioning)
@@ -310,7 +310,7 @@ hparams = tf.contrib.training.HParams(
 	wavenet_learning_rate = 1e-3, #wavenet initial learning rate
 	wavenet_warmup = float(4000), #Only used with 'noam' scheme. Defines the number of ascending learning rate steps.
 	wavenet_decay_rate = 0.5, #Only used with 'exponential' scheme. Defines the decay rate.
-	wavenet_decay_steps = 200000, #Only used with 'exponential' scheme. Defines the decay steps.
+	wavenet_decay_steps = 150000, #Only used with 'exponential' scheme. Defines the decay steps.
 
 	#Optimization parameters
 	wavenet_adam_beta1 = 0.9, #Adam beta1

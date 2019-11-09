@@ -1,34 +1,41 @@
-# Tacotron-2-Chinese
+# **Tacotron-2-Chinese 中文语音合成**
 
-## 预训练模型
+## **预训练模型下载**
 
-[标贝数据集100K步模型](https://github.com/JasonWei512/Tacotron-2-Chinese/releases/download/Biaobei_Tacotron-100K/logs-Tacotron-2.zip)
+&ensp; &ensp; [标贝数据集100K步模型（把解压出的 logs-Tacotron-2 文件夹放到 Tacotron-2-Chinese 文件夹中）](https://github.com/JasonWei512/Tacotron-2-Chinese/releases/download/Biaobei_Tacotron-100K/logs-Tacotron-2.zip)
 
-[生成语音样本](https://github.com/JasonWei512/Tacotron-2-Chinese/releases/download/Biaobei_Tacotron-100K/generated_sample.wav)
+&ensp; &ensp; [生成语音样本](https://github.com/JasonWei512/Tacotron-2-Chinese/releases/download/Biaobei_Tacotron-100K/generated_sample.wav)
 
-仅Tacotron，无WaveNet（正在尝试 mulaw-quantize）
+&ensp; &ensp; 仅 Tacotron 频谱预测部分，无 WaveNet 声码器（实验中），可用 Griffin-Lim 合成语音（见下）。
 
-使用标贝数据集，为避免爆显存用了ffmpeg把语料的采样率从48KHz降到了36KHz
+&ensp; &ensp; 使用标贝数据集训练，为避免爆显存用了 ffmpeg 把语料的采样率从 48KHz 降到了 36KHz，听感基本无区别。
 
-## 安装依赖
+## **安装依赖**
 
-1. 安装 Python 3 和 Tensorflow（在 Tensorflow 1.14 上用 WaveNet 会有Bug，在 1.10 上正常）
+1. 安装 Python 3 和 Tensorflow 1.10（在 Tensorflow 1.14 上用 WaveNet 会有Bug，在 1.10 上正常）。
 
 2. 安装依赖：
-   ```
+   
+   ```Shell
    apt-get install -y libasound-dev portaudio19-dev libportaudio2 libportaudiocpp0 ffmpeg libav-tools
    ```
 
-3. 安装 requirements：
+   若 libav-tools 安装失败则手动安装：
+
+   ```Shell
+   wget http://launchpadlibrarian.net/339874908/libav-tools_3.3.4-2_all.deb
+   dpkg -i libav-tools_3.3.4-2_all.deb
    ```
+
+3. 安装 requirements：
+   
+   ```Shell
    pip install -r requirements.txt
    ```
 
-## 训练
+## **训练模型**
 
-1. **下载[标贝数据集](https://weixinxcxdb.oss-cn-beijing.aliyuncs.com/gwYinPinKu/BZNSYP.rar)，解压至 `Tacotron-2-Chinese`**
-   
-   目录结构如下：
+1. 下载 [标贝数据集](https://weixinxcxdb.oss-cn-beijing.aliyuncs.com/gwYinPinKu/BZNSYP.rar)，解压至 `Tacotron-2-Chinese` 文件夹根目录。目录结构如下：
 
    ```
    Tacotron-2-Chinese
@@ -38,27 +45,35 @@
          |- Wave
    ```
 
-2. **用ffmpeg把BZNSYP/Wave中的wav的采样率降到36KHz**
-   ```
+2. 用 ffmpeg 把 `/BZNSYP/Wave/` 中的 wav 的采样率降到36KHz：
+   
+   ```Shell
    ffmpeg.exe -i 输入.wav -ar 36000 输出.wav
    ```
 
-3. **预处理数据**
-   ```
+3. 预处理数据：
+   
+   ```Shell
    python preprocess.py --dataset='Biaobei'
    ```
 
-4. **训练模型（自动从最新 Checkpoint 继续）**
-   ```
+4. 训练模型（自动从最新 Checkpoint 继续）：
+   
+   ```Shell
    python train.py --model='Tacotron-2'
    ```
 
-5. **从最新 Checkpoint 合成语音** 
+## **合成语音**
 
-   ```
+* 用根目录的 `sentences.txt` 中的文本合成语音。
+
+   ```Shell
    python synthesize.py --model='Tacotron-2' --text_list='sentences.txt'
    ```
-   无WaveNet时，Tacotron输出mel谱，后处理得线性谱，由Griffin-Lim生成波形
+
+   若无 WaveNet 模型，仅有频谱预测模型，则仅由 Griffin-Lim 生成语音，输出至 `/tacotron_output/logs-eval/wavs/` 文件夹中。
+
+   若有 WaveNet 模型，则 WaveNet 生成的语音位于 `/wavenet_output/wavs/` 中。
 
 &nbsp;
 
