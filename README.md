@@ -1,3 +1,86 @@
+# **Tacotron-2-Chinese 中文语音合成**
+
+## **预训练模型下载**
+
+&ensp; &ensp; [标贝数据集100K步模型（把解压出的 logs-Tacotron-2 文件夹放到 Tacotron-2-Chinese 文件夹中）](https://github.com/JasonWei512/Tacotron-2-Chinese/releases/download/Biaobei_Tacotron-100K/logs-Tacotron-2.zip)
+
+&ensp; &ensp; 仅 Tacotron 频谱预测部分，不含 WaveNet 模型。可用 Griffin-Lim 合成语音（见下）。或用生成的 Mel 频谱通过 [r9y9的WaveNet](https://github.com/JasonWei512/wavenet_vocoder/) 生成高音质语音。
+
+&ensp; &ensp; [生成的语音样本](https://github.com/JasonWei512/Tacotron-2-Chinese/issues/7)
+
+&ensp; &ensp; 使用标贝数据集训练，为避免爆显存用了 ffmpeg 把语料的采样率从 48KHz 降到了 36KHz，听感基本无区别。
+
+## **安装依赖**
+
+1. 安装 Python 3 和 Tensorflow 1.10（在 Tensorflow 1.14 上用 WaveNet 会有Bug，在 1.10 上正常）。
+
+2. 安装依赖：
+   
+   ```Shell
+   apt-get install -y libasound-dev portaudio19-dev libportaudio2 libportaudiocpp0 ffmpeg libav-tools
+   ```
+
+   若 libav-tools 安装失败则手动安装：
+
+   ```Shell
+   wget http://launchpadlibrarian.net/339874908/libav-tools_3.3.4-2_all.deb
+   dpkg -i libav-tools_3.3.4-2_all.deb
+   ```
+
+3. 安装 requirements：
+   
+   ```Shell
+   pip install -r requirements.txt
+   ```
+
+## **训练模型**
+
+1. 下载 [标贝数据集](https://weixinxcxdb.oss-cn-beijing.aliyuncs.com/gwYinPinKu/BZNSYP.rar)，解压至 `Tacotron-2-Chinese` 文件夹根目录。目录结构如下：
+
+   ```
+   Tacotron-2-Chinese
+     |- BZNSYP
+         |- PhoneLabeling
+         |- ProsodyLabeling
+         |- Wave
+   ```
+
+2. 用 ffmpeg 把 `/BZNSYP/Wave/` 中的 wav 的采样率降到36KHz：
+   
+   ```Shell
+   ffmpeg.exe -i 输入.wav -ar 36000 输出.wav
+   ```
+
+3. 预处理数据：
+   
+   ```Shell
+   python preprocess.py --dataset='Biaobei'
+   ```
+
+4. 训练模型（自动从最新 Checkpoint 继续）：
+   
+   ```Shell
+   python train.py --model='Tacotron-2'
+   ```
+
+## **合成语音**
+
+* 用根目录的 `sentences.txt` 中的文本合成语音。
+
+   ```Shell
+   python synthesize.py --model='Tacotron-2' --text_list='sentences.txt'
+   ```
+
+   若无 WaveNet 模型，仅有频谱预测模型，则仅由 Griffin-Lim 生成语音，输出至 `/tacotron_output/logs-eval/wavs/` 文件夹中。
+
+   若有 WaveNet 模型，则 WaveNet 生成的语音位于 `/wavenet_output/wavs/` 中。
+
+   输出的 Mel 频谱位于 `/tacotron_output/eval/` 中。可用 [r9y9的WaveNet](https://github.com/JasonWei512/wavenet_vocoder/) 合成语音。
+
+&nbsp;
+
+&nbsp;
+
 # Tacotron-2:
 Tensorflow implementation of DeepMind's Tacotron-2. A deep neural network architecture described in this paper: [Natural TTS synthesis by conditioning Wavenet on MEL spectogram predictions](https://arxiv.org/pdf/1712.05884.pdf)
 

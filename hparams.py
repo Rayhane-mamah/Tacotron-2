@@ -5,7 +5,7 @@ import tensorflow as tf
 hparams = tf.contrib.training.HParams(
 	# Comma-separated list of cleaners to run on text prior to training and eval. For non-English
 	# text, you may want to use "basic_cleaners" or "transliteration_cleaners".
-	cleaners='english_cleaners',
+	cleaners='basic_cleaners',
 
 
 	#If you only have 1 GPU or want to use only one GPU, please set num_gpus=0 and specify the GPU idx on run. example:
@@ -62,7 +62,7 @@ hparams = tf.contrib.training.HParams(
 	#	6- If audio quality is too metallic or fragmented (or if linear spectrogram plots are showing black silent regions on top), then restart from step 2.
 	num_mels = 80, #Number of mel-spectrogram channels and local conditioning dimensionality
 	num_freq = 1025, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
-	rescale = True, #Whether to rescale audio prior to preprocessing
+	rescale = False, #Whether to rescale audio prior to preprocessing
 	rescaling_max = 0.999, #Rescaling value
 
 	#train samples of lengths between 3sec and 14sec are more than enough to make a model capable of generating consistent speech.
@@ -77,14 +77,14 @@ hparams = tf.contrib.training.HParams(
 
 	#Mel spectrogram
 	n_fft = 2048, #Extra window size is filled with 0 paddings to match this parameter
-	hop_size = 275, #For 22050Hz, 275 ~= 12.5 ms (0.0125 * sample_rate)
-	win_size = 1100, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft) (0.05 * sample_rate)
-	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset) (sox --i <filename>)
+	hop_size = 450, #For 22050Hz, 275 ~= 12.5 ms (0.0125 * sample_rate)
+	win_size = 1800, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft) (0.05 * sample_rate)
+	sample_rate = 36000, #22050 Hz (corresponding to ljspeech dataset) (sox --i <filename>)
 	frame_shift_ms = None, #Can replace hop_size parameter. (Recommended: 12.5)
 	magnitude_power = 2., #The power of the spectrogram magnitude (1. for energy, 2. for power)
 
 	#M-AILABS (and other datasets) trim params (there parameters are usually correct for any data, but definitely must be tuned for specific speakers)
-	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
+	trim_silence = False, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
 	trim_fft_size = 2048, #Trimming window size
 	trim_hop_size = 512, #Trimmin hop length
 	trim_top_db = 40, #Trimming db difference from reference db (smaller==harder trim.)
@@ -105,13 +105,13 @@ hparams = tf.contrib.training.HParams(
 	preemphasis = 0.97, #filter coefficient.
 
 	#Limits
-	min_level_db = -100,
+	min_level_db = -120,
 	ref_level_db = 20,
-	fmin = 55, #Set this to 55 if your speaker is male! if female, 95 should help taking off noise. (To test depending on dataset. Pitch info: male~[65, 260], female~[100, 525])
+	fmin = 125, #Set this to 55 if your speaker is male! if female, 95 should help taking off noise. (To test depending on dataset. Pitch info: male~[65, 260], female~[100, 525])
 	fmax = 7600, #To be increased/reduced depending on data.
 
 	#Griffin Lim
-	power = 1.5, #Only used in G&L inversion, usually values between 1.2 and 1.5 are a good choice.
+	power = 1.3, #Only used in G&L inversion, usually values between 1.2 and 1.5 are a good choice.
 	griffin_lim_iters = 60, #Number of G&L iterations, typically 30 is enough but we use 60 to ensure convergence.
 	GL_on_GPU = True, #Whether to use G&L GPU version as part of tensorflow graph. (Usually much faster than CPU but slightly worse quality too).
 	###########################################################################################################################################
@@ -199,12 +199,12 @@ hparams = tf.contrib.training.HParams(
 
 	#model parameters
 	#To use Gaussian distribution as output distribution instead of mixture of logistics, set "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
-	out_channels = 2, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
-	layers = 20, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
-	stacks = 2, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
-	residual_channels = 128, #Number of residual block input/output channels.
-	gate_channels = 256, #split in 2 in gated convolutions
-	skip_out_channels = 128, #Number of residual block skip convolution channels.
+	out_channels = 30, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
+	layers = 24, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
+	stacks = 4, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
+	residual_channels = 256, #Number of residual block input/output channels.
+	gate_channels = 512, #split in 2 in gated convolutions
+	skip_out_channels = 256, #Number of residual block skip convolution channels.
 	kernel_size = 3, #The number of inputs to consider in dilated convolutions.
 
 	#Upsampling parameters (local conditioning)
@@ -218,7 +218,7 @@ hparams = tf.contrib.training.HParams(
 	#Finally, NearestNeighbor is a non-trainable upsampling layer that just expands each frame (or "pixel") to the equivalent hop size. Ignores all upsampling parameters.
 	upsample_type = 'SubPixel', #Type of the upsampling deconvolution. Can be ('1D' or '2D', 'Resize', 'SubPixel' or simple 'NearestNeighbor').
 	upsample_activation = 'Relu', #Activation function used during upsampling. Can be ('LeakyRelu', 'Relu' or None)
-	upsample_scales = [11, 25], #prod(upsample_scales) should be equal to hop_size
+	upsample_scales = [5, 9, 10], #prod(upsample_scales) should be equal to hop_size
 	freq_axis_kernel_size = 3, #Only used for 2D upsampling types. This is the number of requency bands that are spanned at a time for each frame.
 	leaky_alpha = 0.4, #slope of the negative portion of LeakyRelu (LeakyRelu: y=x if x>0 else y=alpha * x)
 	NN_init = True, #Determines whether we want to initialize upsampling kernels/biases in a way to ensure upsample is initialize to Nearest neighbor upsampling. (Mostly for debug)
@@ -251,11 +251,11 @@ hparams = tf.contrib.training.HParams(
 
 	#Learning rate schedule
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
-	tacotron_start_decay = 40000, #Step at which learning decay starts
-	tacotron_decay_steps = 18000, #Determines the learning rate decay slope (UNDER TEST)
+	tacotron_start_decay = 30000, #Step at which learning decay starts
+	tacotron_decay_steps = 10000, #Determines the learning rate decay slope (UNDER TEST)
 	tacotron_decay_rate = 0.5, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
-	tacotron_final_learning_rate = 1e-4, #minimal learning rate
+	tacotron_final_learning_rate = 1e-5, #minimal learning rate
 
 	#Optimization parameters
 	tacotron_adam_beta1 = 0.9, #AdamOptimizer beta1 parameter
@@ -310,7 +310,7 @@ hparams = tf.contrib.training.HParams(
 	wavenet_learning_rate = 1e-3, #wavenet initial learning rate
 	wavenet_warmup = float(4000), #Only used with 'noam' scheme. Defines the number of ascending learning rate steps.
 	wavenet_decay_rate = 0.5, #Only used with 'exponential' scheme. Defines the decay rate.
-	wavenet_decay_steps = 200000, #Only used with 'exponential' scheme. Defines the decay steps.
+	wavenet_decay_steps = 150000, #Only used with 'exponential' scheme. Defines the decay steps.
 
 	#Optimization parameters
 	wavenet_adam_beta1 = 0.9, #Adam beta1
@@ -340,30 +340,34 @@ hparams = tf.contrib.training.HParams(
 	#Eval/Debug parameters
 	#Eval sentences (if no eval text file was specified during synthesis, these sentences are used for eval)
 	sentences = [
-	# From July 8, 2017 New York Times:
-	'Scientists at the CERN laboratory say they have discovered a new particle.',
-	'There\'s a way to measure the acute emotional intelligence that has never gone out of style.',
-	'President Trump met with other leaders at the Group of 20 conference.',
-	'The Senate\'s bill to repeal and replace the Affordable Care Act is now imperiled.',
-	# From Google's Tacotron example page:
-	'Generative adversarial network or variational auto-encoder.',
-	'Basilar membrane and otolaryngology are not auto-correlations.',
-	'He has read the whole thing.',
-	'He reads books.',
-	'He thought it was time to present the present.',
-	'Thisss isrealy awhsome.',
-	'The big brown fox jumps over the lazy dog.',
-	'Did the big brown fox jump over the lazy dog?',
-	"Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?",
-	"She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.",
-	"Tajima Airport serves Toyooka.",
-	#From The web (random long utterance)
-	# 'On offering to help the blind man, the man who then stole his car, had not, at that precise moment, had any evil intention, quite the contrary, \
-	# what he did was nothing more than obey those feelings of generosity and altruism which, as everyone knows, \
-	# are the two best traits of human nature and to be found in much more hardened criminals than this one, a simple car-thief without any hope of advancing in his profession, \
-	# exploited by the real owners of this enterprise, for it is they who take advantage of the needs of the poor.',
-	# A final Thank you note!
-	'Thank you so much for your support!',
+	"bai2 jia1 xuan1 hou4 lai2 yin2 yi3 hao2 zhuang4 de shi4 yi4 sheng1 li3 qu3 guo4 qi1 fang2 nv3 ren2 .",
+	"qu3 tou2 fang2 xi2 fu4 shi2 ta1 gang1 gang1 guo4 shi2 liu4 sui4 sheng1 ri4 .",
+	"na4 shi4 xi1 yuan2 shang4 gong3 jia1 cun1 da4 hu4 gong3 zeng1 rong2 de tou2 sheng1 nv3 ,",
+	"bi3 ta1 da4 liang3 sui4 .",
+	"ta1 zai4 wan2 quan2 wu2 zhi1 huang1 luan4 zhong1 , du4 guo4 le xin1 hun1 zhi1 ye4 ,",
+	"liu2 xia4 le yong2 yuan3 xiu1 yu2 xiang4 ren2 dao4 ji2 de ke3 xiao4 de sha3 yang4 ,",
+	"er2 zi4 ji3 que4 yong3 sheng1 nan2 yi3 wang4 ji4 .",
+	"yi4 nian2 hou4 , zhe4 ge4 nv3 ren2 si3 yu2 nan2 chan3 .",
+	"di4 er4 fang2 qu3 de shi4 nan2 yuan2 pang2 jia1 cun1 yin1 shi2 ren2 jia1 , pang2 xiu1 rui4 de nai3 gan1 nv3 er2 .",
+	"zhe4 nv3 zi3 you4 zheng4 hao3 bi3 ta1 xiao2 liang3 sui4 ,",
+	"mu2 yang4 jun4 xiu4 yan3 jing1 hu1 ling2 er .",
+	"ta1 wan2 quan2 bu4 zhi1 dao4 jia4 ren2 shi4 zen3 me hui2 shi4 ,",
+	"er2 ta1 ci3 shi2 yi3 an1 shu2 nan2 nv3 zhi1 jian1 suo2 you3 de yin3 mi4 .",
+	"ta1 kan4 zhe ta1 de xiu1 qie4 huang1 luan4 er2 xiang3 dao4 zi4 ji3 di4 yi1 ci4 de sha3 yang4 fan3 dao4 jue2 de geng4 fu4 ci4 ji .",
+	"dang1 ta1 hong1 suo1 zhe ba3 duo2 duo3 shan2 shan3 er2 you4 bu4 gan3 wei2 ao4 ta1 de xiao3 xi2 fu4 guo3 ru4 shen1 xia4 de shi2 hou4 ,",
+	"ta1 ting1 dao4 le ta1 de bu2 shi4 huan1 le4 er2 shi4 tong4 ku3 de yi4 sheng1 ku1 jiao4 .",
+	"dang1 ta1 pi2 bei4 de xie1 xi1 xia4 lai2 ,",
+	"cai2 fa1 jue2 jian1 bang3 nei4 ce4 teng2 tong4 zuan1 xin1 ,",
+	"ta1 ba3 ta1 yao3 lan4 le .",
+	"ta1 fu3 shang1 xi1 tong4 de shi2 hou4 ,",
+	"xin1 li3 jiu4 chao2 qi3 le dui4 zhe4 ge4 jiao1 guan4 de you2 dian3 ren4 xing4 de nai3 gan1 nv3 er de nao2 huo3 .",
+	"zheng4 yu4 fa1 zuo4 ,",
+	"ta1 que4 ban1 guo4 ta1 de jian1 bang3 an4 shi4 ta1 zai4 lai2 yi1 ci4 .",
+	"yi4 dang1 jing1 guo4 nan2 nv3 jian1 de di4 yi1 ci4 jiao1 huan1 ,",
+	"ta1 jiu4 bian4 de2 mei2 you3 jie2 zhi4 de ren4 xing4 .",
+	"zhe4 ge4 nv3 ren2 cong2 xia4 jiao4 ding3 zhe hong2 chou2 gai4 jin1 , jin4 ru4 bai2 jia1 men2 lou2 ,",
+	"dao4 tang3 jin4 yi2 ju4 bao2 ban3 guan1 cai tai2 chu1 zhe4 ge4 men2 lou2 ,",
+	"shi2 jian1 shang4 bu4 zu2 yi1 nian2 , shi4 hai4 lao2 bing4 si3 de .",
 	],
 
 	#Wavenet Debug

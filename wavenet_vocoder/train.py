@@ -80,7 +80,7 @@ def create_shadow_saver(model, global_step=None):
 		variables += [global_step]
 
 	shadow_dict = dict(zip(shadow_variables, variables)) #dict(zip(keys, values)) -> {key1: value1, key2: value2, ...}
-	return tf.train.Saver(shadow_dict, max_to_keep=20)
+	return tf.train.Saver(shadow_dict, max_to_keep=5)
 
 def load_averaged_model(sess, sh_saver, checkpoint_path):
 	sh_saver.restore(sess, checkpoint_path)
