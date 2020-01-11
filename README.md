@@ -4,9 +4,9 @@
 
 &ensp; &ensp; [标贝数据集100K步模型（把解压出的 logs-Tacotron-2 文件夹放到 Tacotron-2-Chinese 文件夹中）](https://github.com/JasonWei512/Tacotron-2-Chinese/releases/download/Biaobei_Tacotron-100K/logs-Tacotron-2.zip)
 
-&ensp; &ensp; [生成语音样本](https://github.com/JasonWei512/Tacotron-2-Chinese/releases/download/Biaobei_Tacotron-100K/generated_sample.wav)
+&ensp; &ensp; 仅 Tacotron 频谱预测部分，不含 WaveNet 模型。可用 Griffin-Lim 合成语音（见下）。或用生成的 Mel 频谱通过 [r9y9的WaveNet](https://github.com/JasonWei512/wavenet_vocoder/) 生成高音质语音。
 
-&ensp; &ensp; 仅 Tacotron 频谱预测部分，无 WaveNet 声码器（实验中），可用 Griffin-Lim 合成语音（见下）。
+&ensp; &ensp; [生成的语音样本](https://github.com/JasonWei512/Tacotron-2-Chinese/issues/7)
 
 &ensp; &ensp; 使用标贝数据集训练，为避免爆显存用了 ffmpeg 把语料的采样率从 48KHz 降到了 36KHz，听感基本无区别。
 
@@ -74,6 +74,8 @@
    若无 WaveNet 模型，仅有频谱预测模型，则仅由 Griffin-Lim 生成语音，输出至 `/tacotron_output/logs-eval/wavs/` 文件夹中。
 
    若有 WaveNet 模型，则 WaveNet 生成的语音位于 `/wavenet_output/wavs/` 中。
+
+   输出的 Mel 频谱位于 `/tacotron_output/eval/` 中。可用 [r9y9的WaveNet](https://github.com/JasonWei512/wavenet_vocoder/) 合成语音。
 
 &nbsp;
 
