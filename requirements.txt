@@ -10,4 +10,4 @@ Unidecode==0.4.20
 pyaudio==0.2.11
 sounddevice==0.3.10
 lws
-keras
+keras==2.2.4
