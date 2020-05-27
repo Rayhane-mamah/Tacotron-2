@@ -10,15 +10,10 @@ RUN dpkg -i libav-tools_3.3.4-2_all.deb
 RUN wget http://data.keithito.com/data/speech/LJSpeech-1.1.tar.bz2
 RUN tar -jxvf LJSpeech-1.1.tar.bz2
 
-RUN git clone https://github.com/Rayhane-mamah/Tacotron-2.git
+RUN git clone https://github.com/Cyancey96/Tacotron-2.git
 
 WORKDIR Tacotron-2
 RUN ln -s ../LJSpeech-1.1 .
 RUN pip3 install --upgrade pip
-
 RUN pip3 install tensorflow==1.10
-
-RUN pip3 uninstall -y numpy
-RUN pip3 install numpy
-COPY ./requirements.txt ./requirements.txt
 RUN pip3 install -r ./requirements.txt
