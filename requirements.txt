@@ -3,7 +3,7 @@ inflect==0.2.5
 audioread==2.1.5
 librosa==0.5.1
 matplotlib==2.0.2
-numpy==1.14.0
+numpy==1.22.0
 scipy==1.0.0
 tqdm==4.11.2
 Unidecode==0.4.20
