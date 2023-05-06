@@ -31,9 +31,8 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 		speaker_ids = None if (speaker_ids == '<no_g>').all() else speaker_ids
 	else:
 		#else Get all npy files in input_dir (supposing they are mels)
-		mel_files  = [os.path.join(args.mels_dir, f) for f in os.listdir(args.mels_dir) if f.split('.')[-1] == 'npy']
+		mel_files  = sorted([os.path.join(args.mels_dir, f) for f in os.listdir(args.mels_dir) if f.split('.')[-1] == 'npy'])
 		speaker_ids = None if args.speaker_id is None else args.speaker_id.replace(' ', '').split(',')
-
 		if speaker_ids is not None:
 			assert len(speaker_ids) == len(mel_files)
 

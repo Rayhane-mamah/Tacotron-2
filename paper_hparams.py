@@ -5,7 +5,7 @@ import tensorflow as tf
 hparams = tf.contrib.training.HParams(
 	# Comma-separated list of cleaners to run on text prior to training and eval. For non-English
 	# text, you may want to use "basic_cleaners" or "transliteration_cleaners".
-	cleaners='basic_cleaners',
+	cleaners='english_cleaners',
 
 
 	#If you only have 1 GPU or want to use only one GPU, please set num_gpus=0 and specify the GPU idx on run. example:
@@ -31,10 +31,10 @@ hparams = tf.contrib.training.HParams(
 	#	Many thanks to @MlWoo for his awesome work on multi-GPU Tacotron which showed to work a little faster than the original
 	#	pipeline for a single GPU as well. Great work!
 
-	#Hardware setup: Default supposes user has only one GPU: "/gpu:0" (Both Tacotron and WaveNet can be trained on multi-GPU: data parallelization)
+	#Hardware setup: Default supposes user has only one GPU: "/gpu:0" (Tacotron only for now! WaveNet does not support multi GPU yet, WIP)
 	#Synthesis also uses the following hardware parameters for multi-GPU parallel synthesis.
 	tacotron_num_gpus = 1, #Determines the number of gpus in use for Tacotron training.
-	wavenet_num_gpus = 1, #Determines the number of gpus in use for WaveNet training.
+	wavenet_num_gpus = 1, #Determines the number of gpus in use for WaveNet training. (WIP)
 	split_on_cpu = True, #Determines whether to split data on CPU or on first GPU. This is automatically True when more than 1 GPU is used. 
 		#(Recommend: False on slow CPUs/Disks, True otherwise for small speed boost)
 	###########################################################################################################################################
@@ -61,33 +61,33 @@ hparams = tf.contrib.training.HParams(
 	#		it will also give you an idea about trimming. If silences persist, try reducing trim_top_db slowly. If samples are trimmed mid words, try increasing it.
 	#	6- If audio quality is too metallic or fragmented (or if linear spectrogram plots are showing black silent regions on top), then restart from step 2.
 	num_mels = 80, #Number of mel-spectrogram channels and local conditioning dimensionality
-	num_freq = 513, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
+	num_freq = 1025, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
 	rescale = True, #Whether to rescale audio prior to preprocessing
 	rescaling_max = 0.999, #Rescaling value
 
 	#train samples of lengths between 3sec and 14sec are more than enough to make a model capable of generating consistent speech.
 	clip_mels_length = True, #For cases of OOM (Not really recommended, only use if facing unsolvable OOM errors, also consider clipping your samples to smaller chunks)
-	max_mel_frames = 900,  #Only relevant when clip_mels_length = True, please only use after trying output_per_steps=3 and still getting OOM errors.
+	max_mel_frames = 1000,  #Only relevant when clip_mels_length = True, please only use after trying output_per_steps=3 and still getting OOM errors.
 
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
 	# Does not work if n_ffit is not multiple of hop_size!!
-	use_lws=True,
+	use_lws=False, #Only used to set as True if using WaveNet, no difference in performance is observed in either cases.
 	silence_threshold=2, #silence threshold used for sound trimming for wavenet preprocessing
 
 	#Mel spectrogram
-	n_fft = 1024, #Extra window size is filled with 0 paddings to match this parameter
-	hop_size = 256, #For 22050Hz, 275 ~= 12.5 ms
-	win_size = None, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft)
-	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset)
-	frame_shift_ms = None,
-	magnitude_power = 1., #The power of the spectrogram magnitude (1. for energy, 2. for power)
+	n_fft = 2048, #Extra window size is filled with 0 paddings to match this parameter
+	hop_size = 275, #For 22050Hz, 275 ~= 12.5 ms (0.0125 * sample_rate)
+	win_size = 1100, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft) (0.05 * sample_rate)
+	sample_rate = 22050, #22050 Hz (corresponding to ljspeech dataset) (sox --i <filename>)
+	frame_shift_ms = None, #Can replace hop_size parameter. (Recommended: 12.5)
+	magnitude_power = 2., #The power of the spectrogram magnitude (1. for energy, 2. for power)
 
 	#M-AILABS (and other datasets) trim params (there parameters are usually correct for any data, but definitely must be tuned for specific speakers)
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
 	trim_fft_size = 2048, #Trimming window size
 	trim_hop_size = 512, #Trimmin hop length
-	trim_top_db = 40, #Trimming db difference from reference db (smaller==harder trim.)
+	trim_top_db = 45, #Trimming db difference from reference db (smaller==harder trim.)
 
 	#Mel and Linear spectrograms normalization/scaling and clipping
 	signal_normalization = True, #Whether to normalize mel spectrograms to some predefined range (following below parameters)
@@ -101,20 +101,18 @@ hparams = tf.contrib.training.HParams(
 
 	#Contribution by @begeekmyfriend
 	#Spectrogram Pre-Emphasis (Lfilter: Reduce spectrogram noise and helps model certitude levels. Also allows for better G&L phase reconstruction)
-	preemphasize = True, #whether to apply filter
+	preemphasize = False, #whether to apply filter
 	preemphasis = 0.97, #filter coefficient.
 
 	#Limits
 	min_level_db = -100,
 	ref_level_db = 20,
-	fmin = 55, #Set this to 75 if your speaker is male! if female, 125 should help taking off noise. (To test depending on dataset)
-	fmax = 7600,
+	fmin = 75, #Set this to 55 if your speaker is male! if female, 95 should help taking off noise. (To test depending on dataset. Pitch info: male~[65, 260], female~[100, 525])
+	fmax = 7600, #To be increased/reduced depending on data.
 
 	#Griffin Lim
 	power = 1.5, #Only used in G&L inversion, usually values between 1.2 and 1.5 are a good choice.
 	griffin_lim_iters = 60, #Number of G&L iterations, typically 30 is enough but we use 60 to ensure convergence.
-	GL_on_GPU = True, #Whether to use G&L GPU version as part of tensorflow graph. (Usually much faster than CPU but slightly worse quality too).
-
 	###########################################################################################################################################
 
 	#Tacotron
@@ -122,8 +120,6 @@ hparams = tf.contrib.training.HParams(
 	outputs_per_step = 1, #number of frames to generate at each decoding step (increase to speed up computation and allows for higher batch size, decreases G&L audio quality)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them (True works pretty well)
 	batch_norm_position = 'after', #Can be in ('before', 'after'). Determines whether we use batch norm before or after the activation function (relu). Matter for debate.
-	clip_outputs = True, #Whether to clip spectrograms to T2_output_range (even in loss computation). ie: Don't penalize model for exceeding output range and bring back to borders.
-	lower_bound_decay = 0.1, #Small regularizer for noise synthesis by adding small range of penalty for silence regions. Set to 0 to clip in Tacotron range.
 
 	#Input parameters
 	embedding_dim = 512, #dimension of embedding space
@@ -144,9 +140,9 @@ hparams = tf.contrib.training.HParams(
 	#Attention synthesis constraints
 	#"Monotonic" constraint forces the model to only look at the forwards attention_win_size steps.
 	#"Window" allows the model to look at attention_win_size neighbors, both forward and backward steps.
-	synthesis_constraint = False,  #Whether to use attention windows constraints in synthesis only (Useful for long utterances synthesis)
+	synthesis_constraint = False,  #Whether to use attention windows constraints in synthesis only
 	synthesis_constraint_type = 'window', #can be in ('window', 'monotonic'). 
-	attention_win_size = 7, #Side of the window. Current step does not count. If mode is window and attention_win_size is not pair, the 1 extra is provided to backward part of the window.
+	attention_win_size = 7, #Side of the window. Current step does not count. If mode is window and attention_win_size is not pair, the 1 extra is provided to forward part of the window.
 
 	#Decoder
 	prenet_layers = [256, 256], #number of layers and number of units of prenet
@@ -173,7 +169,7 @@ hparams = tf.contrib.training.HParams(
 	mask_encoder = True, #whether to mask encoder padding while computing attention. Set to True for better prosody but slower convergence.
 	mask_decoder = False, #Whether to use loss mask for padded sequences (if False, <stop_token> loss function will not be weighted, else recommended pos_weight = 20)
 	cross_entropy_pos_weight = 1, #Use class weights to reduce the stop token classes imbalance (by adding more penalty on False Negatives (FN)) (1 = disabled)
-	predict_linear = True, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
+	predict_linear = False, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
 	###########################################################################################################################################
 
 	#Wavenet
@@ -188,42 +184,42 @@ hparams = tf.contrib.training.HParams(
 	input_type="raw", #Raw has better quality but harder to train. mulaw-quantize is easier to train but has lower quality.
 	quantize_channels=2**16,  # 65536 (16-bit) (raw) or 256 (8-bit) (mulaw or mulaw-quantize) // number of classes = 256 <=> mu = 255
 	use_bias = True, #Whether to use bias in convolutional layers of the Wavenet
-	legacy = True, #Whether to use legacy mode: Multiply all skip outputs but the first one with sqrt(0.5) (True for more early training stability, especially for large models)
-	residual_legacy = True, #Whether to scale residual blocks outputs by a factor of sqrt(0.5) (True for input variance preservation early in training and better overall stability)
+	legacy = False, #Whether to use legacy mode: Multiply all skip outputs but the first one with sqrt(0.5) (True for more early training stability, especially for large models)
+	residual_legacy = False, #Whether to scale residual blocks outputs by a factor of sqrt(0.5) (True for input variance preservation early in training and better overall stability)
 
 	#Model Losses parmeters
 	#Minimal scales ranges for MoL and Gaussian modeling
 	log_scale_min=float(np.log(1e-14)), #Mixture of logistic distributions minimal log scale
-	log_scale_min_gauss = float(np.log(1e-7)), #Gaussian distribution minimal allowed log scale
+	log_scale_min_gauss = float(np.log(9.1188196 * 1e-4)), #Gaussian distribution minimal allowed log scale
 	#Loss type
-	cdf_loss = False, #Whether to use CDF loss in Gaussian modeling. Advantages: non-negative loss term and more training stability. (Automatically True for MoL)
+	cdf_loss = True, #Whether to use CDF loss in Gaussian modeling. Advantages: non-negative loss term and more training stability. (Automatically True for MoL)
 
 	#model parameters
 	#To use Gaussian distribution as output distribution instead of mixture of logistics, set "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
-	out_channels = 2, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
-	layers = 20, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
-	stacks = 2, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
-	residual_channels = 128, #Number of residual block input/output channels.
-	gate_channels = 256, #split in 2 in gated convolutions
-	skip_out_channels = 128, #Number of residual block skip convolution channels.
+	out_channels = 30, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
+	layers = 24, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
+	stacks = 4, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
+	residual_channels = 256, #Number of residual block input/output channels.
+	gate_channels = 512, #split in 2 in gated convolutions
+	skip_out_channels = 256, #Number of residual block skip convolution channels.
 	kernel_size = 3, #The number of inputs to consider in dilated convolutions.
 
 	#Upsampling parameters (local conditioning)
 	cin_channels = 80, #Set this to -1 to disable local conditioning, else it must be equal to num_mels!!
-	#Upsample types: ('1D', '2D', 'Resize', 'SubPixel', 'NearestNeighbor')
+	upsample_conditional_features = True, #Whether to repeat conditional features or upsample them (The latter is recommended)
+	#Upsample types: ('1D', '2D', 'Resize', 'SubPixel')
 	#All upsampling initialization/kernel_size are chosen to omit checkerboard artifacts as much as possible. (Resize is designed to omit that by nature).
 	#To be specific, all initial upsample weights/biases (when NN_init=True) ensure that the upsampling layers act as a "Nearest neighbor upsample" of size "hop_size" (checkerboard free).
 	#1D spans all frequency bands for each frame (channel-wise) while 2D spans "freq_axis_kernel_size" bands at a time. Both are vanilla transpose convolutions.
 	#Resize is a 2D convolution that follows a Nearest Neighbor (NN) resize. For reference, this is: "NN resize->convolution".
-	#SubPixel (2D) is the ICNR version (initialized to be equivalent to "convolution->NN resize") of Sub-Pixel convolutions. also called "checkered artifact free sub-pixel conv".
-	#Finally, NearestNeighbor is a non-trainable upsampling layer that just expands each frame (or "pixel") to the equivalent hop size. Ignores all upsampling parameters.
-	upsample_type = 'SubPixel', #Type of the upsampling deconvolution. Can be ('1D' or '2D', 'Resize', 'SubPixel' or simple 'NearestNeighbor').
+	#Finally, SubPixel (2D) is the ICNR version (initialized to be equivalent to "convolution->NN resize") of Sub-Pixel convolutions. also called "checkered artifact free sub-pixel conv".
+	upsample_type = '2D', #Type of the upsampling deconvolution. Can be ('1D' or '2D', 'Resize', 'SubPixel').
 	upsample_activation = 'Relu', #Activation function used during upsampling. Can be ('LeakyRelu', 'Relu' or None)
-	upsample_scales = [11, 25], #prod(upsample_scales) should be equal to hop_size
+	upsample_scales = [5, 5, 11], #prod(upsample_scales) should be equal to hop_size
 	freq_axis_kernel_size = 3, #Only used for 2D upsampling types. This is the number of requency bands that are spanned at a time for each frame.
 	leaky_alpha = 0.4, #slope of the negative portion of LeakyRelu (LeakyRelu: y=x if x>0 else y=alpha * x)
 	NN_init = True, #Determines whether we want to initialize upsampling kernels/biases in a way to ensure upsample is initialize to Nearest neighbor upsampling. (Mostly for debug)
-	NN_scaler = 0.3, #Determines the initial Nearest Neighbor upsample values scale. i.e: upscaled_input_values = input_values * NN_scaler (1. to disable)
+	NN_scaler = 0.1, #Determines the initial Nearest Neighbor upsample values scale. i.e: upscaled_input_values = input_values * NN_scaler (1. to disable)
 
 	#global conditioning
 	gin_channels = -1, #Set this to -1 to disable global conditioning, Only used for multi speaker dataset. It defines the depth of the embeddings (Recommended: 16)
@@ -253,10 +249,10 @@ hparams = tf.contrib.training.HParams(
 	#Learning rate schedule
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	tacotron_start_decay = 40000, #Step at which learning decay starts
-	tacotron_decay_steps = 18000, #Determines the learning rate decay slope (UNDER TEST)
+	tacotron_decay_steps = 24500, #Determines the learning rate decay slope (UNDER TEST)
 	tacotron_decay_rate = 0.5, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
-	tacotron_final_learning_rate = 1e-4, #minimal learning rate
+	tacotron_final_learning_rate = 1e-5, #minimal learning rate
 
 	#Optimization parameters
 	tacotron_adam_beta1 = 0.9, #AdamOptimizer beta1 parameter
@@ -264,7 +260,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_adam_epsilon = 1e-6, #AdamOptimizer Epsilon parameter
 
 	#Regularization parameters
-	tacotron_reg_weight = 1e-6, #regularization weight (for L2 regularization)
+	tacotron_reg_weight = 1e-7, #regularization weight (for L2 regularization)
 	tacotron_scale_regularization = False, #Whether to rescale regularization weight to adapt for outputs range (used when reg_weight is high and biasing the model)
 	tacotron_zoneout_rate = 0.1, #zoneout rate for all LSTM cells in the network
 	tacotron_dropout_rate = 0.5, #dropout rate for all convolutional layers + prenet
@@ -308,7 +304,7 @@ hparams = tf.contrib.training.HParams(
 
 	#Learning rate schedule
 	wavenet_lr_schedule = 'exponential', #learning rate schedule. Can be ('exponential', 'noam')
-	wavenet_learning_rate = 1e-3, #wavenet initial learning rate
+	wavenet_learning_rate = 1e-4, #wavenet initial learning rate
 	wavenet_warmup = float(4000), #Only used with 'noam' scheme. Defines the number of ascending learning rate steps.
 	wavenet_decay_rate = 0.5, #Only used with 'exponential' scheme. Defines the decay rate.
 	wavenet_decay_steps = 200000, #Only used with 'exponential' scheme. Defines the decay steps.
@@ -341,31 +337,37 @@ hparams = tf.contrib.training.HParams(
 	#Eval/Debug parameters
 	#Eval sentences (if no eval text file was specified during synthesis, these sentences are used for eval)
 	sentences = [
-	# From Liepa database teksto_pavyzdys.txt:
-	'Paulius Grinkevičius',
-	'15min.lt',
-	'IT specialistai Lietuvoje ir toliau gyvens kaip karaliai – jų reiks 5 kartus daugiau, nei gali pasiūlyti aukštosios mokyklos',
-	'Per ateinančius trejus metus Lietuvoje informacinių technologijų ir ryšių (IRT) specialistų reikės penkis kartus daugiau, nei parengs mūsų aukštosios mokyklos. Tai stabdys tiek didelių, tiek ir smulkių bei vidutinių įmonių augimą ir lems dar didesnę konkurenciją IT sektoriuje, rodo INFOBALT atliktas IT specialistų poreikio tyrimas.',
-	'"INFOBALT" Inovacijų vadovas Andrius Plečkaitis antradienį apžvelgdamas pastarųjų metų IT specialistų poreikio augimo tendencijas sakė, kad darbo vietų poreikio augimas susijęs su užsienio kapitalo IT įmonių atėjimu į Lietuvą, taip pat auga ir vietos kapitalo įmonės – vien jų eksportas į užsienį pernai padidėjo 82 procentais.',
-	'Į informacines ir ryšių technologijas (IRT) stojančiųjų mažėja nuo 2008 m., kitąmet tikimasi, kad pirmą kartą per penkerius metus šis skaičius pradės augti.',
-	'Apklausę įmones matome, kad apie 90 proc. įmonių nori didinti darbuotojų skaičių. 2014–2016 metais reiks 17,5 tūkst. specialistų, aukštosios mokyklos paruoš 3,2 tūkstančių, – sako A.Plečkaitis. – Tokius rezultatus lemia įmonių, tarp jų ir startuolių, augimas. 46 proc. smulkių, iki dešimties darbuotojų turinčių įmonių artimiausiais metais žada plėstis ir samdyti naujų darbuotojų, mažos ir vidutinės – 11 proc., o stambios įmonės – 14 procentų.',
-	'Pasak A.Plečkaičio, didelį nerimą kelia ir tai, kad studijas baigia tik maždaug pusė įstojusių į IRT specialybes. Bendrai aukštąsias mokyklas Lietuvoje baigia daugiau kaip 62 proc. studentų, o IRT specialybių – 51 procentas.',
-	'Penki pasiūlymai per savaitę',
-	'Personalo atrankos įmonės "Alliance for Recruitment" partneris Vytenis Šidlauskas kalba, kad IRT specialistų poreikis dėl technologijų skverbties į mūsų gyvenimą bus dar didesnis.',
-	'Pasak jo, paprasti darbo skelbimai su siūlymais nebepatraukia darbuotojų dėmesio – esą bene vienintelis būdas prisivilioti gerą IT specialistą – jį pervilioti iš kitos įmonės. O toks darbuotojų persamdymas kenkia visai rinkai.',
-	'"Pralošia ir ta įmonė, kuri prisivilioja darbuotoją, taip pat ir ta, kuri jo netenka, nes reikia kelti atlyginimus. Šalies konkurencingumo mastu naudos praktiškai nėra. Mūsų jau nestebina, kad paskambinus IT specialistui pakviesti į darbo pokalbį šis sako – "esate penktas, kuris man skambina dėl IRT darbo šią savaitę", – pasakoja V.Šidlauskas.',
-	'Jis vidurinių mokyklų moksleivius ragina rinktis IT specialybes, kurios garantuos ir stabilias pajamas ateityje. V.Šidlauskas sako, kad IRT studijas baigęs ir maždaug trejų metų patirtį turintis specialistas nesunkiai per mėnesį gali uždirbti 4–5 tūkst. litų.',
-	'IT specialistų stygius kels paslaugų kainas',
-	'Švietimo ir mokslo ministerijos atstovas Rimantas Vaitkus sako, kad su IT specialistų trūkumu susiduriame ir kitose šalyse.',
-	'Pasak jo, IT specialistų poreikio problemas ketinama spręsti didinant valstybės užsakymų dalį į šias specialybes, pagerinus studijų apmokėjimo sąlygas.',
-	'Tyrime pateikiamos išvados, kad sparčiausiai turėtų augti stambios IT įmonės, o vidutinio dydžio IT įmonės konkuruos su didelėmis ir didins atlyginimus, o tai kels IT paslaugų ir produktų kainas.',
-	'Be to, problemų turės ir startuolių įmonės, nes šioms bus sunku pritraukti kvalifikuotų specialistų.',
-	]
+	# From July 8, 2017 New York Times:
+	'Scientists at the CERN laboratory say they have discovered a new particle.',
+	'There\'s a way to measure the acute emotional intelligence that has never gone out of style.',
+	'President Trump met with other leaders at the Group of 20 conference.',
+	'The Senate\'s bill to repeal and replace the Affordable Care Act is now imperiled.',
+	# From Google's Tacotron example page:
+	'Generative adversarial network or variational auto-encoder.',
+	'Basilar membrane and otolaryngology are not auto-correlations.',
+	'He has read the whole thing.',
+	'He reads books.',
+	'He thought it was time to present the present.',
+	'Thisss isrealy awhsome.',
+	'Punctuation sensitivity, is working.',
+	'Punctuation sensitivity is working.',
+	"Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?",
+	"She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.",
+	"Tajima Airport serves Toyooka.",
+	#From The web (random long utterance)
+	# 'On offering to help the blind man, the man who then stole his car, had not, at that precise moment, had any evil intention, quite the contrary, \
+	# what he did was nothing more than obey those feelings of generosity and altruism which, as everyone knows, \
+	# are the two best traits of human nature and to be found in much more hardened criminals than this one, a simple car-thief without any hope of advancing in his profession, \
+	# exploited by the real owners of this enterprise, for it is they who take advantage of the needs of the poor.',
+	# A final Thank you note!
+	'Thank you so much for your support!',
+	],
 
 	#Wavenet Debug
 	wavenet_synth_debug = False, #Set True to use target as debug in WaveNet synthesis. 
 	wavenet_debug_wavs = ['training_data/audio/audio-LJ001-0008.npy'], #Path to debug audios. Must be multiple of wavenet_num_gpus.
 	wavenet_debug_mels = ['training_data/mels/mel-LJ001-0008.npy'], #Path to corresponding mels. Must be of same length and order as wavenet_debug_wavs.
+
 	)
 
 def hparams_debug_string():

@@ -10,7 +10,7 @@ from tensorflow.python.framework import ops, tensor_shape
 from tensorflow.python.layers import base as layers_base
 from tensorflow.python.ops import rnn_cell_impl
 from tensorflow.python.util import nest
-from pkg_resources import parse_version
+
 
 class CustomDecoderOutput(
 		collections.namedtuple("CustomDecoderOutput", ("rnn_output", "token_output", "sample_id"))):
@@ -40,11 +40,7 @@ class CustomDecoder(decoder.Decoder):
 		Raises:
 			TypeError: if `cell`, `helper` or `output_layer` have an incorrect type.
 		"""
-		if (parse_version(tf.__version__) >= parse_version('1.10')):
-			rnn_cell_impl.assert_like_rnncell(type(cell), cell)
-		else:
-			if not rnn_cell_impl._like_rnncell(cell):  # pylint: disable=protected-access
-				raise TypeError("cell must be an RNNCell, received: %s" % type(cell))
+		rnn_cell_impl.assert_like_rnncell(type(cell), cell)
 		if not isinstance(helper, helper_py.Helper):
 			raise TypeError("helper must be a Helper, received: %s" % type(helper))
 		if (output_layer is not None

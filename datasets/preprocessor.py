@@ -69,13 +69,23 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 			wav_path))
 		return None
 
+	#Trim lead/trail silences
+	if hparams.trim_silence:
+		wav = audio.trim_silence(wav, hparams)
+
+	#Pre-emphasize
+	preem_wav = audio.preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
+
 	#rescale wav
 	if hparams.rescale:
 		wav = wav / np.abs(wav).max() * hparams.rescaling_max
+		preem_wav = preem_wav / np.abs(preem_wav).max() * hparams.rescaling_max
 
-	#M-AILABS extra silence specific
-	if hparams.trim_silence:
-		wav = audio.trim_silence(wav, hparams)
+		#Assert all audio is in [-1, 1]
+		if (wav > 1.).any() or (wav < -1.).any():
+			raise RuntimeError('wav has invalid value: {}'.format(wav_path))
+		if (preem_wav > 1.).any() or (preem_wav < -1.).any():
+			raise RuntimeError('wav has invalid value: {}'.format(wav_path))
 
 	#Mu-law quantize
 	if is_mulaw_quantize(hparams.input_type):
@@ -85,6 +95,7 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 		#Trim silences
 		start, end = audio.start_and_end_indices(out, hparams.silence_threshold)
 		wav = wav[start: end]
+		preem_wav = preem_wav[start: end]
 		out = out[start: end]
 
 		constant_values = mulaw_quantize(0, hparams.quantize_channels)
@@ -103,25 +114,33 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 		out_dtype = np.float32
 
 	# Compute the mel scale spectrogram from the wav
-	mel_spectrogram = audio.melspectrogram(wav, hparams).astype(np.float32)
+	mel_spectrogram = audio.melspectrogram(preem_wav, hparams).astype(np.float32)
 	mel_frames = mel_spectrogram.shape[1]
 
 	if mel_frames > hparams.max_mel_frames and hparams.clip_mels_length:
 		return None
 
 	#Compute the linear scale spectrogram from the wav
-	linear_spectrogram = audio.linearspectrogram(wav, hparams).astype(np.float32)
+	linear_spectrogram = audio.linearspectrogram(preem_wav, hparams).astype(np.float32)
 	linear_frames = linear_spectrogram.shape[1]
 
 	#sanity check
 	assert linear_frames == mel_frames
 
-	#Ensure time resolution adjustement between audio and mel-spectrogram
-	fft_size = hparams.n_fft if hparams.win_size is None else hparams.win_size
-	l, r = audio.pad_lr(wav, fft_size, audio.get_hop_size(hparams))
+	if hparams.use_lws:
+		#Ensure time resolution adjustement between audio and mel-spectrogram
+		fft_size = hparams.n_fft if hparams.win_size is None else hparams.win_size
+		l, r = audio.pad_lr(wav, fft_size, audio.get_hop_size(hparams))
 
-	#Zero pad for quantized signal
-	out = np.pad(out, (l, r), mode='constant', constant_values=constant_values)
+		#Zero pad audio signal
+		out = np.pad(out, (l, r), mode='constant', constant_values=constant_values)
+	else:
+		#Ensure time resolution adjustement between audio and mel-spectrogram
+		l_pad, r_pad = audio.librosa_pad_lr(wav, hparams.n_fft, audio.get_hop_size(hparams), hparams.wavenet_pad_sides)
+
+		#Reflect pad audio signal on the right (Just like it's done in Librosa to avoid frame inconsistency)
+		out = np.pad(out, (l_pad, r_pad), mode='constant', constant_values=constant_values)
+
 	assert len(out) >= mel_frames * audio.get_hop_size(hparams)
 
 	#time resolution adjustement

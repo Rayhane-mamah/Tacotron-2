@@ -14,8 +14,20 @@ def save_wav(wav, path, sr):
 	#proposed by @dsmiller
 	wavfile.write(path, sr, wav.astype(np.int16))
 
-def save_wavenet_wav(wav, path, sr):
-	librosa.output.write_wav(path, wav, sr=sr)
+def save_wavenet_wav(wav, path, sr, inv_preemphasize, k):
+	# wav = inv_preemphasis(wav, k, inv_preemphasize)
+	wav *= 32767 / max(0.01, np.max(np.abs(wav)))
+	wavfile.write(path, sr, wav.astype(np.int16))
+
+def preemphasis(wav, k, preemphasize=True):
+	if preemphasize:
+		return signal.lfilter([1, -k], [1], wav)
+	return wav
+
+def inv_preemphasis(wav, k, inv_preemphasize=True):
+	if inv_preemphasize:
+		return signal.lfilter([1], [1, -k], wav)
+	return wav
 
 #From https://github.com/r9y9/wavenet_vocoder/blob/master/audio.py
 def start_and_end_indices(quantized, silence_threshold=2):
@@ -47,16 +59,18 @@ def get_hop_size(hparams):
 	return hop_size
 
 def linearspectrogram(wav, hparams):
+	# D = _stft(preemphasis(wav, hparams.preemphasis, hparams.preemphasize), hparams)
 	D = _stft(wav, hparams)
-	S = _amp_to_db(np.abs(D), hparams) - hparams.ref_level_db
+	S = _amp_to_db(np.abs(D)**hparams.magnitude_power, hparams) - hparams.ref_level_db
 
 	if hparams.signal_normalization:
 		return _normalize(S, hparams)
 	return S
 
 def melspectrogram(wav, hparams):
+	# D = _stft(preemphasis(wav, hparams.preemphasis, hparams.preemphasize), hparams)
 	D = _stft(wav, hparams)
-	S = _amp_to_db(_linear_to_mel(np.abs(D), hparams), hparams) - hparams.ref_level_db
+	S = _amp_to_db(_linear_to_mel(np.abs(D)**hparams.magnitude_power, hparams), hparams) - hparams.ref_level_db
 
 	if hparams.signal_normalization:
 		return _normalize(S, hparams)
@@ -69,15 +83,15 @@ def inv_linear_spectrogram(linear_spectrogram, hparams):
 	else:
 		D = linear_spectrogram
 
-	S = _db_to_amp(D + hparams.ref_level_db) #Convert back to linear
+	S = _db_to_amp(D + hparams.ref_level_db)**(1/hparams.magnitude_power) #Convert back to linear
 
 	if hparams.use_lws:
 		processor = _lws_processor(hparams)
 		D = processor.run_lws(S.astype(np.float64).T ** hparams.power)
 		y = processor.istft(D).astype(np.float32)
-		return y
+		return inv_preemphasis(y, hparams.preemphasis, hparams.preemphasize)
 	else:
-		return _griffin_lim(S ** hparams.power, hparams)
+		return inv_preemphasis(_griffin_lim(S ** hparams.power, hparams), hparams.preemphasis, hparams.preemphasize)
 
 
 def inv_mel_spectrogram(mel_spectrogram, hparams):
@@ -87,15 +101,48 @@ def inv_mel_spectrogram(mel_spectrogram, hparams):
 	else:
 		D = mel_spectrogram
 
-	S = _mel_to_linear(_db_to_amp(D + hparams.ref_level_db), hparams)  # Convert back to linear
+	S = _mel_to_linear(_db_to_amp(D + hparams.ref_level_db)**(1/hparams.magnitude_power), hparams)  # Convert back to linear
 
 	if hparams.use_lws:
 		processor = _lws_processor(hparams)
 		D = processor.run_lws(S.astype(np.float64).T ** hparams.power)
 		y = processor.istft(D).astype(np.float32)
-		return y
+		return inv_preemphasis(y, hparams.preemphasis, hparams.preemphasize)
 	else:
-		return _griffin_lim(S ** hparams.power, hparams)
+		return inv_preemphasis(_griffin_lim(S ** hparams.power, hparams), hparams.preemphasis, hparams.preemphasize)
+
+###########################################################################################
+# tensorflow Griffin-Lim
+# Thanks to @begeekmyfriend: https://github.com/begeekmyfriend/Tacotron-2/blob/mandarin-new/datasets/audio.py
+
+def inv_linear_spectrogram_tensorflow(spectrogram, hparams):
+	'''Builds computational graph to convert spectrogram to waveform using TensorFlow.
+	Unlike inv_spectrogram, this does NOT invert the preemphasis. The caller should call
+	inv_preemphasis on the output after running the graph.
+	'''
+	if hparams.signal_normalization:
+		D = _denormalize_tensorflow(spectrogram, hparams)
+	else:
+		D = linear_spectrogram
+
+	S = tf.pow(_db_to_amp_tensorflow(D + hparams.ref_level_db), (1/hparams.magnitude_power))
+	return _griffin_lim_tensorflow(tf.pow(S, hparams.power), hparams)
+
+def inv_mel_spectrogram_tensorflow(mel_spectrogram, hparams):
+	'''Builds computational graph to convert mel spectrogram to waveform using TensorFlow.
+	Unlike inv_mel_spectrogram, this does NOT invert the preemphasis. The caller should call
+	inv_preemphasis on the output after running the graph.
+	'''
+	if hparams.signal_normalization:
+		D = _denormalize_tensorflow(mel_spectrogram, hparams)
+	else:
+		D = mel_spectrogram
+
+	S = tf.pow(_db_to_amp_tensorflow(D + hparams.ref_level_db), (1/hparams.magnitude_power))
+	S = _mel_to_linear_tensorflow(S, hparams)  # Convert back to linear
+	return _griffin_lim_tensorflow(tf.pow(S, hparams.power), hparams)
+
+###########################################################################################
 
 def _lws_processor(hparams):
 	import lws
@@ -113,15 +160,32 @@ def _griffin_lim(S, hparams):
 		y = _istft(S_complex * angles, hparams)
 	return y
 
+def _griffin_lim_tensorflow(S, hparams):
+	'''TensorFlow implementation of Griffin-Lim
+	Based on https://github.com/Kyubyong/tensorflow-exercises/blob/master/Audio_Processing.ipynb
+	'''
+	with tf.variable_scope('griffinlim'):
+		# TensorFlow's stft and istft operate on a batch of spectrograms; create batch of size 1
+		S = tf.expand_dims(S, 0)
+		S_complex = tf.identity(tf.cast(S, dtype=tf.complex64))
+		y = tf.contrib.signal.inverse_stft(S_complex, hparams.win_size, get_hop_size(hparams), hparams.n_fft)
+		for i in range(hparams.griffin_lim_iters):
+			est = tf.contrib.signal.stft(y, hparams.win_size, get_hop_size(hparams), hparams.n_fft)
+			angles = est / tf.cast(tf.maximum(1e-8, tf.abs(est)), tf.complex64)
+			y = tf.contrib.signal.inverse_stft(S_complex * angles, hparams.win_size, get_hop_size(hparams), hparams.n_fft)
+	return tf.squeeze(y, 0)
+
 def _stft(y, hparams):
 	if hparams.use_lws:
 		return _lws_processor(hparams).stft(y).T
 	else:
-		return librosa.stft(y=y, n_fft=hparams.n_fft, hop_length=get_hop_size(hparams), win_length=hparams.win_size)
+		return librosa.stft(y=y, n_fft=hparams.n_fft, hop_length=get_hop_size(hparams), win_length=hparams.win_size, pad_mode='constant')
 
 def _istft(y, hparams):
 	return librosa.istft(y, hop_length=get_hop_size(hparams), win_length=hparams.win_size)
 
+##########################################################
+#Those are only correct when using lws!!! (This was messing with Wavenet quality for a long time!)
 def num_frames(length, fsize, fshift):
 	"""Compute number of time frames of spectrogram
 	"""
@@ -141,7 +205,18 @@ def pad_lr(x, fsize, fshift):
 	T = len(x) + 2 * pad
 	r = (M - 1) * fshift + fsize - T
 	return pad, pad + r
-
+##########################################################
+#Librosa correct padding
+def librosa_pad_lr(x, fsize, fshift, pad_sides=1):
+	'''compute right padding (final frame) or both sides padding (first and final frames)
+	'''
+	assert pad_sides in (1, 2)
+	# return int(fsize // 2)
+	pad = (x.shape[0] // fshift + 1) * fshift - x.shape[0]
+	if pad_sides == 1:
+		return 0, pad
+	else:
+		return pad // 2, pad // 2 + pad % 2
 
 # Conversions
 _mel_basis = None
@@ -159,6 +234,12 @@ def _mel_to_linear(mel_spectrogram, hparams):
 		_inv_mel_basis = np.linalg.pinv(_build_mel_basis(hparams))
 	return np.maximum(1e-10, np.dot(_inv_mel_basis, mel_spectrogram))
 
+def _mel_to_linear_tensorflow(mel_spectrogram, hparams):
+	global _inv_mel_basis
+	if _inv_mel_basis is None:
+		_inv_mel_basis = np.linalg.pinv(_build_mel_basis(hparams))
+	return tf.transpose(tf.maximum(1e-10, tf.matmul(tf.cast(_inv_mel_basis, tf.float32), tf.transpose(mel_spectrogram, [1, 0]))), [1, 0])
+
 def _build_mel_basis(hparams):
 	assert hparams.fmax <= hparams.sample_rate // 2
 	return librosa.filters.mel(hparams.sample_rate, hparams.n_fft, n_mels=hparams.num_mels,
@@ -170,6 +251,9 @@ def _amp_to_db(x, hparams):
 
 def _db_to_amp(x):
 	return np.power(10.0, (x) * 0.05)
+
+def _db_to_amp_tensorflow(x):
+	return tf.pow(tf.ones(tf.shape(x)) * 10.0, x * 0.05)
 
 def _normalize(S, hparams):
 	if hparams.allow_clipping_in_normalization:
@@ -193,6 +277,20 @@ def _denormalize(D, hparams):
 				+ hparams.min_level_db)
 		else:
 			return ((np.clip(D, 0, hparams.max_abs_value) * -hparams.min_level_db / hparams.max_abs_value) + hparams.min_level_db)
+
+	if hparams.symmetric_mels:
+		return (((D + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value)) + hparams.min_level_db)
+	else:
+		return ((D * -hparams.min_level_db / hparams.max_abs_value) + hparams.min_level_db)
+
+def _denormalize_tensorflow(D, hparams):
+	if hparams.allow_clipping_in_normalization:
+		if hparams.symmetric_mels:
+			return (((tf.clip_by_value(D, -hparams.max_abs_value,
+				hparams.max_abs_value) + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value))
+				+ hparams.min_level_db)
+		else:
+			return ((tf.clip_by_value(D, 0, hparams.max_abs_value) * -hparams.min_level_db / hparams.max_abs_value) + hparams.min_level_db)
 
 	if hparams.symmetric_mels:
 		return (((D + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value)) + hparams.min_level_db)

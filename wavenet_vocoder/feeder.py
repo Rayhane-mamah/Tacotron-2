@@ -13,7 +13,7 @@ from .util import is_mulaw_quantize, is_scalar_input
 
 
 
-_batches_per_group = 32
+_batches_per_group = 64
 
 
 class Feeder:
@@ -29,9 +29,9 @@ class Feeder:
 		self._test_offset = 0
 
 		if hparams.symmetric_mels:
-			self._spec_pad = -(hparams.max_abs_value + .1)
+			self._spec_pad = -hparams.max_abs_value
 		else:
-			self._spec_pad = -0.1
+			self._spec_pad = 0.
 
 		#Base directory of the project (to map files from different locations)
 		self._base_dir = base_dir
@@ -52,7 +52,7 @@ class Feeder:
 			test_size=test_size, random_state=hparams.wavenet_data_random_state)
 
 		#Make sure test size is a multiple of batch size else round up
-		len_test_indices = _round_up(len(test_indices), hparams.wavenet_batch_size)
+		len_test_indices = _round_down(len(test_indices), hparams.wavenet_batch_size)
 		extra_test = test_indices[len_test_indices:]
 		test_indices = test_indices[:len_test_indices]
 		train_indices = np.concatenate([train_indices, extra_test])
@@ -96,7 +96,7 @@ class Feeder:
 				queue_types.append(tf.int32)
 
 			# Create queue for buffering data
-			queue = tf.FIFOQueue(8, queue_types, name='intput_queue')
+			queue = tf.FIFOQueue(8, queue_types, name='input_queue')
 			self._enqueue_op = queue.enqueue(self._placeholders)
 			variables = queue.dequeue()
 
@@ -107,20 +107,22 @@ class Feeder:
 			self.input_lengths = variables[2]
 			self.input_lengths.set_shape(self._placeholders[2].shape)
 
+			idx = 3
+
 			#If local conditioning disabled override c inputs with None
 			if hparams.cin_channels < 0:
 				self.local_condition_features = None
 			else:
-				self.local_condition_features = variables[3]
-				self.local_condition_features.set_shape(self._placeholders[3].shape)
+				self.local_condition_features = variables[idx]
+				self.local_condition_features.set_shape(self._placeholders[idx].shape)
+				idx += 1
 
 			#If global conditioning disabled override g inputs with None
 			if hparams.gin_channels < 0:
 				self.global_condition_features = None
 			else:
-				self.global_condition_features = variables[4]
-				self.global_condition_features.set_shape(self._placeholders[4].shape)
-
+				self.global_condition_features = variables[idx]
+				self.global_condition_features.set_shape(self._placeholders[idx].shape)
 
 			# Create queue for buffering eval data
 			eval_queue = tf.FIFOQueue(1, queue_types, name='eval_queue')
@@ -134,20 +136,22 @@ class Feeder:
 			self.eval_input_lengths = eval_variables[2]
 			self.eval_input_lengths.set_shape(self._placeholders[2].shape)
 
+			eval_idx = 3
+
 			#If local conditioning disabled override c inputs with None
 			if hparams.cin_channels < 0:
 				self.eval_local_condition_features = None
 			else:
-				self.eval_local_condition_features = eval_variables[3]
-				self.eval_local_condition_features.set_shape(self._placeholders[3].shape)
+				self.eval_local_condition_features = eval_variables[eval_idx]
+				self.eval_local_condition_features.set_shape(self._placeholders[eval_idx].shape)
+				eval_idx += 1
 
 			#If global conditioning disabled override g inputs with None
 			if hparams.gin_channels < 0:
 				self.eval_global_condition_features = None
 			else:
-				self.eval_global_condition_features = eval_variables[4]
-				self.eval_global_condition_features.set_shape(self._placeholders[4].shape)
-
+				self.eval_global_condition_features = eval_variables[eval_idx]
+				self.eval_global_condition_features.set_shape(self._placeholders[eval_idx].shape)
 
 
 	def start_threads(self, session):
@@ -259,30 +263,34 @@ class Feeder:
 		return (input_data, local_condition_features, global_condition_features, len(input_data))
 
 
-	def _prepare_batch(self, batch):
-		np.random.shuffle(batch)
+	def _prepare_batch(self, batches):
+		assert 0 == len(batches) % self._hparams.wavenet_num_gpus
+		size_per_device = int(len(batches) / self._hparams.wavenet_num_gpus)
+		np.random.shuffle(batches)
 
 		#Limit time steps to save GPU Memory usage
 		max_time_steps = self._limit_time()
 		#Adjust time resolution for upsampling
-		batch = self._adjust_time_resolution(batch, self.local_condition, max_time_steps)
+		batches = self._adjust_time_resolution(batches, self.local_condition, max_time_steps)
 
 		#time lengths
-		input_lengths = [len(x[0]) for x in batch]
+		input_lengths = np.asarray([len(x[0]) for x in batches], np.int32)
 		max_input_length = max(input_lengths)
 
-		inputs = self._prepare_inputs([x[0] for x in batch], max_input_length)
-		targets = self._prepare_targets([x[0] for x in batch], max_input_length)
-		local_condition_features = self._prepare_local_conditions(self.local_condition, [x[1] for x in batch])
-		global_condition_features = self._prepare_global_conditions(self.global_condition, [x[2] for x in batch])
+		#Since all inputs/targets will have the same lengths for all GPUs, we can simply treat all GPUs batches as one big batch and stack all data. (fixed length)
+		inputs = self._prepare_inputs([x[0] for x in batches], max_input_length)
+		targets = self._prepare_targets([x[0] for x in batches], max_input_length)
+		local_condition_features = self._prepare_local_conditions(self.local_condition, [x[1] for x in batches])
+		global_condition_features = self._prepare_global_conditions(self.global_condition, [x[2] for x in batches])
 
-		new_batch = (inputs, targets, input_lengths)
+		#Create final batches
+		new_batches = (inputs, targets, input_lengths)
 		if local_condition_features is not None:
-			new_batch += (local_condition_features, )
+			new_batches += (local_condition_features, )
 		if global_condition_features is not None:
-			new_batch += (global_condition_features, )
+			new_batches += (global_condition_features, )
 
-		return new_batch
+		return new_batches
 
 	def _prepare_inputs(self, inputs, maxlen):
 		if is_mulaw_quantize(self._hparams.input_type):
@@ -310,11 +318,13 @@ class Feeder:
 
 	def _prepare_local_conditions(self, local_condition, c_features):
 		if local_condition:
-
 			maxlen = max([len(x) for x in c_features])
 			#[-max, max] or [0,max]
 			T2_output_range = (-self._hparams.max_abs_value, self._hparams.max_abs_value) if self._hparams.symmetric_mels else (0, self._hparams.max_abs_value)
 
+			if self._hparams.clip_for_wavenet:
+				c_features = [np.clip(x, T2_output_range[0], T2_output_range[1]) for x in c_features]
+				
 			c_batch = np.stack([_pad_inputs(x, maxlen, _pad=T2_output_range[0]) for x in c_features]).astype(np.float32)
 			assert len(c_batch.shape) == 3
 			#[batch_size, c_channels, time_steps]
@@ -322,16 +332,20 @@ class Feeder:
 
 			if self._hparams.normalize_for_wavenet:
 				#rerange to [0, 1]
-				c_batch = np.interp(c_batch, T2_output_range, (0, 1))
+				c_batch = _interp(c_batch, T2_output_range).astype(np.float32)
+
 		else:
 			c_batch = None
+
 		return c_batch
 
 	def _prepare_global_conditions(self, global_condition, g_features):
 		if global_condition:
 			g_batch = np.array(g_features).astype(np.int32).reshape(-1, 1)
+
 		else:
 			g_batch = None
+
 		return g_batch
 
 	def _check_conditions(self):
@@ -344,8 +358,10 @@ class Feeder:
 		'''
 		if self._hparams.max_time_sec is not None:
 			return int(self._hparams.max_time_sec * self._hparams.sample_rate)
+
 		elif self._hparams.max_time_steps is not None:
 			return self._hparams.max_time_steps
+
 		else:
 			return None
 
@@ -369,6 +385,7 @@ class Feeder:
 
 				new_batch.append((x, c, g, l))
 			return new_batch
+
 		else:
 			new_batch = []
 			for b in batch:
@@ -383,6 +400,7 @@ class Feeder:
 	def _assert_ready_for_upsample(self, x, c):
 		assert len(x) % len(c) == 0 and len(x) // len(c) == audio.get_hop_size(self._hparams)
 
+
 def _pad_inputs(x, maxlen, _pad=0):
 	return np.pad(x, [(0, maxlen - len(x)), (0, 0)], mode='constant', constant_values=_pad)
 
@@ -393,6 +411,10 @@ def _round_up(x, multiple):
 	remainder = x % multiple
 	return x if remainder == 0 else x + multiple - remainder
 
+def _round_down(x, multiple):
+	remainder = x % multiple
+	return x if remainder == 0 else x - remainder
+
 def _ensure_divisible(length, divisible_by=256, lower=True):
 	if length % divisible_by == 0:
 		return length
@@ -400,3 +422,7 @@ def _ensure_divisible(length, divisible_by=256, lower=True):
 		return length - length % divisible_by
 	else:
 		return length + (divisible_by - length % divisible_by)
+
+def _interp(feats, in_range):
+	#rescales from [-max, max] (or [0, max]) to [0, 1]
+	return (feats - in_range[0]) / (in_range[1] - in_range[0])
